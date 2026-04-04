@@ -63,7 +63,7 @@ function render(): void {
         <div class="dash-hdr">
           <span class="dash-logo">drift</span>
           <div class="dash-controls">
-            <button class="icon-btn" id="btn-theme">${getTheme() === "dark" ? icons.sun(16) : icons.moon(16)}</button>
+            <button class="icon-btn" id="btn-theme">${getTheme() === "dark" ? icons.moon(16) : icons.sun(16)}</button>
           </div>
         </div>
         <div class="dash-empty">Tracking active. Browse the web and come back.</div>
@@ -101,7 +101,7 @@ function render(): void {
         <span class="dash-logo">drift</span>
         <div class="dash-controls">
           <select class="dash-select" id="session-select">${options}</select>
-          <button class="icon-btn" id="btn-theme">${getTheme() === "dark" ? icons.sun(16) : icons.moon(16)}</button>
+          <button class="icon-btn" id="btn-theme">${getTheme() === "dark" ? icons.moon(16) : icons.sun(16)}</button>
           <button class="icon-btn" id="btn-export">${icons.download(16)}</button>
         </div>
       </div>

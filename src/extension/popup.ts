@@ -52,7 +52,7 @@ function render(): void {
         <span class="hdr-logo">drift</span>
         <div class="hdr-right">
           <span class="hdr-dot"></span>
-          <button class="hdr-btn" id="btn-theme">${isDark ? icons.sun(15) : icons.moon(15)}</button>
+          <button class="hdr-btn" id="btn-theme">${isDark ? icons.moon(15) : icons.sun(15)}</button>
         </div>
       </div>
       ${latest ? renderSession(latest) : '<div class="empty">Tracking active. Browse the web and check back here.</div>'}
