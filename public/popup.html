@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drift</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 420px;
+      max-height: 560px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a2e;
+      background: #fafafa;
+      overflow-y: auto;
+    }
+    header {
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+    .badge {
+      font-size: 11px;
+      background: rgba(255,255,255,0.2);
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+    .actions {
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      font-size: 12px;
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #f0f0f0; }
+    button.primary {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    button.primary:hover { background: #5a6fd6; }
+    .section {
+      padding: 10px 16px;
+    }
+    .section h2 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .stat-card .label { font-size: 11px; color: #888; }
+    .stat-card .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .stat-card .value.productive { color: #2ecc71; }
+    .stat-card .value.distraction { color: #e74c3c; }
+    .stat-card .value.neutral { color: #95a5a6; }
+    .event-list { list-style: none; }
+    .event-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .event-list li:last-child { border-bottom: none; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .dot.productive { background: #2ecc71; }
+    .dot.distraction { background: #e74c3c; }
+    .dot.neutral { background: #95a5a6; }
+    .event-domain { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .event-time { font-size: 11px; color: #999; flex-shrink: 0; }
+    .drift-badge {
+      font-size: 10px;
+      background: #e74c3c;
+      color: white;
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .summary-label {
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .narrative {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    #empty-state {
+      text-align: center;
+      padding: 40px 16px;
+      color: #999;
+    }
+    #empty-state p { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Drift</h1>
+    <span class="badge" id="event-count">0 events</span>
+  </header>
+
+  <div class="actions">
+    <button class="primary" id="btn-process">Process Sessions</button>
+    <button id="btn-load-mock">Load Mock Data</button>
+    <button id="btn-export">Export JSON</button>
+    <button id="btn-clear">Clear</button>
+  </div>
+
+  <div id="content">
+    <div id="empty-state">
+      <strong>No sessions yet</strong>
+      <p>Browse the web or load mock data to begin.</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
