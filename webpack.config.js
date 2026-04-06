@@ -8,6 +8,7 @@ module.exports = {
     background: "./src/extension/background.ts",
     popup: "./src/extension/popup.ts",
     dashboard: "./src/ui/dashboard.ts",
+    settings: "./src/ui/settings.ts",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -48,6 +49,11 @@ module.exports = {
       template: "./src/ui/dashboard.html",
       filename: "dashboard.html",
       chunks: ["dashboard"],
+    }),
+    new HtmlWebpackPlugin({
+      template: "./src/ui/settings.html",
+      filename: "settings.html",
+      chunks: ["settings"],
     }),
   ],
   optimization: {

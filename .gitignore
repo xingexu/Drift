@@ -3,3 +3,6 @@ dist/
 *.map
 .DS_Store
 .claude/
+backend/node_modules/
+backend/dist/
+backend/.env

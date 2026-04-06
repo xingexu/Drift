@@ -75,8 +75,26 @@ function matchesDomainSet(domain: string, domainSet: Set<string>): boolean {
 // Classify a single event
 // ---------------------------------------------------------------------------
 
+// User overrides (loaded from settings at runtime)
+let userOverrides: Record<string, Category> = {};
+
+export function setUserOverrides(overrides: Record<string, Category>): void {
+  userOverrides = overrides;
+}
+
 export function classifyEvent(event: BrowsingEvent): Classification {
   const domain = event.domain;
+
+  // Check user overrides first
+  for (const [overrideDomain, category] of Object.entries(userOverrides)) {
+    if (domain === overrideDomain || domain.endsWith(`.${overrideDomain}`)) {
+      return {
+        category,
+        reason: "user-defined domain override",
+        source: "user_override",
+      };
+    }
+  }
 
   if (matchesDomainSet(domain, PRODUCTIVE_DOMAINS)) {
     return {

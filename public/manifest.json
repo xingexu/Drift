@@ -1,14 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Drift",
-  "version": "1.0.0",
-  "description": "Tracks where your attention goes during browsing sessions. Detects drift moments when focus shifts.",
+  "version": "1.2.0",
+  "description": "Know where your time goes. Drift tracks browsing sessions and shows exactly when you lose focus.",
   "permissions": [
     "tabs",
     "activeTab",
     "storage",
-    "idle"
+    "idle",
+    "identity",
+    "notifications"
   ],
+  "host_permissions": [
+    "https://*.supabase.co/*"
+  ],
+  "oauth2": {
+    "scopes": ["openid", "email", "profile"]
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -27,5 +35,11 @@
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
+  },
+  "commands": {
+    "toggle-tracking": {
+      "suggested_key": { "default": "Ctrl+Shift+D", "mac": "Command+Shift+D" },
+      "description": "Toggle session tracking"
+    }
   }
 }

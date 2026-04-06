@@ -217,3 +217,64 @@ export interface SessionSummary {
   summaryLabel: string;
   narrative: string;
 }
+
+// ---------------------------------------------------------------------------
+// Session History (persisted summaries for past sessions)
+// ---------------------------------------------------------------------------
+
+export interface SessionHistoryEntry {
+  sessionId: string;
+  startTime: number;
+  endTime: number;
+  totalActiveTimeMs: number;
+  productiveTimeMs: number;
+  neutralTimeMs: number;
+  distractionTimeMs: number;
+  driftScore: number;
+  driftPointCount: number;
+  summaryLabel: string;
+  entryDomain: string;
+  exitDomain: string;
+  topDomains: { domain: string; timeMs: number }[];
+  eventCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Report (aggregated across sessions)
+// ---------------------------------------------------------------------------
+
+export interface WeeklyReport {
+  periodStart: number;
+  periodEnd: number;
+  sessionCount: number;
+  totalTimeMs: number;
+  productiveTimeMs: number;
+  neutralTimeMs: number;
+  distractionTimeMs: number;
+  averageDriftScore: number;
+  topDomains: { domain: string; timeMs: number }[];
+}
+
+// ---------------------------------------------------------------------------
+// Monthly Report (aggregated across sessions, 30 days)
+// ---------------------------------------------------------------------------
+
+export interface MonthlyReport {
+  periodStart: number;
+  periodEnd: number;
+  sessionCount: number;
+  totalTimeMs: number;
+  productiveTimeMs: number;
+  neutralTimeMs: number;
+  distractionTimeMs: number;
+  averageDriftScore: number;
+  topDomains: { domain: string; timeMs: number }[];
+  // Weekly trend: drift scores per week for sparkline
+  weeklyTrend: { weekStart: number; driftScore: number; totalMs: number }[];
+  // Daily average
+  dailyAverageMs: number;
+  // Best/worst days
+  bestDay: { date: number; driftScore: number } | null;
+  worstDay: { date: number; driftScore: number } | null;
+}
+

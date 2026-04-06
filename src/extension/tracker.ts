@@ -14,7 +14,8 @@ import {
   normalizeUrl,
   generateId,
 } from "../core/normalize";
-import { appendEvent } from "./storage";
+import { appendEvent, loadSettings } from "./storage";
+import { classifyEvent } from "../core/classify";
 
 const MIN_EVENT_DURATION_MS = 500;
 const TRACKING_ENABLED_KEY = "drift_tracking_enabled";
@@ -23,6 +24,9 @@ let trackingEnabled = true;
 let activeEvent: RawTrackerEvent | null = null;
 let previousEventId: string | null = null;
 let lastFinalizedUrl: string | null = null;
+let lastFinalizedCategory: string | null = null;
+let driftCount = 0;
+let firstDriftNotified = false;
 
 // ---------------------------------------------------------------------------
 // Finalize the currently active event
@@ -67,8 +71,58 @@ function finalizeActiveEvent(
   lastFinalizedUrl = event.rawUrl;
   activeEvent = null;
 
+  // Drift detection: check category shift for badge
+  const classification = classifyEvent(event);
+  const currentCategory = classification.category;
+
+  if (lastFinalizedCategory === "productive" && currentCategory === "distraction") {
+    driftCount++;
+    updateBadge(driftCount);
+
+    // Notify on first drift of session (if notifications enabled)
+    if (!firstDriftNotified) {
+      firstDriftNotified = true;
+      loadSettings().then((settings) => {
+        if (settings.notifications) {
+          try {
+            chrome.notifications.create(`drift-${Date.now()}`, {
+              type: "basic",
+              iconUrl: "icons/icon-128.png",
+              title: "Drift detected",
+              message: `You drifted to ${event.domain}`,
+              priority: 1,
+            });
+          } catch {}
+        }
+      }).catch(() => {});
+    }
+  }
+  lastFinalizedCategory = currentCategory;
+
   appendEvent(event).catch(() => {});
   return event;
+}
+
+// ---------------------------------------------------------------------------
+// Badge helpers
+// ---------------------------------------------------------------------------
+
+function updateBadge(count: number): void {
+  try {
+    if (count > 0) {
+      chrome.action.setBadgeText({ text: String(count) });
+      chrome.action.setBadgeBackgroundColor({ color: "#c43c3c" });
+    } else {
+      chrome.action.setBadgeText({ text: "" });
+    }
+  } catch {}
+}
+
+export function resetDriftCount(): void {
+  driftCount = 0;
+  firstDriftNotified = false;
+  lastFinalizedCategory = null;
+  updateBadge(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,9 +178,14 @@ export function installListeners(): void {
     });
     chrome.storage.onChanged.addListener((changes) => {
       if (TRACKING_ENABLED_KEY in changes) {
+        const wasEnabled = trackingEnabled;
         trackingEnabled = changes[TRACKING_ENABLED_KEY].newValue !== false;
         if (!trackingEnabled) {
           finalizeActiveEvent("unknown");
+        }
+        // Reset badge on session start or end
+        if (wasEnabled !== trackingEnabled) {
+          resetDriftCount();
         }
       }
     });
