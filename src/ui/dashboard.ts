@@ -144,8 +144,11 @@ function renderShimmer(): string {
         <div class="shimmer-metric"><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
         <div class="shimmer-metric"><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
         <div class="shimmer-metric"><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
+        <div class="shimmer-metric"><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
       </div>
       <div class="shimmer-rows">
+        <div class="shimmer-row"><div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
+        <div class="shimmer-row"><div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
         <div class="shimmer-row"><div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
         <div class="shimmer-row"><div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
         <div class="shimmer-row"><div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
@@ -435,7 +438,7 @@ function switchTab(newTab: typeof activeTab): void {
   contentEl.classList.remove("tab-content");
 
   setTimeout(() => {
-    // Phase 2: show shimmer
+    // Phase 2: show shimmer loading state
     activeTab = newTab;
     // Update active tab button styles + slide indicator
     document.querySelectorAll(".dash-tab").forEach((btn) => {
@@ -447,13 +450,20 @@ function switchTab(newTab: typeof activeTab): void {
     contentEl.innerHTML = renderShimmer();
 
     setTimeout(() => {
-      // Phase 3: fade in real content
-      contentEl.innerHTML = getTabContent();
-      contentEl.classList.add("tab-content");
-      isTransitioning = false;
-      bindTabContentEvents();
-    }, 280);
-  }, 150);
+      // Phase 3: fade out shimmer, then fade in real content
+      contentEl.style.opacity = "0";
+      contentEl.style.transform = "translateY(4px)";
+
+      setTimeout(() => {
+        contentEl.innerHTML = getTabContent();
+        contentEl.classList.add("tab-content");
+        contentEl.style.opacity = "";
+        contentEl.style.transform = "";
+        isTransitioning = false;
+        bindTabContentEvents();
+      }, 120);
+    }, 450);
+  }, 180);
 }
 
 function bindTabContentEvents(): void {
@@ -545,11 +555,13 @@ async function doExport(): Promise<void> {
 }
 
 async function doClear(): Promise<void> {
+  if (!confirm("Clear all session data? This cannot be undone.")) return;
   await clearAll();
   sessions = [];
   currentIdx = 0;
   historyEntries = [];
   weeklyReport = null;
+  monthlyReport = null;
   render();
 }
 

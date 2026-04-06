@@ -70,6 +70,17 @@ async function updateDailyGoal(value: number): Promise<void> {
   if (label) label.textContent = `${value}%`;
 }
 
+function positionSensitivityIndicator(): void {
+  const row = document.getElementById("sensitivity-row");
+  const indicator = document.getElementById("sensitivity-indicator");
+  const activeBtn = row?.querySelector(".sensitivity-btn.active") as HTMLElement | null;
+  if (!row || !indicator || !activeBtn) return;
+  const rowRect = row.getBoundingClientRect();
+  const btnRect = activeBtn.getBoundingClientRect();
+  indicator.style.width = `${btnRect.width}px`;
+  indicator.style.transform = `translateX(${btnRect.left - rowRect.left}px)`;
+}
+
 function render(): void {
   const isDark = getTheme() === "dark";
   const overrideEntries = Object.entries(settings.domainOverrides);
@@ -113,7 +124,8 @@ function render(): void {
       <div class="settings-section">
         <div class="settings-section-title">Drift Sensitivity</div>
         <div class="settings-section-desc">Controls how aggressively drift is detected.</div>
-        <div class="sensitivity-row">
+        <div class="sensitivity-row" id="sensitivity-row">
+          <div class="sensitivity-indicator" id="sensitivity-indicator"></div>
           ${["low", "medium", "high"].map((level) => `
             <button class="sensitivity-btn ${settings.sensitivity === level ? "active" : ""}" data-level="${level}">
               ${level.charAt(0).toUpperCase() + level.slice(1)}
@@ -149,6 +161,9 @@ function render(): void {
     </div>
   `;
 
+  // Position sensitivity indicator
+  positionSensitivityIndicator();
+
   // Bind events
   document.getElementById("btn-theme")?.addEventListener("click", toggleTheme);
   document.getElementById("btn-add-domain")?.addEventListener("click", addDomainOverride);
@@ -163,8 +178,13 @@ function render(): void {
   });
   document.querySelectorAll(".sensitivity-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      updateSensitivity((btn as HTMLElement).dataset.level!);
-      render();
+      const level = (btn as HTMLElement).dataset.level!;
+      updateSensitivity(level);
+      // Update active states without full re-render for smooth animation
+      document.querySelectorAll(".sensitivity-btn").forEach((b) => {
+        b.classList.toggle("active", (b as HTMLElement).dataset.level === level);
+      });
+      requestAnimationFrame(positionSensitivityIndicator);
     });
   });
   document.getElementById("goal-slider")?.addEventListener("input", (e) => {

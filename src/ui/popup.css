@@ -409,7 +409,23 @@ body {
   padding: 8px 12px;
   margin-bottom: 14px;
   text-align: center;
+  animation: popupFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Loading spinner for auth buttons */
+.auth-loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(74, 107, 239, 0.2);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: authSpin 0.6s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@keyframes authSpin { to { transform: rotate(360deg); } }
 
 .auth-google-btn {
   font-family: inherit;

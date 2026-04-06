@@ -798,6 +798,8 @@ body {
   padding-top: 20px;
   border-top: 1px solid var(--border-subtle);
   margin-top: 20px;
+  animation: staggerIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.3s;
 }
 
 .dash-footer button,
@@ -812,45 +814,47 @@ body {
   margin: -4px -8px;
   border-radius: 6px;
   text-decoration: none;
-  transition: all 0.25s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .dash-footer button:hover,
 .dash-footer a:hover {
   color: var(--text-secondary);
   background: var(--bg-surface);
+  transform: translateY(-1px);
 }
 
 .dash-footer button:active,
 .dash-footer a:active {
-  transform: scale(0.96);
-  transition-duration: 0.1s;
+  transform: translateY(0) scale(0.96);
+  transition-duration: 0.1s !important;
 }
 
 /* ---- Tab Content Transition ---- */
 
 .tab-content {
-  animation: tabFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: tabFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: opacity 0.12s ease, transform 0.12s ease;
 }
 
 .tab-content.exit {
-  animation: tabFadeOut 0.15s ease-out both;
+  animation: tabFadeOut 0.18s ease-out both;
 }
 
 @keyframes tabFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes tabFadeOut {
   from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 0; transform: translateY(-6px); }
 }
 
 /* ---- Shimmer Skeleton ---- */
 
 .shimmer-block {
-  animation: tabFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: tabFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .shimmer-line {
@@ -858,14 +862,15 @@ body {
   border-radius: 6px;
   background: linear-gradient(
     90deg,
-    var(--bg-surface) 0%,
-    var(--border-default) 20%,
-    var(--bg-elevated) 40%,
-    var(--border-default) 60%,
-    var(--bg-surface) 100%
+    var(--bg-elevated) 0%,
+    var(--border-strong) 15%,
+    var(--bg-surface) 30%,
+    var(--border-strong) 45%,
+    var(--bg-elevated) 60%,
+    var(--bg-elevated) 100%
   );
-  background-size: 300% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
+  background-size: 400% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 .shimmer-line.lg {
@@ -939,9 +944,20 @@ body {
 }
 
 @keyframes shimmer {
-  0% { background-position: 300% 0; }
-  100% { background-position: -300% 0; }
+  0% { background-position: 400% 0; }
+  100% { background-position: -400% 0; }
 }
+
+/* ---- Shimmer stagger for rows ---- */
+.shimmer-row:nth-child(1) .shimmer-line { animation-delay: 0s; }
+.shimmer-row:nth-child(2) .shimmer-line { animation-delay: 0.08s; }
+.shimmer-row:nth-child(3) .shimmer-line { animation-delay: 0.16s; }
+.shimmer-row:nth-child(4) .shimmer-line { animation-delay: 0.24s; }
+.shimmer-row:nth-child(5) .shimmer-line { animation-delay: 0.32s; }
+.shimmer-row:nth-child(6) .shimmer-line { animation-delay: 0.40s; }
+.shimmer-metric:nth-child(2) .shimmer-line { animation-delay: 0.1s; }
+.shimmer-metric:nth-child(3) .shimmer-line { animation-delay: 0.2s; }
+.shimmer-metric:nth-child(4) .shimmer-line { animation-delay: 0.3s; }
 
 /* ---- Empty ---- */
 
