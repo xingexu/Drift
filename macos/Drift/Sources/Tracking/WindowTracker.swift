@@ -44,6 +44,7 @@ class WindowTracker: ObservableObject {
     /// Prevents micro-events from very rapid Cmd-Tab switching.
     private let minimumEventDurationMs: TimeInterval = 500
 
+
     /// Seconds of input inactivity before the session is considered idle.
     private var idleThreshold: TimeInterval {
         TimeInterval(max(AppState.shared.idleTimeout, 30))
@@ -233,14 +234,12 @@ class WindowTracker: ObservableObject {
         let now = Date()
         let durationMs = now.timeIntervalSince(lastEventTimestamp) * 1000
 
-        // Record time for the PREVIOUS app, skipping negligible durations.
+        // Record the event for the PREVIOUS app, skipping negligible durations.
+        // Note: category time (productiveMs, etc.) is now accumulated in real-time
+        // by updateSessionTime(), so we do NOT add durationMs to category counters
+        // here — that would double-count.
         if !previousApp.isEmpty, durationMs >= minimumEventDurationMs {
             let prevCategory = AppState.shared.session.currentCategory
-            switch prevCategory {
-            case .productive:  AppState.shared.session.productiveMs += durationMs
-            case .neutral:     AppState.shared.session.neutralMs += durationMs
-            case .distraction: AppState.shared.session.distractionMs += durationMs
-            }
 
             let event = AppEvent(
                 owner: previousApp,
@@ -272,6 +271,23 @@ class WindowTracker: ObservableObject {
     private func updateSessionTime() {
         guard let start = AppState.shared.session.startTime else { return }
         AppState.shared.session.totalMs = Date().timeIntervalSince(start) * 1000
+
+        // Attribute time to the current app's category in real-time.
+        // Without this, focusPercent/driftScore stay at 0% until the user
+        // switches away because category counters only update on app-switch.
+        //
+        // Strategy: each tick, add 1 second to the current category. This is
+        // accurate because the timer fires every 1s and recordAppSwitch()
+        // will record the precise duration on transition anyway. Small drift
+        // is corrected on each app switch.
+        guard isTracking, !isPaused, !previousApp.isEmpty else { return }
+
+        let increment: TimeInterval = 1000  // 1 second in ms
+        switch AppState.shared.session.currentCategory {
+        case .productive:  AppState.shared.session.productiveMs  += increment
+        case .neutral:     AppState.shared.session.neutralMs     += increment
+        case .distraction: AppState.shared.session.distractionMs += increment
+        }
     }
 
     // MARK: - Idle Detection
