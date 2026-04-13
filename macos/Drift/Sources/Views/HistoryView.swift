@@ -17,7 +17,7 @@ struct HistoryView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Space.xxl) {
                 headerSection
 
                 if appState.pastSessions.isEmpty {
@@ -28,7 +28,7 @@ struct HistoryView: View {
                     sessionList
                 }
             }
-            .padding(28)
+            .padding(Space.page)
         }
         .alert("Export Error", isPresented: $showExportError) {
             Button("OK", role: .cancel) {}
@@ -51,13 +51,13 @@ struct HistoryView: View {
 
     private var headerSection: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Space.xxs) {
                 Text("History")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(TypeScale.title)
                     .tracking(-0.5)
                     .accessibilityAddTraits(.isHeader)
                 Text("Your past focus sessions")
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
@@ -68,25 +68,26 @@ struct HistoryView: View {
                 Button {
                     exportSessionsCSV()
                 } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: Space.xxs + 1) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 11, weight: .medium))
                         Text("Export")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(TypeScale.caption)
+                            .fontWeight(.medium)
                     }
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, Space.md)
+                    .padding(.vertical, Space.xs)
                     .background(
-                        RoundedRectangle(cornerRadius: 7)
+                        RoundedRectangle(cornerRadius: Radius.sm)
                             .fill(Color.primary.opacity(0.05))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 7)
-                                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: Radius.sm)
+                                    .stroke(Color.sep.opacity(0.15), lineWidth: 1)
                             )
                     )
                 }
-                .buttonStyle(.plain)
+                .driftButton(.ghost)
                 .accessibilityLabel("Export session history")
                 .accessibilityHint("Exports all sessions as a CSV file")
             }
@@ -96,7 +97,7 @@ struct HistoryView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: Space.lg + 2) {
             ZStack {
                 Circle()
                     .fill(Color.drift.opacity(0.06))
@@ -107,11 +108,11 @@ struct HistoryView: View {
             }
             .accessibilityHidden(true)
 
-            VStack(spacing: 8) {
+            VStack(spacing: Space.sm) {
                 Text("No sessions yet")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(TypeScale.heading)
                 Text("Complete a tracking session to build your history.\nYour productivity trends will appear here.")
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
@@ -126,27 +127,27 @@ struct HistoryView: View {
     // MARK: - Summary Row
 
     private var summaryRow: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Space.lg - 2) {
             HistorySummaryStat(
                 icon: "list.bullet.rectangle",
                 iconColor: Color.drift,
                 value: "\(filteredSessions.count)",
                 label: filteredSessions.count == appState.pastSessions.count ? "Sessions" : "Showing",
-                gradient: [Color.drift.opacity(0.08), Color.drift.opacity(0.02)]
+                tintColor: Color.drift
             )
             HistorySummaryStat(
                 icon: "star.fill",
-                iconColor: .orange,
+                iconColor: .streak,
                 value: "\(bestFocusPercent)%",
                 label: "Best Focus",
-                gradient: [Color.orange.opacity(0.08), Color.orange.opacity(0.02)]
+                tintColor: .streak
             )
             HistorySummaryStat(
                 icon: "clock.fill",
-                iconColor: Color("Green"),
+                iconColor: .productive,
                 value: formatDurationWords(totalHistoryMs),
                 label: "Total Time",
-                gradient: [Color("Green").opacity(0.08), Color("Green").opacity(0.02)]
+                tintColor: .productive
             )
         }
     }
@@ -154,20 +155,20 @@ struct HistoryView: View {
     // MARK: - Toolbar (Search + Sort + Filter)
 
     private var toolbarRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Space.md) {
             // Search field
-            HStack(spacing: 6) {
+            HStack(spacing: Space.xs) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                 TextField("Search apps, dates...", text: $searchText)
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .textFieldStyle(.plain)
                     .accessibilityLabel("Search sessions")
                     .accessibilityHint("Filter sessions by app name or date")
                 if !searchText.isEmpty {
                     Button {
-                        withAnimation(.easeOut(duration: 0.15)) {
+                        withAnimation(Anim.quick) {
                             searchText = ""
                         }
                     } label: {
@@ -177,17 +178,17 @@ struct HistoryView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Clear search")
-                    .transition(.opacity.combined(with: .scale))
+                    .transition(.opacity)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, Space.md)
+            .padding(.vertical, Space.sm - 1)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.controlBackgroundColor))
+                RoundedRectangle(cornerRadius: Radius.sm)
+                    .fill(Color.cardBg)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Radius.sm)
+                            .stroke(Color.sep.opacity(0.15), lineWidth: 1)
                     )
             )
 
@@ -195,7 +196,7 @@ struct HistoryView: View {
             Menu {
                 ForEach(HistorySortOrder.allCases) { order in
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(Anim.quick) {
                             sortOrder = order
                         }
                     } label: {
@@ -208,21 +209,22 @@ struct HistoryView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Space.xxs) {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.system(size: 10, weight: .medium))
                     Text(sortOrder.shortLabel)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(TypeScale.caption)
+                        .fontWeight(.medium)
                 }
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.sm - 1)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.controlBackgroundColor))
+                    RoundedRectangle(cornerRadius: Radius.sm)
+                        .fill(Color.cardBg)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: Radius.sm)
+                                .stroke(Color.sep.opacity(0.15), lineWidth: 1)
                         )
                 )
             }
@@ -235,7 +237,7 @@ struct HistoryView: View {
             Menu {
                 ForEach(HistoryFilterMode.allCases) { mode in
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(Anim.quick) {
                             filterMode = mode
                         }
                     } label: {
@@ -248,25 +250,26 @@ struct HistoryView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Space.xxs) {
                     Image(systemName: filterMode.icon)
                         .font(.system(size: 10, weight: .medium))
                     Text(filterMode.shortLabel)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(TypeScale.caption)
+                        .fontWeight(.medium)
                 }
                 .foregroundStyle(filterMode == .all ? .secondary : Color.drift)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.sm - 1)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: Radius.sm)
                         .fill(filterMode == .all
-                              ? Color(.controlBackgroundColor)
+                              ? Color.cardBg
                               : Color.drift.opacity(0.08))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: Radius.sm)
                                 .stroke(
                                     filterMode == .all
-                                        ? Color.primary.opacity(0.06)
+                                        ? Color.sep.opacity(0.15)
                                         : Color.drift.opacity(0.15),
                                     lineWidth: 1
                                 )
@@ -287,15 +290,12 @@ struct HistoryView: View {
             if filteredSessions.isEmpty {
                 noResultsState
             } else {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: Space.md) {
                     ForEach(Array(filteredSessions.enumerated()), id: \.element.id) { index, session in
                         HistorySessionCard(session: session)
-                            .opacity(appearedSessionIDs.contains(session.id) ? 1 : 0)
-                            .offset(y: appearedSessionIDs.contains(session.id) ? 0 : 8)
+                            .staggerAppear(index: index, appeared: appearedSessionIDs.contains(session.id))
                             .onAppear {
-                                withAnimation(.easeOut(duration: 0.3).delay(Double(index) * 0.03)) {
-                                    appearedSessionIDs.insert(session.id)
-                                }
+                                appearedSessionIDs.insert(session.id)
                             }
                     }
                 }
@@ -304,31 +304,32 @@ struct HistoryView: View {
     }
 
     private var noResultsState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Space.md) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(.quaternary)
                 .accessibilityHidden(true)
 
             Text("No matching sessions")
-                .font(.system(size: 14, weight: .semibold))
+                .font(TypeScale.heading)
                 .foregroundStyle(.secondary)
 
             Text("Try adjusting your search or filter criteria.")
-                .font(.system(size: 12))
+                .font(TypeScale.caption)
                 .foregroundStyle(.tertiary)
 
             Button {
-                withAnimation {
+                withAnimation(Anim.quick) {
                     searchText = ""
                     filterMode = .all
                 }
             } label: {
                 Text("Clear Filters")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(TypeScale.caption)
+                    .fontWeight(.medium)
                     .foregroundStyle(Color.drift)
             }
-            .buttonStyle(.plain)
+            .driftButton(.ghost)
             .accessibilityLabel("Clear all filters")
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -547,51 +548,38 @@ private struct HistorySummaryStat: View {
     let iconColor: Color
     let value: String
     let label: String
-    let gradient: [Color]
-    @State private var isHovered = false
+    let tintColor: Color
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Space.md) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(iconColor)
                 .accessibilityHidden(true)
 
             Text(value)
-                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .font(TypeScale.mono)
+                .font(.system(size: 22))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .contentTransition(.numericText())
 
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .tracking(0.3)
+                .sectionLabel()
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-        .padding(.horizontal, 8)
+        .padding(.vertical, Space.lg + 2)
+        .padding(.horizontal, Space.sm)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(
-                    LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(tintColor.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isHovered ? .thinMaterial : .ultraThinMaterial)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.primary.opacity(isHovered ? 0.06 : 0.03), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5)
                 )
         )
-        .scaleEffect(isHovered ? 1.02 : 1)
-        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .hoverLift()
         .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovered = hovering
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
     }
@@ -601,7 +589,6 @@ private struct HistorySummaryStat: View {
 
 private struct HistorySessionCard: View {
     let session: PastSession
-    @State private var isHovered = false
     @State private var isExpanded = false
 
     private static let dateFormatter: DateFormatter = {
@@ -619,20 +606,22 @@ private struct HistorySessionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Main content (always visible)
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Space.lg - 2) {
                 // Date + time header with expand chevron
                 HStack {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.sm) {
                         Image(systemName: "calendar")
                             .font(.system(size: 12))
                             .foregroundStyle(.tertiary)
                             .accessibilityHidden(true)
                         Text(Self.dateFormatter.string(from: session.date))
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(TypeScale.heading)
+                            .font(.system(size: 14))
                     }
                     Spacer()
                     Text(Self.timeFormatter.string(from: session.date))
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(TypeScale.monoSm)
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
 
                     if !session.topApps.isEmpty {
@@ -640,7 +629,7 @@ private struct HistorySessionCard: View {
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.quaternary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                            .animation(Anim.quick, value: isExpanded)
                     }
                 }
 
@@ -650,65 +639,52 @@ private struct HistorySessionCard: View {
                 // Stats row
                 statsRow
             }
-            .padding(18)
+            .padding(Space.lg + 2)
 
             // Expandable top apps section
             if isExpanded, !session.topApps.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Space.sm) {
                     Divider()
-                        .padding(.horizontal, 18)
+                        .padding(.horizontal, Space.lg + 2)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Space.sm) {
                         Text("Top Apps")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                            .textCase(.uppercase)
-                            .tracking(0.5)
+                            .sectionLabel()
 
                         // Wrap flow for app tags
-                        FlowLayout(spacing: 6) {
+                        FlowLayout(spacing: Space.xs) {
                             ForEach(session.topApps, id: \.self) { app in
                                 Text(app)
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(TypeScale.caption)
+                                    .fontWeight(.medium)
                                     .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, Space.md)
+                                    .padding(.vertical, Space.xxs)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 6)
+                                        RoundedRectangle(cornerRadius: Radius.sm)
                                             .fill(Color.primary.opacity(0.03))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.primary.opacity(0.04), lineWidth: 1)
+                                                RoundedRectangle(cornerRadius: Radius.sm)
+                                                    .stroke(Color.sep.opacity(0.1), lineWidth: 1)
                                             )
                                     )
                                     .accessibilityLabel("App: \(app)")
                             }
                         }
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 16)
-                    .padding(.top, 4)
+                    .padding(.horizontal, Space.lg + 2)
+                    .padding(.bottom, Space.lg)
+                    .padding(.top, Space.xxs)
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.primary.opacity(isHovered ? 0.06 : 0.03), lineWidth: 1)
-                )
-        )
-        .scaleEffect(isHovered ? 1.005 : 1)
-        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .driftCard(padding: 0)
+        .hoverLift()
         .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovered = hovering
-        }
         .onTapGesture {
             guard !session.topApps.isEmpty else { return }
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(Anim.tap) {
                 isExpanded.toggle()
             }
         }
@@ -727,66 +703,59 @@ private struct HistorySessionCard: View {
             let neutralRatio = max(0, 1 - productiveRatio - distractionRatio)
             let barWidth = geo.size.width
 
-            HStack(spacing: 2) {
+            HStack(spacing: Space.xxxs) {
                 if productiveRatio > 0 {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color("Green"), Color("Green").opacity(0.8)],
-                                startPoint: .leading, endPoint: .trailing
-                            )
-                        )
+                    RoundedRectangle(cornerRadius: Space.xxs)
+                        .fill(Color.productive)
                         .frame(width: max(barWidth * productiveRatio, 2))
                 }
 
                 if distractionRatio > 0 {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color("Red").opacity(0.8), Color("Red")],
-                                startPoint: .leading, endPoint: .trailing
-                            )
-                        )
+                    RoundedRectangle(cornerRadius: Space.xxs)
+                        .fill(Color.distraction)
                         .frame(width: max(barWidth * distractionRatio, 2))
                 }
 
                 if neutralRatio > 0 {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(.separatorColor).opacity(0.4))
+                    RoundedRectangle(cornerRadius: Space.xxs)
+                        .fill(Color.sep.opacity(0.4))
                 }
             }
         }
-        .frame(height: 8)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .frame(height: Space.sm)
+        .clipShape(RoundedRectangle(cornerRadius: Space.xxs))
         .accessibilityLabel("Focus breakdown: \(session.focusPercent)% productive, \(session.driftScore)% distraction")
     }
 
     // MARK: - Stats Row
 
     private var statsRow: some View {
-        HStack(spacing: 16) {
-            HStack(spacing: 5) {
+        HStack(spacing: Space.lg) {
+            HStack(spacing: Space.xxs + 1) {
                 Circle()
-                    .fill(Color("Green"))
-                    .frame(width: 6, height: 6)
+                    .fill(Color.productive)
+                    .frame(width: Space.xs, height: Space.xs)
                     .accessibilityHidden(true)
                 Text("\(session.focusPercent)% focus")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(TypeScale.caption)
+                    .fontWeight(.medium)
                     .foregroundStyle(.secondary)
             }
-            HStack(spacing: 5) {
+            HStack(spacing: Space.xxs + 1) {
                 Circle()
-                    .fill(Color("Red"))
-                    .frame(width: 6, height: 6)
+                    .fill(Color.distraction)
+                    .frame(width: Space.xs, height: Space.xs)
                     .accessibilityHidden(true)
                 Text("\(session.driftScore)% drift")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(TypeScale.caption)
+                    .fontWeight(.medium)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             Label {
                 Text(formatDurationWords(session.totalMs))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(TypeScale.caption)
+                    .fontWeight(.medium)
             } icon: {
                 Image(systemName: "clock")
                     .font(.system(size: 10))
@@ -796,7 +765,8 @@ private struct HistorySessionCard: View {
 
             Label {
                 Text("\(session.appCount) apps")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(TypeScale.caption)
+                    .fontWeight(.medium)
             } icon: {
                 Image(systemName: "square.grid.2x2")
                     .font(.system(size: 10))
@@ -819,7 +789,7 @@ private struct HistorySessionCard: View {
 
 /// A simple horizontal wrapping layout for tag-like views.
 private struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
+    var spacing: CGFloat = Space.xs
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let result = layoutSubviews(proposal: proposal, subviews: subviews)

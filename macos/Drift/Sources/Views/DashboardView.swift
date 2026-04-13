@@ -11,19 +11,19 @@ struct HomeView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 headerSection
-                    .padding(.bottom, 28)
+                    .padding(.bottom, Space.page)
 
                 statsRow
-                    .padding(.bottom, 24)
+                    .padding(.bottom, Space.xxl)
                     .opacity(cardsAppeared ? 1 : 0)
                     .offset(y: cardsAppeared ? 0 : 12)
 
                 if tracker.isTracking {
                     currentSessionSection
-                        .padding(.bottom, 24)
+                        .padding(.bottom, Space.xxl)
                         .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .top)).animation(.spring(response: 0.5, dampingFraction: 0.85)),
-                            removal: .opacity.animation(.easeOut(duration: 0.2))
+                            insertion: .opacity.combined(with: .move(edge: .top)).animation(Anim.appear),
+                            removal: .opacity.animation(Anim.quick)
                         ))
                 }
 
@@ -31,48 +31,48 @@ struct HomeView: View {
                     .opacity(cardsAppeared ? 1 : 0)
                     .offset(y: cardsAppeared ? 0 : 18)
             }
-            .padding(28)
+            .padding(Space.page)
         }
         .task {
             guard !cardsAppeared else { return }
             try? await Task.sleep(for: .milliseconds(80))
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.82)) {
+            withAnimation(Anim.appear) {
                 cardsAppeared = true
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: tracker.isTracking)
+        .animation(Anim.appear, value: tracker.isTracking)
     }
 
     // MARK: - Header
 
     private var headerSection: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Space.xs) {
                 Text(greeting)
-                    .font(.system(size: 26, weight: .bold))
+                    .font(TypeScale.title)
                     .tracking(-0.5)
                     .accessibilityAddTraits(.isHeader)
                 Text(dateString)
-                    .font(.system(size: 14))
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
             }
             Spacer()
 
             if !tracker.isTracking {
                 Button(action: { tracker.start() }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Space.xs) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 10))
                         Text("Start Tracking")
                             .font(.system(size: 12, weight: .semibold))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, Space.lg)
+                    .padding(.vertical, Space.sm)
                     .background(Color.drift)
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .driftButton()
                 .accessibilityLabel("Start Tracking")
                 .accessibilityHint("Begins a new focus tracking session")
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
@@ -108,7 +108,7 @@ struct HomeView: View {
     // MARK: - Stats Row
 
     private var statsRow: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Space.lg) {
             HomeStatCard(
                 icon: "clock.fill",
                 iconColor: Color.drift,
@@ -122,10 +122,10 @@ struct HomeView: View {
 
             HomeStatCard(
                 icon: "target",
-                iconColor: Color("Green"),
+                iconColor: .productive,
                 value: "\(averageFocus)%",
                 label: "Avg Focus",
-                gradient: [Color("Green").opacity(0.08), Color("Green").opacity(0.02)]
+                gradient: [Color.productive.opacity(0.08), Color.productive.opacity(0.02)]
             )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Average Focus")
@@ -133,10 +133,10 @@ struct HomeView: View {
 
             HomeStatCard(
                 icon: "flame.fill",
-                iconColor: .orange,
+                iconColor: .streak,
                 value: "\(appState.currentStreak)",
                 label: "Day Streak",
-                gradient: [Color.orange.opacity(0.08), Color.orange.opacity(0.02)]
+                gradient: [Color.streak.opacity(0.08), Color.streak.opacity(0.02)]
             )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Day Streak")
@@ -168,18 +168,15 @@ struct HomeView: View {
 
             sessionControls
         }
-        .padding(20)
-        .background(CardBackground(cornerRadius: 14))
+        .driftCard()
+        .hoverLift()
     }
 
     @ViewBuilder
     private var sessionHeader: some View {
         HStack {
             Text("Current Session")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
+                .sectionLabel()
             Spacer()
             StatusBadge(
                 label: sessionStatusLabel,
@@ -192,9 +189,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private var sessionTimerRow: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: Space.xxl) {
             Text(formatDuration(appState.session.totalMs))
-                .font(.system(size: 28, weight: .bold, design: .monospaced))
+                .font(TypeScale.mono)
                 .tracking(-1)
                 .contentTransition(.numericText())
                 .accessibilityLabel("Session duration: \(formatDurationWords(appState.session.totalMs))")
@@ -216,7 +213,7 @@ struct HomeView: View {
                 icon: tracker.isPaused ? "play.fill" : "pause.fill",
                 style: .primary
             ) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(Anim.tap) {
                     if tracker.isPaused { tracker.start() } else { tracker.pause() }
                 }
             }
@@ -240,20 +237,17 @@ struct HomeView: View {
     }
 
     private var sessionStatusColor: Color {
-        if tracker.isIdle { return .orange }
-        if tracker.isPaused { return .orange }
-        return Color("Green")
+        if tracker.isIdle { return .streak }
+        if tracker.isPaused { return .streak }
+        return .productive
     }
 
     // MARK: - Activity Timeline
 
     private var activityTimeline: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Space.lg) {
             Text("Today's Activity")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
+                .sectionLabel()
                 .accessibilityAddTraits(.isHeader)
 
             if appState.session.events.isEmpty {
@@ -266,8 +260,7 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(20)
-        .background(CardBackground(cornerRadius: 14))
+        .driftCard()
     }
 }
 
@@ -278,13 +271,14 @@ private struct CurrentAppIndicator: View {
     let categoryColor: Color
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Space.sm) {
             Circle()
                 .fill(categoryColor)
                 .frame(width: 8, height: 8)
                 .shadow(color: categoryColor.opacity(0.5), radius: 3)
             Text(appName.isEmpty ? "No app" : appName)
-                .font(.system(size: 13, weight: .medium))
+                .font(TypeScale.body)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
@@ -302,16 +296,16 @@ struct FocusProgressBar: View {
     @State private var animatedDrift: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Space.sm) {
             GeometryReader { geo in
-                HStack(spacing: 2) {
+                HStack(spacing: Space.xxxs) {
                     let focusWidth = geo.size.width * animatedFocus / 100.0
                     let driftWidth = geo.size.width * animatedDrift / 100.0
 
                     RoundedRectangle(cornerRadius: 4)
                         .fill(
                             LinearGradient(
-                                colors: [Color("Green"), Color("Green").opacity(0.8)],
+                                colors: [Color.productive, Color.productive.opacity(0.8)],
                                 startPoint: .leading, endPoint: .trailing
                             )
                         )
@@ -320,14 +314,14 @@ struct FocusProgressBar: View {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(
                             LinearGradient(
-                                colors: [Color("Red").opacity(0.8), Color("Red")],
+                                colors: [Color.distraction.opacity(0.8), Color.distraction],
                                 startPoint: .leading, endPoint: .trailing
                             )
                         )
                         .frame(width: max(driftWidth, 0))
 
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(.separatorColor).opacity(0.5))
+                        .fill(Color.sep.opacity(0.5))
                 }
             }
             .frame(height: 8)
@@ -335,28 +329,29 @@ struct FocusProgressBar: View {
 
             HStack {
                 HStack(spacing: 5) {
-                    Circle().fill(Color("Green")).frame(width: 5, height: 5)
+                    Circle().fill(Color.productive).frame(width: 5, height: 5)
                     Text("Focused \(focusPercent)%")
-                        .foregroundStyle(Color("Green"))
+                        .foregroundStyle(Color.productive)
                 }
                 Spacer()
                 HStack(spacing: 5) {
-                    Circle().fill(Color("Red")).frame(width: 5, height: 5)
+                    Circle().fill(Color.distraction).frame(width: 5, height: 5)
                     Text("Drifted \(driftScore)%")
-                        .foregroundStyle(Color("Red"))
+                        .foregroundStyle(Color.distraction)
                 }
             }
-            .font(.system(size: 11, weight: .medium))
+            .font(TypeScale.caption)
+            .fontWeight(.medium)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Focus: \(focusPercent) percent. Drift: \(driftScore) percent.")
         .task(id: focusPercent) {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+            withAnimation(Anim.appear) {
                 animatedFocus = CGFloat(focusPercent)
             }
         }
         .task(id: driftScore) {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+            withAnimation(Anim.appear) {
                 animatedDrift = CGFloat(driftScore)
             }
         }
@@ -367,16 +362,17 @@ struct FocusProgressBar: View {
 
 private struct EmptyTimelineView: View {
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Space.lg) {
             Image(systemName: "text.line.first.and.arrowtriangle.forward")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(.quaternary)
-            VStack(spacing: 4) {
+            VStack(spacing: Space.xxs) {
                 Text("No activity yet")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(TypeScale.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(.tertiary)
                 Text("Start tracking to see your app usage")
-                    .font(.system(size: 12))
+                    .font(TypeScale.caption)
                     .foregroundStyle(.quaternary)
             }
         }
@@ -400,9 +396,9 @@ private struct TimelineRow: View {
     }()
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Space.md) {
             Text(Self.timeFormatter.string(from: event.timestamp))
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .font(TypeScale.monoSm)
                 .foregroundStyle(.tertiary)
                 .frame(width: 64, alignment: .trailing)
 
@@ -412,13 +408,14 @@ private struct TimelineRow: View {
                 .padding(.top, 5)
                 .shadow(color: event.category.color.opacity(0.4), radius: 2)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Space.xxxs) {
                 Text(event.owner)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(TypeScale.body)
+                    .fontWeight(.medium)
                     .lineLimit(1)
                 if !event.title.isEmpty {
                     Text(event.title)
-                        .font(.system(size: 11))
+                        .font(TypeScale.caption)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
@@ -428,19 +425,19 @@ private struct TimelineRow: View {
 
             if event.durationMs > 0 {
                 Text(formatDurationWords(event.durationMs))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(TypeScale.monoSm)
                     .foregroundStyle(.quaternary)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
+        .padding(.vertical, Space.sm)
+        .padding(.horizontal, Space.sm)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: Radius.sm)
                 .fill(isHovered ? Color.primary.opacity(0.03) : .clear)
         )
         .contentShape(Rectangle())
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
+            withAnimation(Anim.quick) {
                 isHovered = hovering
             }
         }
@@ -466,7 +463,7 @@ struct HomeStatCard: View {
     @State private var isHovered = false
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Space.md) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(iconColor)
@@ -478,25 +475,22 @@ struct HomeStatCard: View {
                 .contentTransition(.numericText())
 
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .tracking(0.3)
+                .sectionLabel()
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Space.sm)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Radius.lg)
                 .fill(
                     LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: Radius.lg)
                         .fill(isHovered ? .thinMaterial : .ultraThinMaterial)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: Radius.lg)
                         .stroke(Color.primary.opacity(isHovered ? 0.06 : 0.03), lineWidth: 1)
                 )
         )
@@ -506,7 +500,7 @@ struct HomeStatCard: View {
             radius: isHovered ? 12 : 0,
             y: isHovered ? 4 : 0
         )
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isHovered)
+        .animation(Anim.tap, value: isHovered)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering
@@ -527,7 +521,7 @@ struct DriftActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: Space.xs) {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
                 Text(label)
@@ -540,9 +534,9 @@ struct DriftActionButton: View {
             .clipShape(Capsule())
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .driftButton()
         .scaleEffect(isHovered ? 1.03 : 1)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovered)
+        .animation(Anim.tap, value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -567,21 +561,6 @@ struct DriftActionButton: View {
     }
 }
 
-// MARK: - Card Background (Reusable)
-
-struct CardBackground: View {
-    let cornerRadius: CGFloat
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius)
-            .fill(.ultraThinMaterial)
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.primary.opacity(0.04), lineWidth: 1)
-            )
-    }
-}
-
 // MARK: - Status Badge (Shared)
 
 struct StatusBadge: View {
@@ -590,7 +569,7 @@ struct StatusBadge: View {
     let pulsing: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Space.xs) {
             Circle()
                 .fill(color)
                 .frame(width: 7, height: 7)
@@ -598,12 +577,13 @@ struct StatusBadge: View {
                 .opacity(pulsing ? 1 : 0.6)
                 .animation(
                     pulsing
-                        ? .easeInOut(duration: 1).repeatForever(autoreverses: true)
+                        ? Anim.breathe
                         : .default,
                     value: pulsing
                 )
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 10)
@@ -628,13 +608,14 @@ struct StatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: Space.xxxs) {
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: .monospaced))
+                .font(TypeScale.heading)
+                .fontDesign(.monospaced)
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
             Text(label)
-                .font(.system(size: 9, weight: .medium))
+                .font(TypeScale.tiny)
                 .foregroundStyle(.tertiary)
                 .textCase(.uppercase)
         }

@@ -19,12 +19,13 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            OnboardingBackground()
+            Color("Background")
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 progressBar
-                    .padding(.top, 52)
-                    .padding(.horizontal, 60)
+                    .padding(.top, Space.xxxl + Space.xl)
+                    .padding(.horizontal, Space.xxxl + Space.page)
 
                 Spacer()
 
@@ -34,15 +35,15 @@ struct OnboardingView: View {
                 Spacer()
 
                 navigationButtons
-                    .padding(.bottom, 48)
-                    .padding(.horizontal, 60)
+                    .padding(.bottom, Space.xxxl + Space.lg)
+                    .padding(.horizontal, Space.xxxl + Space.page)
             }
         }
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Onboarding, step \(currentStep + 1) of \(steps.count)")
         .onAppear {
-            withAnimation(.easeOut(duration: 0.8)) {
+            withAnimation(Anim.appear) {
                 appeared = true
             }
         }
@@ -51,19 +52,19 @@ struct OnboardingView: View {
     // MARK: - Progress Bar
 
     private var progressBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Space.xs) {
             ForEach(0..<steps.count, id: \.self) { index in
                 Capsule()
-                    .fill(index <= currentStep ? Color.drift : Color.primary.opacity(0.08))
+                    .fill(index <= currentStep ? Color.accent : Color.primary.opacity(0.08))
                     .frame(height: 4)
                     .overlay(alignment: .leading) {
                         if index == currentStep {
                             Capsule()
-                                .fill(Color.drift)
+                                .fill(Color.accent)
                                 .matchedGeometryEffect(id: "activeProgress", in: progressNamespace)
                         }
                     }
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: currentStep)
+                    .animation(Anim.page, value: currentStep)
                     .accessibilityHidden(true)
             }
         }
@@ -126,16 +127,17 @@ struct OnboardingView: View {
 
             if currentStep < steps.count - 1 {
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.4)) {
+                    withAnimation(Anim.page) {
                         onComplete()
                     }
                 }) {
                     Text("Skip Tutorial")
-                        .font(.system(size: 13))
+                        .font(TypeScale.body)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 16)
+                .driftButton(.ghost)
+                .padding(.trailing, Space.lg)
                 .accessibilityLabel("Skip tutorial and start using Drift")
                 .accessibilityHint("Skips the remaining onboarding steps")
             }
@@ -160,7 +162,7 @@ struct OnboardingView: View {
     private func goForward() {
         guard currentStep < steps.count - 1 else { return }
         navigationDirection = .forward
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+        withAnimation(Anim.page) {
             currentStep += 1
         }
     }
@@ -168,54 +170,8 @@ struct OnboardingView: View {
     private func goBack() {
         guard currentStep > 0 else { return }
         navigationDirection = .backward
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+        withAnimation(Anim.page) {
             currentStep -= 1
-        }
-    }
-}
-
-// MARK: - Animated Background
-
-private struct OnboardingBackground: View {
-    @State private var gradientPhase: CGFloat = 0
-
-    var body: some View {
-        ZStack {
-            Color("Background")
-
-            Circle()
-                .fill(RadialGradient(
-                    colors: [Color.drift.opacity(0.15), .clear],
-                    center: .center, startRadius: 0, endRadius: 250
-                ))
-                .frame(width: 500, height: 500)
-                .offset(x: -180, y: gradientPhase * -60 - 80)
-                .blur(radius: 40)
-
-            Circle()
-                .fill(RadialGradient(
-                    colors: [Color("Green").opacity(0.08), .clear],
-                    center: .center, startRadius: 0, endRadius: 200
-                ))
-                .frame(width: 400, height: 400)
-                .offset(x: 200, y: gradientPhase * 50 + 150)
-                .blur(radius: 35)
-
-            Circle()
-                .fill(RadialGradient(
-                    colors: [Color.orange.opacity(0.06), .clear],
-                    center: .center, startRadius: 0, endRadius: 180
-                ))
-                .frame(width: 360, height: 360)
-                .offset(x: 100, y: gradientPhase * -40 - 200)
-                .blur(radius: 30)
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
-        .onAppear {
-            withAnimation(.linear(duration: 10).repeatForever(autoreverses: true)) {
-                gradientPhase = 1
-            }
         }
     }
 }
@@ -224,45 +180,23 @@ private struct OnboardingBackground: View {
 
 private struct OnboardingWelcomeStep: View {
     @Binding var appeared: Bool
-    @State private var ringsVisible = false
 
     var body: some View {
-        VStack(spacing: 32) {
-            ZStack {
-                ForEach(0..<3, id: \.self) { i in
-                    Circle()
-                        .stroke(Color.drift.opacity(0.08 - Double(i) * 0.02), lineWidth: 2)
-                        .frame(width: CGFloat(120 + i * 40), height: CGFloat(120 + i * 40))
-                        .scaleEffect(ringsVisible ? 1 : 0.5)
-                        .opacity(ringsVisible ? 1 : 0)
-                        .animation(
-                            .spring(response: 0.8, dampingFraction: 0.6)
-                                .delay(Double(i) * 0.15),
-                            value: ringsVisible
-                        )
-                }
+        VStack(spacing: Space.xxxl) {
+            Image("DriftLogo")
+                .resizable()
+                .interpolation(.high)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.lg + 6, style: .continuous))
+                .frame(width: 88, height: 88)
+                .shadow(color: .black.opacity(0.1), radius: 20, y: 6)
+                .scaleEffect(appeared ? 1 : 0.9)
+                .opacity(appeared ? 1 : 0)
+                .animation(Anim.appear, value: appeared)
+                .accessibilityLabel("Drift app icon")
 
-                Image("DriftLogo")
-                    .resizable()
-                    .interpolation(.high)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .frame(width: 88, height: 88)
-                    .shadow(color: Color.drift.opacity(0.4), radius: 30, y: 10)
-                    .scaleEffect(appeared ? 1 : 0.5)
-                    .rotationEffect(.degrees(appeared ? 0 : -10))
-                    .animation(.spring(response: 0.8, dampingFraction: 0.6), value: appeared)
-                    .accessibilityLabel("Drift app icon")
-            }
-            .onAppear {
-                withAnimation {
-                    ringsVisible = true
-                }
-            }
-
-            VStack(spacing: 16) {
+            VStack(spacing: Space.lg) {
                 Text("Welcome to Drift")
-                    .font(.system(size: 36, weight: .bold))
-                    .tracking(-1)
+                    .font(TypeScale.hero)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Your personal focus companion for macOS.\nTrack your time, stay focused, build streaks.")
@@ -273,18 +207,18 @@ private struct OnboardingWelcomeStep: View {
                     .frame(maxWidth: 420)
             }
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 20)
-            .animation(.easeOut(duration: 0.6).delay(0.3), value: appeared)
+            .offset(y: appeared ? 0 : 8)
+            .animation(Anim.appear.delay(0.15), value: appeared)
 
-            HStack(spacing: 12) {
-                OnboardingBadge(icon: "eye.tracking.circle", text: "Auto Tracking", color: Color.drift)
-                OnboardingBadge(icon: "timer", text: "Pomodoro", color: Color("Green"))
-                OnboardingBadge(icon: "shield.fill", text: "Focus Blocker", color: .orange)
+            HStack(spacing: Space.md) {
+                OnboardingBadge(icon: "eye.tracking.circle", text: "Auto Tracking", color: .accent)
+                OnboardingBadge(icon: "timer", text: "Pomodoro", color: .productive)
+                OnboardingBadge(icon: "shield.fill", text: "Focus Blocker", color: .streak)
                 OnboardingBadge(icon: "chart.bar.fill", text: "Analytics", color: .purple)
             }
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 16)
-            .animation(.easeOut(duration: 0.6).delay(0.5), value: appeared)
+            .offset(y: appeared ? 0 : 8)
+            .animation(Anim.appear.delay(0.3), value: appeared)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Features: Auto Tracking, Pomodoro, Focus Blocker, Analytics")
         }
@@ -299,13 +233,12 @@ private struct OnboardingPermissionsStep: View {
     @State private var hasCheckedOnce = false
 
     var body: some View {
-        VStack(spacing: 36) {
+        VStack(spacing: Space.xxxl + Space.xxs) {
             permissionIllustration
 
-            VStack(spacing: 16) {
+            VStack(spacing: Space.lg) {
                 Text("Grant Accessibility Access")
-                    .font(.system(size: 28, weight: .bold))
-                    .tracking(-0.5)
+                    .font(TypeScale.hero)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Drift needs accessibility access to detect which app\nyou're using. Your data never leaves your Mac.")
@@ -316,7 +249,7 @@ private struct OnboardingPermissionsStep: View {
                     .frame(maxWidth: 440)
             }
 
-            HStack(spacing: 20) {
+            HStack(spacing: Space.xl) {
                 PrivacyBadge(icon: "lock.fill", text: "Local Only")
                 PrivacyBadge(icon: "hand.raised.fill", text: "No Keylogging")
                 PrivacyBadge(icon: "eye.slash.fill", text: "No Screenshots")
@@ -325,12 +258,13 @@ private struct OnboardingPermissionsStep: View {
             .accessibilityLabel("Privacy guarantees: Data stays local, no keylogging, no screenshots")
 
             if permissionGranted {
-                HStack(spacing: 8) {
+                HStack(spacing: Space.sm) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color("Green"))
+                        .foregroundStyle(.productive)
                     Text("Accessibility access granted")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color("Green"))
+                        .font(TypeScale.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.productive)
                 }
                 .transition(.scale.combined(with: .opacity))
                 .accessibilityLabel("Accessibility access has been granted")
@@ -343,7 +277,7 @@ private struct OnboardingPermissionsStep: View {
                 .accessibilityHint("Opens System Settings to the Privacy and Security section")
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: permissionGranted)
+        .animation(Anim.page, value: permissionGranted)
         .onAppear {
             checkAccessibilityStatus()
             startPollingPermission()
@@ -355,72 +289,62 @@ private struct OnboardingPermissionsStep: View {
     }
 
     private var permissionIllustration: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.primary.opacity(0.03))
-                .frame(width: 320, height: 200)
-
-            VStack(spacing: 16) {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "lock.shield.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(Color.drift)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Accessibility Access")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("System Settings > Privacy")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.tertiary)
-                        }
+        VStack(spacing: Space.lg) {
+            VStack(spacing: Space.md) {
+                HStack(spacing: Space.md) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.accent)
+                    VStack(alignment: .leading, spacing: Space.xxxs) {
+                        Text("Accessibility Access")
+                            .font(TypeScale.body)
+                            .fontWeight(.semibold)
+                        Text("System Settings > Privacy")
+                            .font(TypeScale.caption)
+                            .foregroundStyle(.tertiary)
                     }
-
-                    HStack {
-                        HStack(spacing: 8) {
-                            Image("DriftLogo")
-                                .resizable()
-                                .interpolation(.high)
-                                .frame(width: 20, height: 20)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                            Text("Drift")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        Spacer()
-                        ZStack {
-                            Capsule()
-                                .fill(permissionGranted ? Color("Green") : Color.primary.opacity(0.1))
-                                .frame(width: 36, height: 20)
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 16, height: 16)
-                                .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
-                                .offset(x: permissionGranted ? 8 : -8)
-                        }
-                        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: permissionGranted)
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.controlBackgroundColor))
-                    )
                 }
-                .padding(16)
+
+                HStack {
+                    HStack(spacing: Space.sm) {
+                        Image("DriftLogo")
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 20, height: 20)
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        Text("Drift")
+                            .font(TypeScale.body)
+                            .fontWeight(.medium)
+                    }
+                    Spacer()
+                    ZStack {
+                        Capsule()
+                            .fill(permissionGranted ? Color.productive : Color.primary.opacity(0.1))
+                            .frame(width: 36, height: 20)
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 16, height: 16)
+                            .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
+                            .offset(x: permissionGranted ? 8 : -8)
+                    }
+                    .animation(Anim.tap, value: permissionGranted)
+                }
+                .padding(Space.md)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                        )
+                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                        .fill(Color.cardBg)
                 )
-                .frame(maxWidth: 260)
             }
+            .padding(Space.lg)
+            .driftCard(padding: 0)
+            .padding(Space.lg)
+            .frame(maxWidth: 260)
         }
+        .frame(width: 320, height: 200)
         .accessibilityHidden(true)
     }
 
     private func requestAccessibility() {
-        // Use takeUnretainedValue for the constant key -- it is not an owned reference
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
         hasCheckedOnce = true
@@ -452,21 +376,20 @@ private struct OnboardingTrackingStep: View {
     @State private var animationTask: Task<Void, Never>?
 
     private let demoApps: [(name: String, category: String, color: Color)] = [
-        ("Xcode", "Productive", Color("Green")),
-        ("Safari - Twitter", "Distraction", Color("Red")),
-        ("Slack", "Productive", Color("Green")),
-        ("Spotify", "Distraction", Color("Red")),
-        ("Terminal", "Productive", Color("Green")),
+        ("Xcode", "Productive", .productive),
+        ("Safari - Twitter", "Distraction", .distraction),
+        ("Slack", "Productive", .productive),
+        ("Spotify", "Distraction", .distraction),
+        ("Terminal", "Productive", .productive),
     ]
 
     var body: some View {
-        VStack(spacing: 36) {
+        VStack(spacing: Space.xxxl + Space.xxs) {
             trackingDemoCard
 
-            VStack(spacing: 16) {
+            VStack(spacing: Space.lg) {
                 Text("Automatic App Tracking")
-                    .font(.system(size: 28, weight: .bold))
-                    .tracking(-0.5)
+                    .font(TypeScale.hero)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Drift watches which apps you use and classifies them\nautomatically. Productive, neutral, or distraction.")
@@ -477,10 +400,10 @@ private struct OnboardingTrackingStep: View {
                     .frame(maxWidth: 440)
             }
 
-            HStack(spacing: 24) {
-                CategoryLegend(color: Color("Green"), label: "Productive", examples: "Xcode, VSCode, Figma")
+            HStack(spacing: Space.xxl) {
+                CategoryLegend(color: .productive, label: "Productive", examples: "Xcode, VSCode, Figma")
                 CategoryLegend(color: .secondary, label: "Neutral", examples: "Finder, System Settings")
-                CategoryLegend(color: Color("Red"), label: "Distraction", examples: "Twitter, YouTube, TikTok")
+                CategoryLegend(color: .distraction, label: "Distraction", examples: "Twitter, YouTube, TikTok")
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Categories: Productive apps like Xcode. Neutral apps like Finder. Distractions like Twitter.")
@@ -491,72 +414,65 @@ private struct OnboardingTrackingStep: View {
 
     private var trackingDemoCard: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
+            HStack(spacing: Space.xs) {
                 Circle().fill(Color.red.opacity(0.8)).frame(width: 8, height: 8)
                 Circle().fill(Color.orange.opacity(0.8)).frame(width: 8, height: 8)
                 Circle().fill(Color.green.opacity(0.8)).frame(width: 8, height: 8)
                 Spacer()
                 Text("Drift - Session")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(TypeScale.tiny)
                     .foregroundStyle(.tertiary)
                 Spacer()
                 Color.clear.frame(width: 30)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, Space.md)
+            .padding(.vertical, Space.sm)
             .background(Color.primary.opacity(0.03))
 
-            VStack(spacing: 8) {
+            VStack(spacing: Space.sm) {
                 ForEach(0..<min(trackingDemoPhase, demoApps.count), id: \.self) { i in
                     let app = demoApps[i]
-                    HStack(spacing: 10) {
+                    HStack(spacing: Space.md) {
                         Circle()
                             .fill(app.color)
                             .frame(width: 6, height: 6)
-                            .shadow(color: app.color.opacity(0.5), radius: 3)
 
                         Text(app.name)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(TypeScale.body)
+                            .fontWeight(.medium)
                             .lineLimit(1)
 
                         Spacer()
 
                         Text(app.category)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(TypeScale.tiny)
+                            .fontWeight(.medium)
                             .foregroundStyle(app.color)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, Space.sm)
+                            .padding(.vertical, Space.xxxs + 1)
                             .background(
                                 Capsule().fill(app.color.opacity(0.1))
                             )
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, Space.md)
+                    .padding(.vertical, Space.xs)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 if trackingDemoPhase == 0 {
                     HStack {
                         Text("Waiting for activity...")
-                            .font(.system(size: 11))
+                            .font(TypeScale.caption)
                             .foregroundStyle(.tertiary)
                     }
-                    .padding(.vertical, 20)
+                    .padding(.vertical, Space.xl)
                 }
             }
-            .padding(12)
-            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: trackingDemoPhase)
+            .padding(Space.md)
+            .animation(Anim.appear, value: trackingDemoPhase)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                )
-        )
+        .driftCard(padding: 0)
         .frame(maxWidth: 340)
-        .shadow(color: .black.opacity(0.08), radius: 20, y: 8)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Demo showing apps being tracked: Xcode as productive, Safari Twitter as distraction, Slack as productive")
     }
@@ -567,7 +483,7 @@ private struct OnboardingTrackingStep: View {
             for i in 1...5 {
                 try? await Task.sleep(nanoseconds: UInt64(i) * 600_000_000)
                 guard !Task.isCancelled else { return }
-                withAnimation {
+                withAnimation(Anim.appear) {
                     trackingDemoPhase = i
                 }
             }
@@ -581,8 +497,8 @@ private struct OnboardingFocusModeStep: View {
     @State private var focusTimerValue: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 36) {
-            HStack(spacing: 24) {
+        VStack(spacing: Space.xxxl + Space.xxs) {
+            HStack(spacing: Space.xxl) {
                 focusTimerRing
 
                 blockedSitesPreview
@@ -594,10 +510,9 @@ private struct OnboardingFocusModeStep: View {
                 }
             }
 
-            VStack(spacing: 16) {
+            VStack(spacing: Space.lg) {
                 Text("Focus Mode & Blocker")
-                    .font(.system(size: 28, weight: .bold))
-                    .tracking(-0.5)
+                    .font(TypeScale.hero)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Pomodoro timer with built-in website blocking.\nSet a password to prevent early stopping.")
@@ -608,7 +523,7 @@ private struct OnboardingFocusModeStep: View {
                     .frame(maxWidth: 440)
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: Space.md) {
                 FeaturePill(icon: "timer", text: "Customizable Intervals")
                 FeaturePill(icon: "lock.fill", text: "Password Lock")
                 FeaturePill(icon: "bell.fill", text: "Notifications")
@@ -621,14 +536,14 @@ private struct OnboardingFocusModeStep: View {
     private var focusTimerRing: some View {
         ZStack {
             Circle()
-                .stroke(Color(.separatorColor).opacity(0.3), lineWidth: 6)
+                .stroke(Color.sep.opacity(0.3), lineWidth: 6)
                 .frame(width: 140, height: 140)
 
             Circle()
                 .trim(from: 0, to: focusTimerValue)
                 .stroke(
                     AngularGradient(
-                        colors: [Color.drift.opacity(0.5), Color.drift],
+                        colors: [Color.accent.opacity(0.5), Color.accent],
                         center: .center,
                         startAngle: .degrees(-90),
                         endAngle: .degrees(270)
@@ -638,12 +553,13 @@ private struct OnboardingFocusModeStep: View {
                 .frame(width: 140, height: 140)
                 .rotationEffect(.degrees(-90))
 
-            VStack(spacing: 4) {
+            VStack(spacing: Space.xxs) {
                 Text("24:38")
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .font(TypeScale.mono)
+                    .minimumScaleFactor(0.7)
                 Text("FOCUS")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color.drift)
+                    .font(TypeScale.tiny)
+                    .foregroundStyle(.accent)
                     .tracking(1)
             }
         }
@@ -652,42 +568,36 @@ private struct OnboardingFocusModeStep: View {
     }
 
     private var blockedSitesPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            HStack(spacing: Space.xs) {
                 Image(systemName: "shield.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.drift)
-                Text("Blocked Sites")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .font(TypeScale.caption)
+                    .foregroundStyle(.accent)
+                Text("BLOCKED SITES")
+                    .sectionLabel()
             }
 
-            VStack(spacing: 4) {
+            VStack(spacing: Space.xxs) {
                 ForEach(["twitter.com", "reddit.com", "youtube.com", "instagram.com"], id: \.self) { site in
-                    HStack(spacing: 6) {
+                    HStack(spacing: Space.xs) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 10))
-                            .foregroundStyle(Color("Red").opacity(0.6))
+                            .foregroundStyle(.distraction.opacity(0.6))
                         Text(site)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(TypeScale.caption)
+                            .fontWeight(.medium)
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color("Red").opacity(0.04)))
+                    .padding(.vertical, Space.xxs)
+                    .padding(.horizontal, Space.sm)
+                    .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Color.distraction.opacity(0.04)))
                 }
             }
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                )
-        )
+        .padding(Space.md + Space.xxxs)
+        .driftCard(padding: 0)
+        .padding(Space.md + Space.xxxs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Blocked sites list: twitter, reddit, youtube, instagram")
     }
@@ -699,49 +609,24 @@ private struct OnboardingReadyStep: View {
     let onComplete: () -> Void
     let onSignIn: () -> Void
 
-    @State private var confettiVisible = false
     @State private var checkScale: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 32) {
-            ZStack {
-                if confettiVisible {
-                    ForEach(0..<20, id: \.self) { i in
-                        ConfettiParticle(index: i)
+        VStack(spacing: Space.xxxl) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(.productive)
+                .scaleEffect(checkScale)
+                .accessibilityHidden(true)
+                .onAppear {
+                    withAnimation(Anim.appear.delay(0.2)) {
+                        checkScale = 1
                     }
                 }
 
-                ZStack {
-                    Circle()
-                        .fill(Color("Green").opacity(0.1))
-                        .frame(width: 100, height: 100)
-
-                    Circle()
-                        .fill(Color("Green").opacity(0.2))
-                        .frame(width: 80, height: 80)
-
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 52))
-                        .foregroundStyle(Color("Green"))
-                        .scaleEffect(checkScale)
-                }
-            }
-            .frame(height: 140)
-            .accessibilityHidden(true)
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.5).delay(0.2)) {
-                    checkScale = 1
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 400_000_000)
-                    withAnimation { confettiVisible = true }
-                }
-            }
-
-            VStack(spacing: 16) {
-                Text("You're All Set!")
-                    .font(.system(size: 36, weight: .bold))
-                    .tracking(-1)
+            VStack(spacing: Space.lg) {
+                Text("You're All Set")
+                    .font(TypeScale.hero)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Drift is ready to help you focus.\nStart tracking and build your productivity streaks.")
@@ -752,43 +637,43 @@ private struct OnboardingReadyStep: View {
                     .frame(maxWidth: 440)
             }
 
-            VStack(spacing: 14) {
-                PressableButton(action: {
-                    withAnimation(.easeInOut(duration: 0.4)) {
+            VStack(spacing: Space.md) {
+                Button(action: {
+                    withAnimation(Anim.page) {
                         onComplete()
                     }
                 }) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.sm) {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 12))
+                            .font(TypeScale.body)
                         Text("Start Your First Session")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(TypeScale.heading)
                     }
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 36)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, Space.xxxl + Space.xxs)
+                    .padding(.vertical, Space.md + Space.xxxs)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.drift)
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .fill(Color.accent)
                     )
-                    .shadow(color: Color.drift.opacity(0.3), radius: 16, y: 6)
                 }
+                .driftButton()
                 .accessibilityLabel("Start your first focus session")
                 .keyboardShortcut(.return, modifiers: [])
 
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.4)) {
+                    withAnimation(Anim.page) {
                         onSignIn()
                     }
                 }) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Space.xxs) {
                         Text("Have an account?")
                             .foregroundStyle(.tertiary)
                         Text("Sign in to sync")
-                            .foregroundStyle(Color.drift)
+                            .foregroundStyle(.accent)
                             .fontWeight(.medium)
                     }
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Sign in to sync your data across devices")
@@ -814,27 +699,6 @@ struct OnboardingStep {
 
 // MARK: - Reusable Components
 
-/// A button with a satisfying press-scale effect.
-private struct PressableButton<Label: View>: View {
-    let action: () -> Void
-    @ViewBuilder let label: () -> Label
-    @State private var isPressed = false
-
-    var body: some View {
-        Button(action: action) {
-            label()
-                .scaleEffect(isPressed ? 0.96 : 1.0)
-                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-    }
-}
-
 /// Navigation button used in the onboarding footer.
 private struct OnboardingNavButton: View {
     let label: String
@@ -843,44 +707,35 @@ private struct OnboardingNavButton: View {
     let style: Style
     let action: () -> Void
 
-    @State private var isPressed = false
-
     enum IconPosition { case leading, trailing }
     enum Style { case primary, secondary }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: iconPosition == .leading ? 4 : 6) {
+            HStack(spacing: iconPosition == .leading ? Space.xxs : Space.xs) {
                 if iconPosition == .leading {
                     Image(systemName: icon)
                         .font(.system(size: 12, weight: .semibold))
                 }
                 Text(label)
-                    .font(.system(size: style == .primary ? 14 : 13, weight: style == .primary ? .semibold : .medium))
+                    .font(style == .primary ? TypeScale.heading : TypeScale.body)
+                    .fontWeight(style == .primary ? .semibold : .medium)
                 if iconPosition == .trailing {
                     Image(systemName: icon)
                         .font(.system(size: 12, weight: .semibold))
                 }
             }
             .foregroundStyle(style == .primary ? .white : .secondary)
-            .padding(.horizontal, style == .primary ? 28 : 16)
-            .padding(.vertical, style == .primary ? 11 : 10)
+            .padding(.horizontal, style == .primary ? Space.page : Space.lg)
+            .padding(.vertical, style == .primary ? Space.md - 1 : Space.md - 2)
             .background {
                 if style == .primary {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.drift)
-                        .shadow(color: Color.drift.opacity(0.25), radius: 8, y: 4)
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .fill(Color.accent)
                 }
             }
-            .scaleEffect(isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
         }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .driftButton(style == .primary ? .primary : .secondary)
     }
 }
 
@@ -890,32 +745,23 @@ private struct OnboardingActionButton: View {
     let icon: String
     let action: () -> Void
 
-    @State private var isPressed = false
-
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: Space.sm) {
                 Image(systemName: icon)
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                 Text(label)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(TypeScale.heading)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Space.xxl)
+            .padding(.vertical, Space.md)
             .background(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .fill(Color.primary.opacity(0.06))
             )
             .foregroundStyle(.primary)
-            .scaleEffect(isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
         }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .driftButton(.secondary)
     }
 }
 
@@ -925,16 +771,18 @@ private struct OnboardingBadge: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Space.xs) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(color)
             Text(text)
-                .font(.system(size: 12, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, Space.md)
+        .padding(.vertical, Space.xs + 1)
         .background(
             Capsule()
                 .fill(color.opacity(0.08))
@@ -949,22 +797,23 @@ private struct PrivacyBadge: View {
     let text: String
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Space.sm) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundStyle(Color("Green"))
+                .foregroundStyle(.productive)
             Text(text)
-                .font(.system(size: 11, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
         }
         .frame(width: 100)
-        .padding(.vertical, 14)
+        .padding(.vertical, Space.md + Space.xxxs)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color("Green").opacity(0.06))
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.productive.opacity(0.06))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color("Green").opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .stroke(Color.productive.opacity(0.1), lineWidth: 1)
                 )
         )
         .accessibilityElement(children: .combine)
@@ -977,14 +826,15 @@ private struct CategoryLegend: View {
     let examples: String
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 5) {
+        VStack(spacing: Space.xs) {
+            HStack(spacing: Space.xxs + 1) {
                 Circle().fill(color).frame(width: 6, height: 6)
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(TypeScale.caption)
+                    .fontWeight(.semibold)
             }
             Text(examples)
-                .font(.system(size: 10))
+                .font(TypeScale.tiny)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
         }
@@ -998,67 +848,23 @@ private struct FeaturePill: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Space.xs) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.drift)
+                .font(TypeScale.tiny)
+                .fontWeight(.medium)
+                .foregroundStyle(.accent)
             Text(text)
-                .font(.system(size: 11, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Space.md + Space.xxxs)
+        .padding(.vertical, Space.sm)
         .background(
             Capsule()
-                .fill(Color.drift.opacity(0.06))
-                .overlay(Capsule().stroke(Color.drift.opacity(0.1), lineWidth: 1))
+                .fill(Color.accent.opacity(0.06))
+                .overlay(Capsule().stroke(Color.accent.opacity(0.1), lineWidth: 1))
         )
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// Confetti particle with deterministic initial values to avoid re-randomizing on redraws.
-private struct ConfettiParticle: View {
-    let index: Int
-
-    @State private var position: CGPoint = .zero
-    @State private var opacity: Double = 1
-    @State private var rotation: Double = 0
-
-    private static let colors: [Color] = [Color.drift, Color("Green"), .orange, .purple, .pink, .yellow]
-
-    // Pre-computed deterministic values based on index to avoid body-level randomness
-    private var particleColor: Color {
-        Self.colors[index % Self.colors.count]
-    }
-
-    private var particleSize: CGFloat {
-        CGFloat(4 + (index * 3) % 5)
-    }
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(particleColor)
-            .frame(width: particleSize, height: particleSize)
-            .rotationEffect(.degrees(rotation))
-            .offset(x: position.x, y: position.y)
-            .opacity(opacity)
-            .accessibilityHidden(true)
-            .onAppear {
-                // Seeded pseudo-random from index for deterministic but varied output
-                let seed = Double(index)
-                let angle = (seed * 137.508).truncatingRemainder(dividingBy: 360) * .pi / 180
-                let distance = CGFloat(60 + (index * 17) % 80)
-                let duration = 1.0 + Double((index * 7) % 10) / 10.0
-
-                withAnimation(.easeOut(duration: duration)) {
-                    position = CGPoint(
-                        x: cos(angle) * distance,
-                        y: sin(angle) * distance - 40
-                    )
-                    rotation = Double((index * 47) % 720) - 360
-                    opacity = 0
-                }
-            }
     }
 }

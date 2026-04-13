@@ -7,14 +7,15 @@ struct MenuBarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack(spacing: 8) {
+            HStack(spacing: Space.sm) {
                 Image("DriftLogo")
                     .resizable()
                     .interpolation(.high)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(RoundedRectangle(cornerRadius: Space.xxs))
                     .frame(width: 18, height: 18)
                 Text("Drift")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(TypeScale.body)
+                    .fontWeight(.bold)
                 Spacer()
                 StatusBadge(
                     label: statusLabel,
@@ -22,37 +23,37 @@ struct MenuBarView: View {
                     pulsing: tracker.isTracking && !tracker.isPaused
                 )
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, Space.md)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Drift. Status: \(statusLabel)")
 
             Divider()
-                .padding(.bottom, 12)
+                .padding(.bottom, Space.md)
 
             // Timer section (visible when tracking)
             if tracker.isTracking {
-                VStack(spacing: 8) {
+                VStack(spacing: Space.sm) {
                     // Large mono timer with subtle pulse
                     Text(formatDuration(appState.session.totalMs))
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .font(TypeScale.mono)
                         .contentTransition(.numericText())
-                        .animation(.default, value: appState.session.totalMs)
+                        .animation(Anim.count, value: appState.session.totalMs)
                         .accessibilityLabel("Session time: \(formatDuration(appState.session.totalMs))")
 
                     // Current app with category dot
-                    HStack(spacing: 6) {
+                    HStack(spacing: Space.xs) {
                         Circle()
                             .fill(appState.session.currentCategory.color)
-                            .frame(width: 6, height: 6)
+                            .frame(width: Space.xs, height: Space.xs)
                         Text(tracker.activeApp.isEmpty ? "No active app" : tracker.activeApp)
-                            .font(.system(size: 11))
+                            .font(TypeScale.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Current app: \(tracker.activeApp.isEmpty ? "None" : tracker.activeApp)")
                 }
-                .padding(.bottom, 12)
+                .padding(.bottom, Space.md)
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
 
                 // Mini stats row
@@ -60,20 +61,20 @@ struct MenuBarView: View {
                     MenuBarStat(
                         value: "\(appState.session.focusPercent)%",
                         label: "Focus",
-                        color: Color("Green")
+                        color: .productive
                     )
 
                     Divider()
-                        .frame(height: 28)
+                        .frame(height: Space.page)
 
                     MenuBarStat(
                         value: "\(appState.session.driftScore)%",
                         label: "Drift",
-                        color: Color("Red")
+                        color: .distraction
                     )
 
                     Divider()
-                        .frame(height: 28)
+                        .frame(height: Space.page)
 
                     MenuBarStat(
                         value: "\(appState.session.uniqueApps)",
@@ -81,24 +82,24 @@ struct MenuBarView: View {
                         color: .primary
                     )
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, Space.sm)
                 .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.bottom, 12)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.sm))
+                .padding(.bottom, Space.md)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Session statistics")
 
                 Divider()
-                    .padding(.bottom, 8)
+                    .padding(.bottom, Space.sm)
             }
 
             // Actions
-            VStack(spacing: 2) {
+            VStack(spacing: Space.xxxs) {
                 // Start / Pause / Resume
                 MenuBarButton(
                     title: trackingButtonLabel,
                     icon: tracker.isTracking && !tracker.isPaused ? "pause.fill" : "play.fill",
-                    color: tracker.isTracking && !tracker.isPaused ? .secondary : Color("Green"),
+                    color: tracker.isTracking && !tracker.isPaused ? .secondary : .productive,
                     shortcutHint: nil
                 ) {
                     toggleTracking()
@@ -120,14 +121,14 @@ struct MenuBarView: View {
                     .accessibilityLabel("Reset tracking session")
                 }
             }
-            .padding(.bottom, 8)
-            .animation(.easeInOut(duration: 0.15), value: tracker.isTracking)
+            .padding(.bottom, Space.sm)
+            .animation(Anim.quick, value: tracker.isTracking)
 
             Divider()
-                .padding(.bottom, 8)
+                .padding(.bottom, Space.sm)
 
             // Open Drift + Quit
-            VStack(spacing: 2) {
+            VStack(spacing: Space.xxxs) {
                 MenuBarButton(
                     title: "Open Drift",
                     icon: "macwindow",
@@ -149,7 +150,7 @@ struct MenuBarView: View {
                 .accessibilityLabel("Quit Drift")
             }
         }
-        .padding(14)
+        .padding(Space.lg)
         .frame(width: 260)
     }
 
@@ -161,7 +162,7 @@ struct MenuBarView: View {
     }
 
     private var statusColor: Color {
-        if tracker.isTracking && !tracker.isPaused { return Color("Green") }
+        if tracker.isTracking && !tracker.isPaused { return .productive }
         return .secondary
     }
 
@@ -189,14 +190,15 @@ private struct MenuBarStat: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: Space.xxxs) {
             Text(value)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .font(TypeScale.monoSm)
+                .fontWeight(.bold)
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: value)
+                .animation(Anim.count, value: value)
             Text(label)
-                .font(.system(size: 9))
+                .font(TypeScale.tiny)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
@@ -220,11 +222,11 @@ private struct MenuBarButton: View {
             HStack {
                 Label {
                     Text(title)
-                        .font(.system(size: 13))
+                        .font(TypeScale.body)
                 } icon: {
                     Image(systemName: icon)
-                        .font(.system(size: 11))
-                        .frame(width: 16)
+                        .font(TypeScale.caption)
+                        .frame(width: Space.lg)
                 }
                 .foregroundStyle(color)
 
@@ -234,7 +236,7 @@ private struct MenuBarButton: View {
                     Text(hint)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(.quaternary)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, Space.xxs)
                         .padding(.vertical, 1)
                         .background(
                             RoundedRectangle(cornerRadius: 3)
@@ -243,17 +245,17 @@ private struct MenuBarButton: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Space.md)
+            .padding(.vertical, Space.xs)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: Radius.sm)
                     .fill(isHovered ? Color.primary.opacity(0.06) : .clear)
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .driftButton(.ghost)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
+            withAnimation(Anim.quick) {
                 isHovered = hovering
             }
         }

@@ -38,17 +38,15 @@ struct AuthView: View {
             formPanel
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.25), value: mode)
-        .animation(.easeInOut(duration: 0.25), value: errorMessage != nil)
-        .animation(.easeInOut(duration: 0.25), value: successMessage != nil)
+        .animation(Anim.quick, value: mode)
+        .animation(Anim.quick, value: errorMessage != nil)
+        .animation(Anim.quick, value: successMessage != nil)
         .onChange(of: mode) { _, _ in
             errorMessage = nil
             successMessage = nil
-            // Reset focus to email when switching modes
             focusedField = .email
         }
         .onDisappear {
-            // Clean up any outstanding polling task
             googlePollTask?.cancel()
             googlePollTask = nil
         }
@@ -58,21 +56,7 @@ struct AuthView: View {
 
     private var brandingPanel: some View {
         ZStack(alignment: .topLeading) {
-            LinearGradient(
-                colors: [Color.drift, Color.drift.opacity(0.7)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(.white.opacity(0.05))
-                .frame(width: 300, height: 300)
-                .offset(x: -100, y: -80)
-
-            Circle()
-                .fill(.white.opacity(0.03))
-                .frame(width: 400, height: 400)
-                .offset(x: 150, y: 250)
+            Color.accent
 
             VStack(alignment: .leading, spacing: 0) {
                 Image("DriftLogo")
@@ -80,21 +64,21 @@ struct AuthView: View {
                     .interpolation(.high)
                     .frame(width: 48, height: 48)
                     .colorMultiply(.white)
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                    .padding(.top, 48)
+                    .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                    .padding(.top, Space.xxxl + Space.lg)
                     .accessibilityLabel("Drift logo")
 
-                Spacer().frame(height: 40)
+                Spacer().frame(height: Space.xxxl + Space.sm)
 
                 Text("Focus better.\nWork smarter.")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(TypeScale.hero)
                     .foregroundStyle(.white)
                     .lineSpacing(4)
                     .accessibilityAddTraits(.isHeader)
 
-                Spacer().frame(height: 32)
+                Spacer().frame(height: Space.xxxl)
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: Space.md + Space.xxxs) {
                     AuthFeatureBullet(text: "Automatic app tracking")
                     AuthFeatureBullet(text: "Real-time focus analytics")
                     AuthFeatureBullet(text: "Pomodoro focus timer")
@@ -105,11 +89,12 @@ struct AuthView: View {
                 Spacer()
 
                 Text("drift.app")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(TypeScale.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(.white.opacity(0.5))
-                    .padding(.bottom, 48)
+                    .padding(.bottom, Space.xxxl + Space.lg)
             }
-            .padding(.horizontal, 48)
+            .padding(.horizontal, Space.xxxl + Space.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
@@ -123,14 +108,14 @@ struct AuthView: View {
 
             VStack(spacing: 0) {
                 backButton
-                    .padding(.top, 24)
-                    .padding(.horizontal, 32)
+                    .padding(.top, Space.xxl)
+                    .padding(.horizontal, Space.xxxl)
 
                 Spacer()
 
                 formContent
                     .frame(maxWidth: 340)
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, Space.xxxl)
 
                 Spacer()
             }
@@ -143,18 +128,17 @@ struct AuthView: View {
         HStack {
             if let onBack {
                 Button(action: onBack) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Space.xxs) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 12, weight: .semibold))
                         Text("Back")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(TypeScale.body)
+                            .fontWeight(.medium)
                     }
                     .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .onHover { hovering in
-                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                }
+                .driftButton(.ghost)
                 .accessibilityLabel("Go back")
             }
             Spacer()
@@ -162,17 +146,17 @@ struct AuthView: View {
     }
 
     private var formContent: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: Space.xxl) {
             // Title + subtitle
-            VStack(spacing: 8) {
+            VStack(spacing: Space.sm) {
                 Text(mode == .login ? "Welcome back" : "Create your account")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(TypeScale.title)
                     .accessibilityAddTraits(.isHeader)
 
                 Text(mode == .login
                      ? "Sign in to sync your data across devices"
                      : "Get started with focus tracking")
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -191,16 +175,16 @@ struct AuthView: View {
             socialButtons
 
             // Divider
-            HStack(spacing: 12) {
+            HStack(spacing: Space.md) {
                 Rectangle()
-                    .fill(Color.primary.opacity(0.1))
+                    .fill(Color.sep)
                     .frame(height: 1)
                 Text("or")
-                    .font(.system(size: 12))
+                    .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
                     .layoutPriority(1)
                 Rectangle()
-                    .fill(Color.primary.opacity(0.1))
+                    .fill(Color.sep)
                     .frame(height: 1)
             }
             .accessibilityHidden(true)
@@ -219,7 +203,7 @@ struct AuthView: View {
                 onSuccess?()
             }) {
                 Text("Continue without account")
-                    .font(.system(size: 12))
+                    .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
@@ -230,7 +214,7 @@ struct AuthView: View {
     // MARK: - Social Buttons
 
     private var socialButtons: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Space.md - 2) {
             SignInWithAppleButton(.signIn) { request in
                 request.requestedScopes = [.email, .fullName]
             } onCompletion: { result in
@@ -238,11 +222,11 @@ struct AuthView: View {
             }
             .signInWithAppleButtonStyle(.black)
             .frame(height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             .disabled(isAnyLoading)
             .overlay {
                 if appleSignInLoading {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                         .fill(.black.opacity(0.6))
                     ProgressView()
                         .controlSize(.small)
@@ -260,7 +244,7 @@ struct AuthView: View {
     // MARK: - Form Fields
 
     private var formFields: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Space.md + Space.xxxs) {
             AuthLabeledField(
                 label: "Email",
                 text: $email,
@@ -310,34 +294,34 @@ struct AuthView: View {
     private var messageArea: some View {
         Group {
             if let error = errorMessage {
-                HStack(spacing: 8) {
+                HStack(spacing: Space.sm) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(TypeScale.caption)
                     Text(error)
-                        .font(.system(size: 12))
+                        .font(TypeScale.caption)
                 }
-                .foregroundStyle(.red)
-                .padding(10)
+                .foregroundStyle(.distraction)
+                .padding(Space.md - 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.distraction.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .accessibilityLabel("Error: \(error)")
                 .accessibilityAddTraits(.isStaticText)
             }
 
             if let success = successMessage {
-                HStack(spacing: 8) {
+                HStack(spacing: Space.sm) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(TypeScale.caption)
                     Text(success)
-                        .font(.system(size: 12))
+                        .font(TypeScale.caption)
                 }
-                .foregroundStyle(.green)
-                .padding(10)
+                .foregroundStyle(.productive)
+                .padding(Space.md - 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.green.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.productive.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .accessibilityLabel("Success: \(success)")
             }
@@ -357,14 +341,15 @@ struct AuthView: View {
                     Text(mode == .login ? "Sign In" : "Create Account")
                 }
             }
-            .font(.system(size: 14, weight: .semibold))
+            .font(TypeScale.body)
+            .fontWeight(.semibold)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(canSubmit ? Color.drift : Color.drift.opacity(0.4))
+            .background(canSubmit ? Color.accent : Color.accent.opacity(0.4))
             .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .driftButton()
         .disabled(!canSubmit)
         .keyboardShortcut(.return, modifiers: [.command])
         .accessibilityLabel(mode == .login ? "Sign in" : "Create account")
@@ -393,7 +378,6 @@ struct AuthView: View {
 
     private func isValidEmail(_ email: String) -> Bool {
         guard !email.isEmpty else { return false }
-        // RFC 5322 simplified: at least one char, @, domain with dot
         let pattern = #"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#
         return email.range(of: pattern, options: .regularExpression) != nil
     }
@@ -405,7 +389,6 @@ struct AuthView: View {
     // MARK: - Submit Handler
 
     private func handleSubmit() {
-        // Client-side validation with specific error messages
         guard isValidEmail(email) else {
             errorMessage = "Please enter a valid email address."
             return
@@ -453,7 +436,6 @@ struct AuthView: View {
         }
     }
 
-    /// Applies a brief cooldown after a failed submit to prevent rapid repeated calls.
     private func applySubmitCooldown() {
         submitCooldown = true
         Task { @MainActor in
@@ -462,10 +444,8 @@ struct AuthView: View {
         }
     }
 
-    /// Returns a user-friendly error message, stripping any tokens or sensitive detail.
     private func sanitizedErrorMessage(from error: Error) -> String {
         let message = error.localizedDescription
-        // Never expose token strings or URLs that may contain tokens
         if message.lowercased().contains("token") || message.lowercased().contains("bearer") {
             return "Authentication failed. Please try again."
         }
@@ -524,7 +504,6 @@ struct AuthView: View {
             }
 
         case .failure(let error):
-            // User cancelled -- don't show error
             if (error as NSError).code == ASAuthorizationError.canceled.rawValue {
                 return
             }
@@ -538,7 +517,6 @@ struct AuthView: View {
         googleSignInLoading = true
         errorMessage = nil
 
-        // Cancel any existing poll
         googlePollTask?.cancel()
         googlePollTask = nil
 
@@ -554,7 +532,6 @@ struct AuthView: View {
                     successMessage = "Complete sign-in in your browser. The app will update automatically."
                 }
 
-                // Start cancellable polling
                 await startCancellableAuthPoll()
             } catch {
                 await MainActor.run {
@@ -565,12 +542,10 @@ struct AuthView: View {
         }
     }
 
-    /// Polls for auth completion with proper cancellation support.
     private func startCancellableAuthPoll() async {
         googlePollTask?.cancel()
 
         googlePollTask = Task { @MainActor in
-            // Poll for up to 60 seconds (30 iterations * 2 seconds)
             for _ in 0..<30 {
                 guard !Task.isCancelled else { return }
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -582,7 +557,6 @@ struct AuthView: View {
                 }
             }
 
-            // Polling timed out -- inform the user
             if !Task.isCancelled {
                 errorMessage = "Sign-in timed out. Please try again."
                 successMessage = nil
@@ -597,11 +571,11 @@ private struct AuthFeatureBullet: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Space.md - 2) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 16))
             Text(text)
-                .font(.system(size: 15))
+                .font(TypeScale.heading)
         }
         .foregroundStyle(.white.opacity(0.7))
         .accessibilityElement(children: .combine)
@@ -614,11 +588,10 @@ private struct AuthGoogleSignInButton: View {
     let isLoading: Bool
     let isDisabled: Bool
     let action: () -> Void
-    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: Space.md - 2) {
                 ZStack {
                     Circle()
                         .fill(.white)
@@ -634,28 +607,24 @@ private struct AuthGoogleSignInButton: View {
                         )
                 }
                 Text("Continue with Google")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(TypeScale.body)
+                    .fontWeight(.medium)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(isHovered ? Color.primary.opacity(0.08) : Color.primary.opacity(0.04))
+            .background(Color.primary.opacity(0.04))
             .foregroundStyle(.primary)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                    .strokeBorder(Color.sep.opacity(0.3), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .driftButton(.secondary)
         .disabled(isDisabled)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.12)) {
-                isHovered = hovering
-            }
-        }
         .overlay {
             if isLoading {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                     .fill(Color(.windowBackgroundColor).opacity(0.7))
                 ProgressView()
                     .controlSize(.small)
@@ -676,27 +645,16 @@ struct AuthLabeledField: View {
     @State private var isFocused = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Space.xxs) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
             TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 14))
-                .padding(8)
-                .background(Color(.controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.drift.opacity(isFocused ? 0.5 : 0), lineWidth: 1.5)
-                )
+                .textFieldStyle(.roundedBorder)
+                .font(TypeScale.body)
                 .disabled(isDisabled)
                 .opacity(isDisabled ? 0.6 : 1)
-                .onFocusChange { focused in
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        isFocused = focused
-                    }
-                }
                 .accessibilityLabel(label)
         }
     }
@@ -707,15 +665,15 @@ struct AuthLabeledSecureField: View {
     @Binding var text: String
     let placeholder: String
     var isDisabled: Bool = false
-    @State private var isFocused = false
     @State private var showPassword = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Space.xxs) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
-            HStack(spacing: 4) {
+            HStack(spacing: Space.xxs) {
                 Group {
                     if showPassword {
                         TextField(placeholder, text: $text)
@@ -723,31 +681,19 @@ struct AuthLabeledSecureField: View {
                         SecureField(placeholder, text: $text)
                     }
                 }
-                .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .textFieldStyle(.roundedBorder)
+                .font(TypeScale.body)
 
                 Button(action: { showPassword.toggle() }) {
                     Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                        .font(.system(size: 12))
+                        .font(TypeScale.caption)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showPassword ? "Hide password" : "Show password")
             }
-            .padding(8)
-            .background(Color(.controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.drift.opacity(isFocused ? 0.5 : 0), lineWidth: 1.5)
-            )
             .disabled(isDisabled)
             .opacity(isDisabled ? 0.6 : 1)
-            .onFocusChange { focused in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isFocused = focused
-                }
-            }
             .accessibilityLabel(label)
         }
     }
@@ -755,27 +701,5 @@ struct AuthLabeledSecureField: View {
 
 // MARK: - Backwards-compatible aliases
 
-/// Kept as typealiases so any external code referencing the old names still compiles.
 typealias LabeledField = AuthLabeledField
 typealias LabeledSecureField = AuthLabeledSecureField
-
-// MARK: - Focus Change Modifier
-
-private struct FocusChangeModifier: ViewModifier {
-    let action: (Bool) -> Void
-    @FocusState private var isFocused: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .focused($isFocused)
-            .onChange(of: isFocused) { _, newValue in
-                action(newValue)
-            }
-    }
-}
-
-extension View {
-    func onFocusChange(_ action: @escaping (Bool) -> Void) -> some View {
-        modifier(FocusChangeModifier(action: action))
-    }
-}

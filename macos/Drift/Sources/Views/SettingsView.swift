@@ -12,15 +12,15 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: Space.xl) {
                 headerSection
 
                 ForEach(SettingsSectionID.allCases) { section in
                     sectionView(for: section)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(.opacity)
                 }
             }
-            .padding(28)
+            .padding(Space.page)
         }
         .alert("Reset All Data?", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -45,13 +45,13 @@ struct SettingsView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Space.xxs) {
             Text("Settings")
-                .font(.system(size: 26, weight: .bold))
+                .font(TypeScale.title)
                 .tracking(-0.5)
                 .accessibilityAddTraits(.isHeader)
             Text("Customize your Drift experience")
-                .font(.system(size: 13))
+                .font(TypeScale.body)
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
@@ -215,7 +215,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             SettingsRow(icon: "envelope", label: "Email") {
                 Text(user.email)
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -262,8 +262,8 @@ struct SettingsView: View {
     }
 
     private var signedOutAccountContent: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
+        VStack(spacing: Space.md) {
+            HStack(spacing: Space.md) {
                 ZStack {
                     Circle()
                         .fill(Color.drift.opacity(0.08))
@@ -274,11 +274,12 @@ struct SettingsView: View {
                 }
                 .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Space.xxxs) {
                     Text("Not signed in")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(TypeScale.body)
+                        .fontWeight(.semibold)
                     Text("Sign in to sync your data across devices.")
-                        .font(.system(size: 11))
+                        .font(TypeScale.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -308,7 +309,7 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 SettingsRow(icon: "number", label: "Version") {
                     Text(appVersionString)
-                        .font(.system(size: 13, design: .monospaced))
+                        .font(TypeScale.monoSm)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("App version")
                         .accessibilityValue(appVersionString)
@@ -448,7 +449,7 @@ struct CollapsibleSettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             // Section header (tappable to collapse/expand)
             Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(Anim.tap) {
                     if isExpanded {
                         expandedSections.remove(id)
                     } else {
@@ -456,15 +457,12 @@ struct CollapsibleSettingsSection<Content: View>: View {
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: Space.xs) {
                     Image(systemName: icon)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.tertiary)
                     Text(title)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .textCase(.uppercase)
-                        .tracking(0.5)
+                        .sectionLabel()
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .bold))
@@ -477,32 +475,20 @@ struct CollapsibleSettingsSection<Content: View>: View {
             .accessibilityLabel("\(title) section")
             .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
             .accessibilityHint("Double-tap to \(isExpanded ? "collapse" : "expand") this section")
-            .padding(.bottom, isExpanded ? 10 : 0)
+            .padding(.bottom, isExpanded ? Space.md : 0)
 
             // Collapsible content
             if isExpanded {
                 VStack(spacing: 0) {
                     content()
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, Space.lg)
+                        .padding(.vertical, Space.md)
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.primary.opacity(0.04), lineWidth: 1)
-                        )
-                )
-                .transition(
-                    .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
-                        removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
-                    )
-                )
+                .driftCard(padding: 0)
+                .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: isExpanded)
+        .animation(Anim.tap, value: isExpanded)
     }
 }
 
@@ -516,18 +502,19 @@ struct SettingsRow<Trailing: View>: View {
 
     var body: some View {
         HStack {
-            HStack(spacing: 8) {
+            HStack(spacing: Space.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
-                    .frame(width: 20, alignment: .center)
+                    .frame(width: Space.xl, alignment: .center)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Space.xxxs) {
                     Text(label)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(TypeScale.body)
+                        .fontWeight(.medium)
                     if let hint {
                         Text(hint)
-                            .font(.system(size: 11))
+                            .font(TypeScale.caption)
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -548,18 +535,19 @@ struct SettingsToggleRow: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        Toggle(isOn: $isOn.animation(.easeInOut(duration: 0.2))) {
-            HStack(spacing: 8) {
+        Toggle(isOn: $isOn.animation(Anim.quick)) {
+            HStack(spacing: Space.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
-                    .frame(width: 20, alignment: .center)
+                    .frame(width: Space.xl, alignment: .center)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Space.xxxs) {
                     Text(label)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(TypeScale.body)
+                        .fontWeight(.medium)
                     Text(hint)
-                        .font(.system(size: 11))
+                        .font(TypeScale.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -577,7 +565,7 @@ struct SettingsToggleRow: View {
 private struct SettingsDivider: View {
     var body: some View {
         Divider()
-            .padding(.vertical, 8)
+            .padding(.vertical, Space.sm)
     }
 }
 
@@ -590,21 +578,22 @@ struct KeyboardShortcutRow: View {
     var body: some View {
         HStack {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
+                .font(TypeScale.body)
+                .fontWeight(.medium)
             Spacer()
-            HStack(spacing: 3) {
+            HStack(spacing: Space.xxxs + 1) {
                 ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
                     Text(key)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .frame(minWidth: 22, minHeight: 22)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, Space.xxs)
                         .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(Color(.controlBackgroundColor))
+                            RoundedRectangle(cornerRadius: Radius.sm)
+                                .fill(Color.cardBg)
                                 .shadow(color: .black.opacity(0.06), radius: 0.5, y: 0.5)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: Radius.sm)
+                                        .stroke(Color.sep.opacity(0.15), lineWidth: 1)
                                 )
                         )
                 }
@@ -630,9 +619,10 @@ private struct PlanBadge: View {
 
     var body: some View {
         Text(plan.capitalized)
-            .font(.system(size: 12, weight: .semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
+            .font(TypeScale.caption)
+            .fontWeight(.semibold)
+            .padding(.horizontal, Space.md)
+            .padding(.vertical, Space.xxxs + 1)
             .background(color.opacity(0.12))
             .foregroundStyle(color)
             .clipShape(Capsule())
@@ -653,57 +643,46 @@ struct SettingsActionButton: View {
     let style: SettingsButtonStyle
     let action: () -> Void
     @State private var isHovered = false
-    @State private var isPressed = false
 
     private var foregroundColor: Color {
         switch style {
         case .accent: return .white
         case .secondary: return .primary
-        case .destructive: return Color("Red")
+        case .destructive: return .distraction
         }
     }
 
     private var backgroundColor: Color {
         switch style {
         case .accent:
-            return isPressed ? Color.drift.opacity(0.8) : Color.drift
+            return Color.drift
         case .secondary:
-            return Color.primary.opacity(isPressed ? 0.1 : (isHovered ? 0.08 : 0.05))
+            return Color.primary.opacity(isHovered ? 0.08 : 0.05)
         case .destructive:
-            return Color("Red").opacity(isPressed ? 0.16 : (isHovered ? 0.12 : 0.06))
+            return Color.distraction.opacity(isHovered ? 0.12 : 0.06)
         }
     }
 
     var body: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.1)) {
-                isPressed = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeOut(duration: 0.1)) {
-                    isPressed = false
-                }
-                action()
-            }
-        } label: {
-            HStack(spacing: 6) {
+        Button(action: action) {
+            HStack(spacing: Space.xs) {
                 Image(systemName: icon)
                     .font(.system(size: 12))
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(TypeScale.body)
+                    .fontWeight(.medium)
             }
             .foregroundStyle(foregroundColor)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
+            .padding(.vertical, Space.sm + 1)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Radius.sm)
                     .fill(backgroundColor)
             )
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.98 : (isHovered ? 1.01 : 1))
-        .animation(.easeOut(duration: 0.12), value: isHovered)
-        .animation(.easeOut(duration: 0.08), value: isPressed)
+        .driftButton()
+        .opacity(isHovered ? 0.92 : 1)
+        .animation(Anim.quick, value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -730,9 +709,9 @@ struct SettingsExternalLink: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
+            HStack(spacing: Space.xxs) {
                 Text(title)
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 10, weight: .medium))
             }
@@ -740,7 +719,7 @@ struct SettingsExternalLink: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(Anim.quick) {
                 isHovered = hovering
             }
         }

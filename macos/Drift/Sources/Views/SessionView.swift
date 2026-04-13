@@ -12,7 +12,7 @@ struct SessionView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 24) {
+            VStack(spacing: Space.xxl) {
                 sessionHeader
                 clockRing
                     .opacity(contentAppeared ? 1 : 0)
@@ -28,12 +28,12 @@ struct SessionView: View {
                     .opacity(contentAppeared ? 1 : 0)
                     .offset(y: contentAppeared ? 0 : 12)
             }
-            .padding(28)
+            .padding(Space.page)
         }
         .task {
             guard !contentAppeared else { return }
             try? await Task.sleep(for: .milliseconds(80))
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.82)) {
+            withAnimation(Anim.appear) {
                 contentAppeared = true
             }
         }
@@ -44,13 +44,13 @@ struct SessionView: View {
     @ViewBuilder
     private var sessionHeader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Space.xxs) {
                 Text("Session")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(TypeScale.title)
                     .tracking(-0.5)
                     .accessibilityAddTraits(.isHeader)
                 Text("Track your focus in real-time")
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -69,14 +69,14 @@ struct SessionView: View {
     private var clockRing: some View {
         ZStack {
             Circle()
-                .stroke(Color(.separatorColor).opacity(0.4), lineWidth: 8)
+                .stroke(Color.sep.opacity(0.4), lineWidth: 8)
                 .frame(width: 200, height: 200)
 
             SessionProgressRing(
                 progress: CGFloat(appState.session.focusPercent) / 100.0
             )
 
-            VStack(spacing: 6) {
+            VStack(spacing: Space.xs) {
                 Text(formatDuration(appState.session.totalMs))
                     .font(.system(size: 36, weight: .bold, design: .monospaced))
                     .tracking(-1.5)
@@ -84,7 +84,8 @@ struct SessionView: View {
                     .accessibilityLabel("Session duration: \(formatDurationWords(appState.session.totalMs))")
 
                 Text(statusLabel)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(TypeScale.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(.secondary)
             }
         }
@@ -97,7 +98,7 @@ struct SessionView: View {
 
     @ViewBuilder
     private var controlStrip: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.md) {
             // Reset
             Button(action: { tracker.resetSession() }) {
                 Label("Reset", systemImage: "arrow.counterclockwise")
@@ -113,25 +114,26 @@ struct SessionView: View {
                     )
                     .foregroundStyle(resetHovered ? .primary : .secondary)
             }
-            .buttonStyle(.plain)
+            .driftButton(.secondary)
             .disabled(!tracker.isTracking)
             .opacity(tracker.isTracking ? 1 : 0.4)
             .scaleEffect(resetHovered ? 1.03 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: resetHovered)
+            .animation(Anim.tap, value: resetHovered)
             .onHover { h in resetHovered = h }
             .accessibilityLabel("Reset Session")
             .accessibilityHint("Saves and resets the current tracking session")
 
             // Main action
             Button(action: toggleTracking) {
-                HStack(spacing: 8) {
+                HStack(spacing: Space.sm) {
                     Image(systemName: actionButtonIcon)
                         .font(.system(size: 14))
                         .contentTransition(.symbolEffect(.replace))
                     Text(actionButtonLabel)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(TypeScale.body)
+                        .fontWeight(.semibold)
                 }
-                .padding(.horizontal, 28)
+                .padding(.horizontal, Space.page)
                 .padding(.vertical, 11)
                 .background(
                     Capsule()
@@ -140,20 +142,20 @@ struct SessionView: View {
                 )
                 .foregroundStyle(.white)
             }
-            .buttonStyle(.plain)
+            .driftButton()
             .scaleEffect(actionHovered ? 1.04 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: actionHovered)
+            .animation(Anim.tap, value: actionHovered)
             .onHover { h in actionHovered = h }
             .accessibilityLabel(actionButtonLabel)
             .accessibilityHint(actionAccessibilityHint)
 
             // Focus Mode
             Button(action: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                withAnimation(Anim.page) {
                     appState.focusModeActive.toggle()
                 }
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: Space.xs) {
                     Image(systemName: appState.focusModeActive ? "shield.fill" : "shield")
                         .font(.system(size: 14, weight: .medium))
                         .contentTransition(.symbolEffect(.replace))
@@ -162,16 +164,16 @@ struct SessionView: View {
                             .font(.system(size: 12, weight: .medium))
                     }
                 }
-                .padding(.horizontal, appState.focusModeActive ? 16 : 14)
+                .padding(.horizontal, appState.focusModeActive ? Space.lg : Space.lg)
                 .padding(.vertical, 9)
                 .background(focusModeBackground)
                 .foregroundStyle(
                     appState.focusModeActive ? Color.drift : (focusHovered ? .primary : .secondary)
                 )
             }
-            .buttonStyle(.plain)
+            .driftButton(.ghost)
             .scaleEffect(focusHovered ? 1.03 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: focusHovered)
+            .animation(Anim.tap, value: focusHovered)
             .onHover { h in focusHovered = h }
             .accessibilityLabel(appState.focusModeActive ? "Focus Mode On" : "Focus Mode Off")
             .accessibilityHint("Toggles distraction blocking")
@@ -204,7 +206,7 @@ struct SessionView: View {
             MetricItem(
                 label: "Focus",
                 value: "\(appState.session.focusPercent)%",
-                color: Color("Green"),
+                color: .productive,
                 icon: "target"
             )
             .accessibilityElement(children: .combine)
@@ -216,7 +218,7 @@ struct SessionView: View {
             MetricItem(
                 label: "Drift",
                 value: "\(appState.session.driftScore)%",
-                color: Color("Red"),
+                color: .distraction,
                 icon: "arrow.triangle.branch"
             )
             .accessibilityElement(children: .combine)
@@ -235,20 +237,17 @@ struct SessionView: View {
             .accessibilityLabel("App Switches")
             .accessibilityValue("\(appState.session.uniqueApps)")
         }
-        .padding(.vertical, 16)
-        .background(CardBackground(cornerRadius: 14))
+        .driftCard(padding: Space.lg)
+        .hoverLift()
     }
 
     // MARK: - App Timeline
 
     @ViewBuilder
     private var appTimeline: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Space.md) {
             Text("App Timeline")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
+                .sectionLabel()
                 .accessibilityAddTraits(.isHeader)
 
             if appState.session.events.isEmpty {
@@ -256,17 +255,16 @@ struct SessionView: View {
             } else {
                 SessionTimelineBar(events: appState.session.events)
 
-                HStack(spacing: 16) {
-                    LegendDot(label: "Productive", color: Color("Green"))
+                HStack(spacing: Space.lg) {
+                    LegendDot(label: "Productive", color: .productive)
                     LegendDot(label: "Neutral", color: .secondary)
-                    LegendDot(label: "Distraction", color: Color("Red"))
+                    LegendDot(label: "Distraction", color: .distraction)
                 }
-                .font(.system(size: 11))
+                .font(TypeScale.caption)
                 .foregroundStyle(.tertiary)
             }
         }
-        .padding(18)
-        .background(CardBackground(cornerRadius: 14))
+        .driftCard()
     }
 
     // MARK: - Current App Bar
@@ -276,32 +274,33 @@ struct SessionView: View {
         let appName = tracker.activeApp
         let category = appState.session.currentCategory
 
-        HStack(spacing: 10) {
+        HStack(spacing: Space.md) {
             Circle()
                 .fill(category.color)
                 .frame(width: 8, height: 8)
                 .shadow(color: category.color.opacity(0.5), radius: 3)
 
             Text(appName.isEmpty ? "Waiting for activity..." : appName)
-                .font(.system(size: 13, weight: .medium))
+                .font(TypeScale.body)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
             Spacer()
 
             Text(category.label)
-                .font(.system(size: 11, weight: .medium))
+                .font(TypeScale.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(category.color)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Space.sm)
                 .padding(.vertical, 3)
                 .background(
                     Capsule()
                         .fill(category.color.opacity(0.1))
                 )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(CardBackground(cornerRadius: 10))
+        .driftCard(padding: Space.lg)
+        .hoverLift()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Current app: \(appName.isEmpty ? "None" : appName), \(category.label)")
     }
@@ -316,9 +315,9 @@ struct SessionView: View {
     }
 
     private var statusColor: Color {
-        if tracker.isIdle { return .orange }
-        if tracker.isPaused { return .orange }
-        if tracker.isTracking { return Color("Green") }
+        if tracker.isIdle { return .streak }
+        if tracker.isPaused { return .streak }
+        if tracker.isTracking { return .productive }
         return .secondary
     }
 
@@ -342,7 +341,7 @@ struct SessionView: View {
     // MARK: - Actions
 
     private func toggleTracking() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(Anim.tap) {
             if tracker.isTracking && !tracker.isPaused {
                 tracker.pause()
             } else {
@@ -371,7 +370,7 @@ private struct SessionProgressRing: View {
             )
             .frame(width: 200, height: 200)
             .rotationEffect(.degrees(-90))
-            .animation(.easeInOut(duration: 0.6), value: progress)
+            .animation(Anim.appear, value: progress)
             .shadow(color: Color.drift.opacity(0.3), radius: 6)
     }
 }
@@ -381,7 +380,7 @@ private struct SessionProgressRing: View {
 private struct MetricDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Color(.separatorColor).opacity(0.3))
+            .fill(Color.sep.opacity(0.3))
             .frame(width: 1, height: 36)
             .accessibilityHidden(true)
     }
@@ -391,16 +390,16 @@ private struct MetricDivider: View {
 
 private struct SessionEmptyTimeline: View {
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Space.sm) {
             Image(systemName: "waveform.path")
                 .font(.system(size: 20, weight: .light))
                 .foregroundStyle(.quaternary)
             Text("Activity will appear here during tracking.")
-                .font(.system(size: 13))
+                .font(TypeScale.body)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 20)
+        .padding(.vertical, Space.xl)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("No activity yet. Activity will appear here during tracking.")
     }
@@ -428,8 +427,8 @@ private struct SessionTimelineBar: View {
             }
         }
         .frame(height: 12)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .animation(.easeInOut(duration: 0.3), value: events.count)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.sm))
+        .animation(Anim.quick, value: events.count)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("App timeline showing \(events.count) tracked activities")
     }
@@ -444,7 +443,7 @@ struct MetricItem: View {
     let icon: String
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Space.xs) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(color.opacity(0.6))
@@ -453,10 +452,7 @@ struct MetricItem: View {
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .tracking(0.3)
+                .sectionLabel()
         }
         .frame(maxWidth: .infinity)
     }
@@ -467,10 +463,10 @@ struct LegendDot: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Space.xxs) {
             Circle()
                 .fill(color)
-                .frame(width: 6, height: 6)
+                .frame(width: Space.xs, height: Space.xs)
             Text(label)
         }
         .accessibilityElement(children: .combine)
