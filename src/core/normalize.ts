@@ -76,10 +76,20 @@ export function normalizeUrl(url: string): string {
 }
 
 /**
- * Generate a v4-style random ID (not crypto-grade, fine for local use).
+ * Generate a random ID suitable for local use.
+ * Uses crypto.getRandomValues when available for better entropy.
  */
 export function generateId(): string {
-  return "xxxx-xxxx-xxxx".replace(/x/g, () =>
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    let hex = "";
+    for (let i = 0; i < bytes.length; i++) {
+      hex += bytes[i].toString(16).padStart(2, "0");
+    }
+    return `${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}`;
+  }
+  return "xxxx-xxxx-xxxx-xxxx".replace(/x/g, () =>
     Math.floor(Math.random() * 16).toString(16),
   );
 }

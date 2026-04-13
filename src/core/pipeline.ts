@@ -28,6 +28,10 @@ export function processPipeline(
   events: BrowsingEvent[],
   gapThresholdMs?: number,
 ): ProcessedOutput {
+  if (events.length === 0) {
+    return { sessions: [] };
+  }
+
   // Step 1: classify
   classifyEvents(events);
 
@@ -52,16 +56,17 @@ export function processPipeline(
     const driftScore = computeDriftScore(stats);
     const summaryLabel = computeSummaryLabel(stats, driftScore);
 
+    const first = sessionEvents[0];
+    const last = sessionEvents[sessionEvents.length - 1];
+
     const session: BrowsingSession = {
       id: sessionId,
       events: sessionEvents,
-      startTime: sessionEvents[0].startTime,
-      endTime: sessionEvents[sessionEvents.length - 1].endTime,
-      totalDurationMs:
-        sessionEvents[sessionEvents.length - 1].endTime -
-        sessionEvents[0].startTime,
-      entryEventId: sessionEvents[0].id,
-      exitEventId: sessionEvents[sessionEvents.length - 1].id,
+      startTime: first.startTime,
+      endTime: last.endTime,
+      totalDurationMs: last.endTime - first.startTime,
+      entryEventId: first.id,
+      exitEventId: last.id,
       intent,
       driftScore,
       stats,

@@ -71,8 +71,10 @@ function finalizeActiveEvent(
   lastFinalizedUrl = event.rawUrl;
   activeEvent = null;
 
-  // Drift detection: check category shift for badge
+  // Classify the event in-place so it's stored with category data
   const classification = classifyEvent(event);
+  event.classification = classification;
+  event.category = classification.category;
   const currentCategory = classification.category;
 
   if (lastFinalizedCategory === "productive" && currentCategory === "distraction") {
@@ -241,7 +243,7 @@ export function installListeners(): void {
     }
     // Browser regained focus – query active tab in focused window
     chrome.tabs.query({ active: true, windowId }, (tabs) => {
-      if (chrome.runtime.lastError || !tabs?.[0]?.url) return;
+      if (chrome.runtime.lastError || !tabs?.[0]?.url || tabs[0].id == null) return;
       const tab = tabs[0];
       startTracking(
         tab.id!,
@@ -263,7 +265,7 @@ export function installListeners(): void {
       }
     } else if (state === "active") {
       chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-        if (chrome.runtime.lastError || !tabs?.[0]?.url) return;
+        if (chrome.runtime.lastError || !tabs?.[0]?.url || tabs[0].id == null) return;
         const tab = tabs[0];
         startTracking(
           tab.id!,

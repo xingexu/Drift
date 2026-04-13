@@ -85,7 +85,7 @@ describe("isTrackableUrl", () => {
 describe("generateId", () => {
   it("returns a string of hex characters and dashes", () => {
     const id = generateId();
-    expect(id).toMatch(/^[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}$/);
+    expect(id).toMatch(/^[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}$/);
   });
 
   it("generates unique ids", () => {

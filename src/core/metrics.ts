@@ -104,7 +104,7 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
     eventCount: events.length,
     uniqueDomains: uniqueDomains.size,
     transitionCount: Math.max(0, events.length - 1),
-    driftPointCount: events.filter((e) => e.drift).length,
+    driftPointCount: 0, // Set by pipeline after drift detection runs
     categorySwitchCount,
     productiveTimeMs,
     neutralTimeMs,
