@@ -10,19 +10,20 @@ import {
 } from "./types";
 
 function formatMs(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
-  const hours = Math.floor(minutes / 60);
-  const rem = minutes % 60;
-  return `${hours}h ${rem}m`;
+  if (ms < 0) ms = 0;
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes !== 1 ? "s" : ""}`;
+  const hours = Math.floor(totalMinutes / 60);
+  const rem = totalMinutes % 60;
+  return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`;
 }
 
 export function buildSessionSummary(session: BrowsingSession): SessionSummary {
   const { events, stats } = session;
-  const entry = events[0];
-  const exit = events[events.length - 1];
+  const entry = events.length > 0 ? events[0] : undefined;
+  const exit = events.length > 0 ? events[events.length - 1] : undefined;
 
   return {
     sessionId: session.id,

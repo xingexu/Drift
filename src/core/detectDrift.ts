@@ -27,6 +27,9 @@ const BOUNCE_MIN_OCCURRENCES = 3;
 // ---------------------------------------------------------------------------
 
 export function inferSessionIntent(events: BrowsingEvent[]): SessionIntent {
+  if (events.length === 0) {
+    return { label: "unknown", confidence: 0, basedOnEventIds: [] };
+  }
   const seedEvents = events.slice(0, 3).filter((e) => e.category);
   if (seedEvents.length === 0) {
     return { label: "unknown", confidence: 0, basedOnEventIds: [] };
@@ -98,6 +101,10 @@ type DriftRule = (
 // Rule 1: Productive → distraction transition
 const productiveToDistraction: DriftRule = (events, transitions, sessionId) => {
   const points: DriftPoint[] = [];
+  // Build lookup once: O(n) instead of O(n) per transition
+  const eventById = new Map<string, BrowsingEvent>();
+  for (const e of events) eventById.set(e.id, e);
+
   for (const t of transitions) {
     if (t.fromCategory === "productive" && t.toCategory === "distraction") {
       points.push({
@@ -105,7 +112,7 @@ const productiveToDistraction: DriftRule = (events, transitions, sessionId) => {
         sessionId,
         transitionId: t.id,
         eventId: t.targetEventId,
-        timestamp: events.find((e) => e.id === t.targetEventId)?.startTime ?? 0,
+        timestamp: eventById.get(t.targetEventId)?.startTime ?? 0,
         reason: `Switched from productive (${t.sourceDomain}) to distraction (${t.targetDomain})`,
         trigger: "productive_to_distraction",
       });
@@ -147,6 +154,10 @@ const rapidSwitching: DriftRule = (events, _transitions, sessionId) => {
 // Rule 3: Sharp domain jump (productive → unrelated distraction)
 const sharpJump: DriftRule = (events, transitions, sessionId) => {
   const points: DriftPoint[] = [];
+  // Build lookup once: O(n) instead of O(n) per transition
+  const eventById = new Map<string, BrowsingEvent>();
+  for (const e of events) eventById.set(e.id, e);
+
   for (const t of transitions) {
     if (
       t.fromCategory === "productive" &&
@@ -162,7 +173,7 @@ const sharpJump: DriftRule = (events, transitions, sessionId) => {
           transitionId: t.id,
           eventId: t.targetEventId,
           timestamp:
-            events.find((e) => e.id === t.targetEventId)?.startTime ?? 0,
+            eventById.get(t.targetEventId)?.startTime ?? 0,
           reason: `Sharp jump from ${t.sourceDomain} to unrelated ${t.targetDomain}`,
           trigger: "sharp_jump",
         });
@@ -300,6 +311,10 @@ export function applyDriftToEvents(
     if (driftEventIds.has(e.id)) {
       e.drift = true;
       e.driftReasons = reasonsByEvent.get(e.id);
+    } else {
+      // Reset stale flags if pipeline is re-run on the same events
+      e.drift = false;
+      e.driftReasons = undefined;
     }
   }
 }

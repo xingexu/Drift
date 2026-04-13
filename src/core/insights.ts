@@ -110,7 +110,10 @@ export function generateInsights(entries: SessionHistoryEntry[]): Insight[] {
       }
     }
     if (worstHour >= 0 && worstAvg > 30) {
-      const label = `${worstHour % 12 || 12}${worstHour < 12 ? "AM" : "PM"}-${(worstHour + 2) % 12 || 12}${worstHour + 2 < 12 ? "AM" : "PM"}`;
+      const endHour = (worstHour + 2) % 24;
+      const startAmPm = worstHour < 12 ? "AM" : "PM";
+      const endAmPm = endHour < 12 ? "AM" : "PM";
+      const label = `${worstHour % 12 || 12}${startAmPm}-${endHour % 12 || 12}${endAmPm}`;
       insights.push({
         icon: "clock",
         title: "Peak drift window",

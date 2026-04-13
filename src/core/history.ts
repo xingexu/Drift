@@ -8,14 +8,14 @@ import {
   WeeklyReport,
   MonthlyReport,
 } from "./types";
-import { exportSession } from "./pipeline";
+import { buildSessionSummary } from "./summaries";
 
 // ---------------------------------------------------------------------------
 // Build a compact history entry from a full session
 // ---------------------------------------------------------------------------
 
 export function buildHistoryEntry(session: BrowsingSession): SessionHistoryEntry {
-  const { summary } = exportSession(session);
+  const summary = buildSessionSummary(session);
 
   // Aggregate top 5 domains by time
   const domainMap = new Map<string, number>();

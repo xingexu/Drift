@@ -26,7 +26,7 @@ export function buildTransitions(
       targetDomain: tgt.domain,
       sourceNormalizedUrl: src.normalizedUrl,
       targetNormalizedUrl: tgt.normalizedUrl,
-      timeGapMs: tgt.startTime - src.endTime,
+      timeGapMs: Math.max(0, tgt.startTime - src.endTime),
       isCategoryShift: src.category !== tgt.category,
       fromCategory: src.category,
       toCategory: tgt.category,

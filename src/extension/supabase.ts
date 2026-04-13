@@ -248,7 +248,7 @@ export async function syncSessionToSupabase(
   });
   if (sessionErr) throw sessionErr;
 
-  // 2. Upsert events (batch)
+  // 2. Upsert events (batch, chunked to avoid request size limits)
   if (session.events.length > 0) {
     const eventRows = session.events.map((e: BrowsingEvent) => ({
       id: e.id,
@@ -272,8 +272,13 @@ export async function syncSessionToSupabase(
       drift: e.drift ?? false,
       drift_reasons: e.driftReasons ?? [],
     }));
-    const { error: eventsErr } = await sb.from("browsing_events").upsert(eventRows);
-    if (eventsErr) throw eventsErr;
+    // Chunk to avoid exceeding Supabase request size limits
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < eventRows.length; i += CHUNK_SIZE) {
+      const chunk = eventRows.slice(i, i + CHUNK_SIZE);
+      const { error: eventsErr } = await sb.from("browsing_events").upsert(chunk);
+      if (eventsErr) throw eventsErr;
+    }
   }
 
   // 3. Upsert transitions
@@ -342,30 +347,35 @@ export async function pullSessionHistory(): Promise<SessionHistoryEntry[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
 
+  // Only pull last 90 days to avoid huge responses
+  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
   const { data, error } = await getSupabase()
     .from("session_history")
     .select("*")
     .eq("user_id", userId)
-    .order("start_time", { ascending: false });
+    .gte("end_time", cutoff)
+    .order("start_time", { ascending: false })
+    .limit(1000);
 
   if (error) throw error;
   if (!data) return [];
 
   return data.map((row) => ({
-    sessionId: row.session_id,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    totalActiveTimeMs: row.total_active_time_ms,
-    productiveTimeMs: row.productive_time_ms,
-    neutralTimeMs: row.neutral_time_ms,
-    distractionTimeMs: row.distraction_time_ms,
-    driftScore: row.drift_score,
-    driftPointCount: row.drift_point_count,
-    summaryLabel: row.summary_label,
-    entryDomain: row.entry_domain,
-    exitDomain: row.exit_domain,
+    sessionId: row.session_id ?? "",
+    startTime: row.start_time ?? 0,
+    endTime: row.end_time ?? 0,
+    totalActiveTimeMs: row.total_active_time_ms ?? 0,
+    productiveTimeMs: row.productive_time_ms ?? 0,
+    neutralTimeMs: row.neutral_time_ms ?? 0,
+    distractionTimeMs: row.distraction_time_ms ?? 0,
+    driftScore: row.drift_score ?? 0,
+    driftPointCount: row.drift_point_count ?? 0,
+    summaryLabel: row.summary_label ?? "",
+    entryDomain: row.entry_domain ?? "",
+    exitDomain: row.exit_domain ?? "",
     topDomains: row.top_domains ?? [],
-    eventCount: row.event_count,
+    eventCount: row.event_count ?? 0,
   }));
 }
 
@@ -397,8 +407,13 @@ export async function syncLocalHistoryToSupabase(
     event_count: e.eventCount,
   }));
 
-  const { error } = await getSupabase().from("session_history").upsert(rows);
-  if (error) throw error;
+  // Chunk to avoid exceeding Supabase request size limits
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    const { error } = await getSupabase().from("session_history").upsert(chunk);
+    if (error) throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +426,14 @@ const INITIAL_SYNC_KEY = "drift_initial_sync_done";
 async function readKey<T>(key: string, fallback: T): Promise<T> {
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     return new Promise((resolve) => {
-      chrome.storage.local.get(key, (r) => resolve((r[key] as T) ?? fallback));
+      chrome.storage.local.get(key, (r) => {
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] readKey error:", chrome.runtime.lastError.message);
+          resolve(fallback);
+          return;
+        }
+        resolve((r[key] as T) ?? fallback);
+      });
     });
   }
   try {
@@ -425,17 +447,37 @@ async function readKey<T>(key: string, fallback: T): Promise<T> {
 async function writeKey(key: string, value: unknown): Promise<void> {
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     return new Promise((resolve) => {
-      chrome.storage.local.set({ [key]: value }, resolve);
+      chrome.storage.local.set({ [key]: value }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] writeKey error:", chrome.runtime.lastError.message);
+        }
+        resolve();
+      });
     });
   }
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn("[Drift] localStorage writeKey error:", e);
+  }
 }
 
+// Serialize pending sync operations to prevent race conditions
+let pendingSyncLock: Promise<void> = Promise.resolve();
+
 export async function addToPendingSync(sessionId: string): Promise<void> {
-  const pending = await readKey<string[]>(PENDING_SYNC_KEY, []);
-  if (!pending.includes(sessionId)) {
-    pending.push(sessionId);
-    await writeKey(PENDING_SYNC_KEY, pending);
+  const release = pendingSyncLock;
+  let resolve: () => void;
+  pendingSyncLock = new Promise<void>((r) => { resolve = r; });
+  try {
+    await release;
+    const pending = await readKey<string[]>(PENDING_SYNC_KEY, []);
+    if (!pending.includes(sessionId)) {
+      pending.push(sessionId);
+      await writeKey(PENDING_SYNC_KEY, pending);
+    }
+  } finally {
+    resolve!();
   }
 }
 

@@ -76,18 +76,33 @@ function matchesDomainSet(domain: string, domainSet: Set<string>): boolean {
 // ---------------------------------------------------------------------------
 
 // User overrides (loaded from settings at runtime)
-let userOverrides: Record<string, Category> = {};
+let userOverridesMap = new Map<string, Category>();
+let userOverrideSuffixes: [string, Category][] = [];
 
 export function setUserOverrides(overrides: Record<string, Category>): void {
-  userOverrides = overrides;
+  userOverridesMap = new Map<string, Category>();
+  userOverrideSuffixes = [];
+  for (const [domain, category] of Object.entries(overrides)) {
+    userOverridesMap.set(domain, category);
+    userOverrideSuffixes.push([`.${domain}`, category]);
+  }
 }
 
 export function classifyEvent(event: BrowsingEvent): Classification {
   const domain = event.domain;
 
-  // Check user overrides first
-  for (const [overrideDomain, category] of Object.entries(userOverrides)) {
-    if (domain === overrideDomain || domain.endsWith(`.${overrideDomain}`)) {
+  // Check user overrides first - exact match via Map (O(1))
+  const exactOverride = userOverridesMap.get(domain);
+  if (exactOverride) {
+    return {
+      category: exactOverride,
+      reason: "user-defined domain override",
+      source: "user_override",
+    };
+  }
+  // Check subdomain matches
+  for (const [suffix, category] of userOverrideSuffixes) {
+    if (domain.endsWith(suffix)) {
       return {
         category,
         reason: "user-defined domain override",

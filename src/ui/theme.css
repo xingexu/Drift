@@ -1,11 +1,46 @@
 /* =========================================================================
-   Drift – Design System (Apple-inspired)
+   Drift -- Design System (Apple-inspired)
+   =========================================================================
+   Sections:
+     1. Fonts
+     2. Color Tokens (Light)
+     3. Color Tokens (Dark)
+     4. Shared Tokens (Radius, Motion, Layout)
+     5. Reset & Base
+     6. Scrollbar
+     7. Global Transitions
+     8. Focus & Accessibility
+     9. Keyframe Definitions
+    10. Animation Utility Classes
+    11. Stagger Utilities
+    12. Typography Scale
+    13. Layout Utilities
+    14. Button System
+    15. Card System
+    16. Badge System
+    17. Form Elements
+    18. Skeleton Loaders
+    19. Toast / Notification
+    20. Tooltip
+    21. Micro-interactions
+    22. Reduced Motion
+   ========================================================================= */
+
+
+/* =========================================================================
+   1. Fonts
    ========================================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=SF+Mono:wght@400;500&display=swap');
 
-/* ---- Light Mode (default) ---- */
+
+/* =========================================================================
+   2. Color Tokens -- Light Mode (default)
+   ========================================================================= */
+
 :root, [data-theme="light"] {
+
+  /* -- Backgrounds -- */
   --bg-primary: #ffffff;
   --bg-secondary: #f7f7f9;
   --bg-elevated: #f7f7f9;
@@ -13,39 +48,113 @@
   --bg-card-hover: #f3f3f6;
   --bg-surface: #f0f0f3;
   --bg-inset: rgba(0, 0, 0, 0.03);
+  --bg-overlay: rgba(0, 0, 0, 0.4);
 
+  /* -- Text -- */
   --text-primary: #1d1d1f;
   --text-secondary: #6e6e73;
   --text-tertiary: #86868b;
   --text-muted: #aeaeb2;
+  --text-inverse: #ffffff;
 
+  /* -- Productive / Success -- */
   --color-productive: #1a8a3e;
   --color-productive-bg: rgba(26, 138, 62, 0.08);
   --color-productive-border: rgba(26, 138, 62, 0.2);
+  --color-productive-text: #15772e;
 
+  /* -- Neutral -- */
   --color-neutral: #86868b;
   --color-neutral-bg: rgba(134, 134, 139, 0.08);
+  --color-neutral-border: rgba(134, 134, 139, 0.15);
+  --color-neutral-text: #636366;
 
+  /* -- Distraction / Danger -- */
   --color-distraction: #c43c3c;
   --color-distraction-bg: rgba(196, 60, 60, 0.07);
   --color-distraction-border: rgba(196, 60, 60, 0.2);
+  --color-distraction-text: #a82e2e;
 
+  /* -- Accent / Info -- */
   --color-accent: #4a6bef;
   --color-accent-bg: rgba(74, 107, 239, 0.08);
+  --color-accent-border: rgba(74, 107, 239, 0.2);
+  --color-accent-text: #3a57cc;
+  --color-accent-hover: #3a57cc;
 
+  /* -- Warning -- */
+  --color-warning: #c88417;
+  --color-warning-bg: rgba(200, 132, 23, 0.08);
+  --color-warning-border: rgba(200, 132, 23, 0.2);
+  --color-warning-text: #9a6610;
+
+  /* -- Info (alias for accent, semantic distinction) -- */
+  --color-info: #4a6bef;
+  --color-info-bg: rgba(74, 107, 239, 0.08);
+  --color-info-border: rgba(74, 107, 239, 0.2);
+  --color-info-text: #3a57cc;
+
+  /* -- Success (alias for productive, semantic distinction) -- */
+  --color-success: #1a8a3e;
+  --color-success-bg: rgba(26, 138, 62, 0.08);
+  --color-success-border: rgba(26, 138, 62, 0.2);
+  --color-success-text: #15772e;
+
+  /* -- Borders -- */
   --border-subtle: rgba(0, 0, 0, 0.04);
   --border-default: rgba(0, 0, 0, 0.08);
   --border-strong: rgba(0, 0, 0, 0.12);
 
+  /* -- Shadows -- */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 4px rgba(0, 0, 0, 0.03);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.1);
+  --shadow-focus: 0 0 0 3px rgba(74, 107, 239, 0.25);
+  --shadow-accent-glow: 0 4px 16px rgba(74, 107, 239, 0.15);
 
+  /* -- Interactive states -- */
+  --hover-opacity: 0.85;
+  --active-opacity: 0.7;
+  --disabled-opacity: 0.4;
+  --hover-lift: -2px;
+  --active-scale: 0.97;
+
+  /* -- Glassmorphism -- */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-blur: 20px;
+  --glass-saturate: 1.8;
+
+  /* -- Input -- */
+  --input-bg: var(--bg-secondary);
+  --input-border: var(--border-default);
+  --input-border-focus: var(--color-accent);
+  --input-placeholder: var(--text-muted);
+  --input-ring: var(--shadow-focus);
+
+  /* -- Toast -- */
+  --toast-bg: var(--bg-card);
+  --toast-border: var(--border-default);
+  --toast-shadow: var(--shadow-lg);
+
+  /* -- Scrollbar -- */
   --scrollbar-thumb: rgba(0, 0, 0, 0.15);
   --scrollbar-hover: rgba(0, 0, 0, 0.25);
+
+  /* -- Skeleton -- */
+  --skeleton-base: var(--bg-elevated);
+  --skeleton-shine: var(--border-strong);
 }
 
-/* ---- Dark Mode ---- */
+
+/* =========================================================================
+   3. Color Tokens -- Dark Mode
+   ========================================================================= */
+
 [data-theme="dark"] {
+
+  /* -- Backgrounds -- */
   --bg-primary: #000000;
   --bg-secondary: #111113;
   --bg-elevated: #1c1c1e;
@@ -53,51 +162,158 @@
   --bg-card-hover: #1e1e21;
   --bg-surface: #1a1a1d;
   --bg-inset: rgba(255, 255, 255, 0.04);
+  --bg-overlay: rgba(0, 0, 0, 0.65);
 
+  /* -- Text -- */
   --text-primary: #f5f5f7;
   --text-secondary: #a1a1a6;
   --text-tertiary: #6e6e73;
   --text-muted: #48484a;
+  --text-inverse: #1d1d1f;
 
+  /* -- Productive / Success -- */
   --color-productive: #34a853;
   --color-productive-bg: rgba(52, 168, 83, 0.12);
   --color-productive-border: rgba(52, 168, 83, 0.3);
+  --color-productive-text: #4cc76a;
 
+  /* -- Neutral -- */
   --color-neutral: #6e6e73;
   --color-neutral-bg: rgba(110, 110, 115, 0.1);
+  --color-neutral-border: rgba(110, 110, 115, 0.2);
+  --color-neutral-text: #8e8e93;
 
+  /* -- Distraction / Danger -- */
   --color-distraction: #d94f4f;
   --color-distraction-bg: rgba(217, 79, 79, 0.12);
   --color-distraction-border: rgba(217, 79, 79, 0.3);
+  --color-distraction-text: #ef6b6b;
 
+  /* -- Accent / Info -- */
   --color-accent: #6c8cff;
   --color-accent-bg: rgba(108, 140, 255, 0.12);
+  --color-accent-border: rgba(108, 140, 255, 0.25);
+  --color-accent-text: #8aa4ff;
+  --color-accent-hover: #8aa4ff;
 
+  /* -- Warning -- */
+  --color-warning: #e09b2d;
+  --color-warning-bg: rgba(224, 155, 45, 0.12);
+  --color-warning-border: rgba(224, 155, 45, 0.3);
+  --color-warning-text: #f0b44d;
+
+  /* -- Info -- */
+  --color-info: #6c8cff;
+  --color-info-bg: rgba(108, 140, 255, 0.12);
+  --color-info-border: rgba(108, 140, 255, 0.25);
+  --color-info-text: #8aa4ff;
+
+  /* -- Success -- */
+  --color-success: #34a853;
+  --color-success-bg: rgba(52, 168, 83, 0.12);
+  --color-success-border: rgba(52, 168, 83, 0.3);
+  --color-success-text: #4cc76a;
+
+  /* -- Borders -- */
   --border-subtle: rgba(255, 255, 255, 0.05);
   --border-default: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.12);
 
+  /* -- Shadows -- */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.35);
+  --shadow-focus: 0 0 0 3px rgba(108, 140, 255, 0.3);
+  --shadow-accent-glow: 0 4px 16px rgba(108, 140, 255, 0.2);
 
+  /* -- Interactive states -- */
+  --hover-opacity: 0.9;
+  --active-opacity: 0.75;
+  --disabled-opacity: 0.35;
+  --hover-lift: -2px;
+  --active-scale: 0.97;
+
+  /* -- Glassmorphism -- */
+  --glass-bg: rgba(28, 28, 30, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+  --glass-saturate: 1.8;
+
+  /* -- Input -- */
+  --input-bg: var(--bg-secondary);
+  --input-border: var(--border-default);
+  --input-border-focus: var(--color-accent);
+  --input-placeholder: var(--text-muted);
+  --input-ring: var(--shadow-focus);
+
+  /* -- Toast -- */
+  --toast-bg: var(--bg-elevated);
+  --toast-border: var(--border-default);
+  --toast-shadow: var(--shadow-lg);
+
+  /* -- Scrollbar -- */
   --scrollbar-thumb: rgba(255, 255, 255, 0.12);
   --scrollbar-hover: rgba(255, 255, 255, 0.2);
+
+  /* -- Skeleton -- */
+  --skeleton-base: var(--bg-elevated);
+  --skeleton-shine: var(--border-strong);
 }
 
-/* ---- Radius & Motion ---- */
+
+/* =========================================================================
+   4. Shared Tokens -- Radius, Motion, Layout
+   ========================================================================= */
+
 :root {
+  /* -- Border radius -- */
+  --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
 
+  /* -- Easing -- */
   --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* -- Duration -- */
+  --duration-instant: 80ms;
   --duration-fast: 150ms;
   --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+
+  /* -- Z-index scale -- */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* -- Spacing (4px grid) -- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
 }
 
+
 /* =========================================================================
-   Reset & Base
+   5. Reset & Base
    ========================================================================= */
 
 *, *::before, *::after {
@@ -121,8 +337,9 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+
 /* =========================================================================
-   Scrollbar
+   6. Scrollbar
    ========================================================================= */
 
 ::-webkit-scrollbar { width: 6px; }
@@ -133,33 +350,9 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
-/* =========================================================================
-   Animation
-   ========================================================================= */
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.fade-in {
-  animation: fadeIn 0.3s var(--ease-out) both;
-}
 
 /* =========================================================================
-   Typography
-   ========================================================================= */
-
-.font-mono { font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace; }
-
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* =========================================================================
-   Global Transitions — everything animates smoothly
+   7. Global Transitions -- everything animates smoothly on theme change
    ========================================================================= */
 
 /* Smooth theme transitions on all major elements */
@@ -186,53 +379,981 @@ input[type="range"] {
   transition: unset;
 }
 
-/* ---- Stagger utility classes ---- */
-.stagger-1 { animation-delay: 0.05s !important; }
-.stagger-2 { animation-delay: 0.10s !important; }
-.stagger-3 { animation-delay: 0.15s !important; }
-.stagger-4 { animation-delay: 0.20s !important; }
-.stagger-5 { animation-delay: 0.25s !important; }
-.stagger-6 { animation-delay: 0.30s !important; }
 
-/* ---- View transitions ---- */
-@keyframes viewFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* =========================================================================
+   8. Focus & Accessibility
+   ========================================================================= */
 
-@keyframes viewFadeOut {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-6px); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* ---- Focus ring utility ---- */
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* ---- Reduced motion ---- */
+
+/* =========================================================================
+   9. Keyframe Definitions
+   ========================================================================= */
+
+/* -- Fade -- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInPure {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* -- View transitions -- */
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes viewFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+
+/* -- Scale -- */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes scaleInBounce {
+  0%   { opacity: 0; transform: scale(0.9); }
+  60%  { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* -- Slide -- */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* -- Bounce entrance -- */
+@keyframes bounceIn {
+  0%   { opacity: 0; transform: scale(0.85); }
+  40%  { opacity: 1; transform: scale(1.06); }
+  70%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+/* -- Utility pulses -- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+@keyframes shimmerFlow {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* -- Toast entrance -- */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+
+
+/* =========================================================================
+   10. Animation Utility Classes
+   ========================================================================= */
+
+.fade-in {
+  animation: fadeIn 0.3s var(--ease-out) both;
+}
+
+.fade-in-pure {
+  animation: fadeInPure 0.3s var(--ease-out) both;
+}
+
+.slide-in-up {
+  animation: slideUp 0.4s var(--ease-smooth) both;
+}
+
+.slide-in-down {
+  animation: slideDown 0.4s var(--ease-smooth) both;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.4s var(--ease-smooth) both;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.4s var(--ease-smooth) both;
+}
+
+.scale-in {
+  animation: scaleIn 0.35s var(--ease-smooth) both;
+}
+
+.bounce-in {
+  animation: bounceIn 0.5s var(--ease-out) both;
+}
+
+/* Stagger children: apply to parent, each child gets auto-delayed */
+.stagger-children > * {
+  animation: fadeIn 0.35s var(--ease-smooth) both;
+}
+.stagger-children > *:nth-child(1)  { animation-delay: 0.03s; }
+.stagger-children > *:nth-child(2)  { animation-delay: 0.06s; }
+.stagger-children > *:nth-child(3)  { animation-delay: 0.09s; }
+.stagger-children > *:nth-child(4)  { animation-delay: 0.12s; }
+.stagger-children > *:nth-child(5)  { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(6)  { animation-delay: 0.18s; }
+.stagger-children > *:nth-child(7)  { animation-delay: 0.21s; }
+.stagger-children > *:nth-child(8)  { animation-delay: 0.24s; }
+.stagger-children > *:nth-child(9)  { animation-delay: 0.27s; }
+.stagger-children > *:nth-child(10) { animation-delay: 0.30s; }
+.stagger-children > *:nth-child(11) { animation-delay: 0.33s; }
+.stagger-children > *:nth-child(12) { animation-delay: 0.36s; }
+
+/* Slide-up variant of stagger */
+.stagger-children-up > * {
+  animation: slideUp 0.4s var(--ease-smooth) both;
+}
+.stagger-children-up > *:nth-child(1)  { animation-delay: 0.04s; }
+.stagger-children-up > *:nth-child(2)  { animation-delay: 0.08s; }
+.stagger-children-up > *:nth-child(3)  { animation-delay: 0.12s; }
+.stagger-children-up > *:nth-child(4)  { animation-delay: 0.16s; }
+.stagger-children-up > *:nth-child(5)  { animation-delay: 0.20s; }
+.stagger-children-up > *:nth-child(6)  { animation-delay: 0.24s; }
+.stagger-children-up > *:nth-child(7)  { animation-delay: 0.28s; }
+.stagger-children-up > *:nth-child(8)  { animation-delay: 0.32s; }
+.stagger-children-up > *:nth-child(9)  { animation-delay: 0.36s; }
+.stagger-children-up > *:nth-child(10) { animation-delay: 0.40s; }
+.stagger-children-up > *:nth-child(11) { animation-delay: 0.44s; }
+.stagger-children-up > *:nth-child(12) { animation-delay: 0.48s; }
+
+
+/* =========================================================================
+   11. Stagger Utilities (legacy, preserved for compatibility)
+   ========================================================================= */
+
+.stagger-1  { animation-delay: 0.05s !important; }
+.stagger-2  { animation-delay: 0.10s !important; }
+.stagger-3  { animation-delay: 0.15s !important; }
+.stagger-4  { animation-delay: 0.20s !important; }
+.stagger-5  { animation-delay: 0.25s !important; }
+.stagger-6  { animation-delay: 0.30s !important; }
+.stagger-7  { animation-delay: 0.35s !important; }
+.stagger-8  { animation-delay: 0.40s !important; }
+.stagger-9  { animation-delay: 0.45s !important; }
+.stagger-10 { animation-delay: 0.50s !important; }
+.stagger-11 { animation-delay: 0.55s !important; }
+.stagger-12 { animation-delay: 0.60s !important; }
+
+
+/* =========================================================================
+   12. Typography Scale
+   ========================================================================= */
+
+.font-mono {
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* -- Size scale -- */
+.text-xs   { font-size: 11px; line-height: 1.45; }
+.text-sm   { font-size: 13px; line-height: 1.45; }
+.text-base { font-size: 15px; line-height: 1.5;  }
+.text-lg   { font-size: 17px; line-height: 1.47; }
+.text-xl   { font-size: 20px; line-height: 1.4;  letter-spacing: -0.01em; }
+.text-2xl  { font-size: 24px; line-height: 1.33; letter-spacing: -0.02em; }
+.text-3xl  { font-size: 30px; line-height: 1.27; letter-spacing: -0.025em; }
+.text-4xl  { font-size: 36px; line-height: 1.2;  letter-spacing: -0.03em; }
+
+/* -- Weight -- */
+.font-light    { font-weight: 300; }
+.font-regular  { font-weight: 400; }
+.font-medium   { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold     { font-weight: 700; }
+.font-heavy    { font-weight: 800; }
+
+/* -- Tracking -- */
+.tracking-tighter { letter-spacing: -0.04em; }
+.tracking-tight   { letter-spacing: -0.02em; }
+.tracking-normal  { letter-spacing: -0.01em; }
+.tracking-wide    { letter-spacing: 0.02em; }
+.tracking-wider   { letter-spacing: 0.06em; }
+.tracking-caps    { letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* -- Color helpers -- */
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary  { color: var(--text-tertiary); }
+.text-muted     { color: var(--text-muted); }
+.text-accent    { color: var(--color-accent); }
+.text-success   { color: var(--color-productive); }
+.text-warning   { color: var(--color-warning); }
+.text-danger    { color: var(--color-distraction); }
+
+
+/* =========================================================================
+   13. Layout Utilities
+   ========================================================================= */
+
+.flex          { display: flex; }
+.flex-col      { display: flex; flex-direction: column; }
+.flex-center   { display: flex; align-items: center; justify-content: center; }
+.flex-between  { display: flex; align-items: center; justify-content: space-between; }
+.items-center  { align-items: center; }
+.items-start   { align-items: flex-start; }
+.gap-1 { gap: var(--space-1); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
+.gap-6 { gap: var(--space-6); }
+.gap-8 { gap: var(--space-8); }
+
+
+/* =========================================================================
+   14. Button System
+   ========================================================================= */
+
+/* Shared base for all drift buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--duration-normal) var(--ease-smooth);
+  -webkit-user-select: none;
+  user-select: none;
+  line-height: 1;
+}
+
+.btn:active {
+  transform: scale(var(--active-scale));
+  transition-duration: var(--duration-instant);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* -- Sizes -- */
+.btn-sm {
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+}
+
+.btn-md {
+  font-size: 14px;
+  padding: 10px 20px;
+}
+
+.btn-lg {
+  font-size: 15px;
+  padding: 13px 24px;
+  border-radius: var(--radius-lg);
+}
+
+/* -- Primary -- */
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--text-inverse);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  box-shadow: var(--shadow-accent-glow);
+  transform: translateY(var(--hover-lift));
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(var(--active-scale));
+}
+
+/* -- Secondary -- */
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-accent-border);
+  color: var(--color-accent);
+  transform: translateY(var(--hover-lift));
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary:active {
+  transform: translateY(0) scale(var(--active-scale));
+}
+
+/* -- Ghost -- */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.btn-ghost:active {
+  transform: scale(var(--active-scale));
+}
+
+/* -- Danger -- */
+.btn-danger {
+  background: var(--color-distraction);
+  color: var(--text-inverse);
+  border: 1px solid transparent;
+}
+
+.btn-danger:hover {
+  opacity: var(--hover-opacity);
+  transform: translateY(var(--hover-lift));
+  box-shadow: 0 4px 16px rgba(196, 60, 60, 0.2);
+}
+
+.btn-danger:active {
+  transform: translateY(0) scale(var(--active-scale));
+}
+
+/* -- Icon button -- */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.btn-icon:hover {
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  transform: scale(1.08);
+}
+
+.btn-icon:active {
+  transform: scale(0.92);
+  transition-duration: var(--duration-instant);
+}
+
+
+/* =========================================================================
+   15. Card System
+   ========================================================================= */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.card:hover {
+  transform: translateY(var(--hover-lift));
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-accent-border);
+}
+
+/* Interactive card variant -- more lift on hover */
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-interactive:active {
+  transform: translateY(-1px) scale(0.99);
+  transition-duration: var(--duration-instant);
+}
+
+/* Flat card -- no hover effect */
+.card-flat {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+}
+
+/* Glass card */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+
+/* Inset card -- recessed surface */
+.card-inset {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+
+/* =========================================================================
+   16. Badge System
+   ========================================================================= */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.badge-productive {
+  background: var(--color-productive-bg);
+  color: var(--color-productive-text);
+  border: 1px solid var(--color-productive-border);
+}
+
+.badge-neutral {
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral-text);
+  border: 1px solid var(--color-neutral-border);
+}
+
+.badge-distraction {
+  background: var(--color-distraction-bg);
+  color: var(--color-distraction-text);
+  border: 1px solid var(--color-distraction-border);
+}
+
+.badge-accent {
+  background: var(--color-accent-bg);
+  color: var(--color-accent-text);
+  border: 1px solid var(--color-accent-border);
+}
+
+.badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border: 1px solid var(--color-warning-border);
+}
+
+/* Dot indicator inside a badge */
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.badge-productive .badge-dot { background: var(--color-productive); }
+.badge-neutral .badge-dot    { background: var(--color-neutral); }
+.badge-distraction .badge-dot { background: var(--color-distraction); }
+.badge-accent .badge-dot     { background: var(--color-accent); }
+.badge-warning .badge-dot    { background: var(--color-warning); }
+
+
+/* =========================================================================
+   17. Form Elements
+   ========================================================================= */
+
+.input,
+.textarea {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  outline: none;
+  width: 100%;
+  transition: border-color var(--duration-fast) ease,
+              box-shadow var(--duration-fast) ease;
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: var(--input-ring);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+.input:disabled,
+.textarea:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+.input-sm {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-xs);
+}
+
+.input-lg {
+  font-size: 15px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+}
+
+.select {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--duration-fast) ease,
+              box-shadow var(--duration-fast) ease;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2386868b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.select:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: var(--input-ring);
+}
+
+/* -- Label -- */
+.label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.label-muted {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* -- Input group (icon + input) -- */
+.input-group {
+  position: relative;
+}
+
+.input-group .input {
+  padding-left: 36px;
+}
+
+.input-group-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+}
+
+
+/* =========================================================================
+   18. Skeleton Loaders
+   ========================================================================= */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-shine) 15%,
+    var(--skeleton-base) 30%,
+    var(--skeleton-shine) 45%,
+    var(--skeleton-base) 60%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 400% 100%;
+  animation: shimmerFlow 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: var(--radius-xs);
+  margin-bottom: 8px;
+}
+
+.skeleton-heading {
+  height: 24px;
+  width: 60%;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+}
+
+.skeleton-card {
+  height: 120px;
+  border-radius: var(--radius-lg);
+}
+
+
+/* =========================================================================
+   19. Toast / Notification
+   ========================================================================= */
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--toast-bg);
+  border: 1px solid var(--toast-border);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  box-shadow: var(--toast-shadow);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  animation: toastIn 0.35s var(--ease-smooth) both;
+  max-width: calc(100vw - 48px);
+}
+
+.toast-exit {
+  animation: toastOut 0.25s ease-out both;
+}
+
+.toast-success {
+  border-color: var(--color-success-border);
+}
+
+.toast-success::before {
+  content: '';
+  width: 4px;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--color-success);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.toast-error {
+  border-color: var(--color-distraction-border);
+}
+
+.toast-error::before {
+  content: '';
+  width: 4px;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--color-distraction);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.toast-warning {
+  border-color: var(--color-warning-border);
+}
+
+.toast-warning::before {
+  content: '';
+  width: 4px;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--color-warning);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: all var(--duration-fast) ease;
+}
+
+.toast-close:hover {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+
+/* =========================================================================
+   20. Tooltip
+   ========================================================================= */
+
+.tooltip {
+  position: absolute;
+  z-index: var(--z-tooltip);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: scaleIn 0.15s var(--ease-out) both;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  transform: rotate(45deg);
+}
+
+/* Arrow positioning */
+.tooltip-arrow-top {
+  bottom: -5px;
+  left: 50%;
+  margin-left: -4px;
+  border-top: none;
+  border-left: none;
+}
+
+.tooltip-arrow-bottom {
+  top: -5px;
+  left: 50%;
+  margin-left: -4px;
+  border-bottom: none;
+  border-right: none;
+}
+
+
+/* =========================================================================
+   21. Micro-interactions
+   ========================================================================= */
+
+/* -- Section title -- consistent across all pages */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+/* -- Link with animated underline -- */
+.link-underline {
+  position: relative;
+  text-decoration: none;
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.link-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 1.5px;
+  background: var(--color-accent);
+  border-radius: 1px;
+  transition: width var(--duration-normal) var(--ease-smooth);
+}
+
+.link-underline:hover::after {
+  width: 100%;
+}
+
+/* -- Hover lift -- generic utility */
+.hover-lift {
+  transition: transform var(--duration-normal) var(--ease-smooth),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+}
+
+.hover-lift:hover {
+  transform: translateY(var(--hover-lift));
+  box-shadow: var(--shadow-md);
+}
+
+/* -- Press scale -- generic active feedback */
+.press-scale {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.press-scale:active {
+  transform: scale(var(--active-scale));
+}
+
+/* -- Glow pulse on focused/active states -- */
+.glow-accent {
+  box-shadow: 0 0 0 0 rgba(74, 107, 239, 0);
+  transition: box-shadow var(--duration-normal) ease;
+}
+
+.glow-accent:hover {
+  box-shadow: var(--shadow-accent-glow);
+}
+
+/* -- Spinner utility -- */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.spinner-sm {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
+.spinner-lg {
+  width: 24px;
+  height: 24px;
+  border-width: 2.5px;
+}
+
+/* -- Divider -- */
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+  border: none;
+  margin: var(--space-4) 0;
+}
+
+/* -- Visual-only hidden (screen reader accessible) -- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+
+/* =========================================================================
+   22. Reduced Motion
+   ========================================================================= */
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

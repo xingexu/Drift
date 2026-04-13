@@ -39,6 +39,12 @@ async function read<T>(key: string, fallback: T): Promise<T> {
   if (backend === "chrome") {
     return new Promise((resolve) => {
       chrome.storage.local.get(key, (result) => {
+        // Check for runtime errors (e.g., storage quota exceeded)
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] storage read error:", chrome.runtime.lastError.message);
+          resolve(fallback);
+          return;
+        }
         resolve((result[key] as T) ?? fallback);
       });
     });
@@ -57,12 +63,24 @@ async function read<T>(key: string, fallback: T): Promise<T> {
 async function write(key: string, value: unknown): Promise<void> {
   const backend = getBackend();
   if (backend === "chrome") {
-    return new Promise((resolve) => {
-      chrome.storage.local.set({ [key]: value }, resolve);
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set({ [key]: value }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] storage write error:", chrome.runtime.lastError.message);
+          // Resolve anyway to avoid unhandled rejections crashing the extension
+          resolve();
+          return;
+        }
+        resolve();
+      });
     });
   }
   if (backend === "local") {
-    localStorage.setItem(key, JSON.stringify(value));
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.warn("[Drift] localStorage write error:", e);
+    }
     return;
   }
   memoryStore[key] = value;
@@ -80,10 +98,21 @@ export async function saveEvents(events: BrowsingEvent[]): Promise<void> {
   return write(EVENTS_KEY, events);
 }
 
+// Simple mutex to prevent race conditions in read-modify-write operations
+let appendLock: Promise<void> = Promise.resolve();
+
 export async function appendEvent(event: BrowsingEvent): Promise<void> {
-  const events = await loadEvents();
-  events.push(event);
-  await saveEvents(events);
+  const release = appendLock;
+  let resolve: () => void;
+  appendLock = new Promise<void>((r) => { resolve = r; });
+  try {
+    await release;
+    const events = await loadEvents();
+    events.push(event);
+    await saveEvents(events);
+  } finally {
+    resolve!();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -200,20 +229,40 @@ export async function runInitialSync(): Promise<void> {
 export async function loadTrackingState(): Promise<boolean> {
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     return new Promise((resolve) => {
-      chrome.storage.local.get(TRACKING_KEY, (r) => resolve(r[TRACKING_KEY] !== false));
+      chrome.storage.local.get(TRACKING_KEY, (r) => {
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] loadTrackingState error:", chrome.runtime.lastError.message);
+          resolve(true); // Default to enabled
+          return;
+        }
+        resolve(r[TRACKING_KEY] !== false);
+      });
     });
   }
-  const raw = localStorage.getItem(TRACKING_KEY);
-  return raw !== "false";
+  try {
+    const raw = localStorage.getItem(TRACKING_KEY);
+    return raw !== "false";
+  } catch {
+    return true; // Default to enabled
+  }
 }
 
 export async function setTrackingState(enabled: boolean): Promise<void> {
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     return new Promise((resolve) => {
-      chrome.storage.local.set({ [TRACKING_KEY]: enabled }, resolve);
+      chrome.storage.local.set({ [TRACKING_KEY]: enabled }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] setTrackingState error:", chrome.runtime.lastError.message);
+        }
+        resolve();
+      });
     });
   }
-  localStorage.setItem(TRACKING_KEY, String(enabled));
+  try {
+    localStorage.setItem(TRACKING_KEY, String(enabled));
+  } catch {
+    // Silently fail if localStorage is not available
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +282,12 @@ export async function clearAll(): Promise<void> {
   const backend = getBackend();
   if (backend === "chrome") {
     return new Promise((resolve) => {
-      chrome.storage.local.clear(resolve);
+      chrome.storage.local.clear(() => {
+        if (chrome.runtime.lastError) {
+          console.warn("[Drift] storage clear error:", chrome.runtime.lastError.message);
+        }
+        resolve();
+      });
     });
   }
   if (backend === "local") {
