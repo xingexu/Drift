@@ -2,25 +2,61 @@
 // Summary & narrative generation
 // ---------------------------------------------------------------------------
 
-import {
-  BrowsingEvent,
-  BrowsingSession,
-  SessionSummary,
-  SessionStats,
-} from "./types";
+import { BrowsingSession, SessionSummary } from "./types";
 
+/**
+ * Format a millisecond duration into a compact human-readable string.
+ *
+ * - Under 60 s  -> "Xs"
+ * - Under 60 min -> "X minute(s)"
+ * - 60 min+      -> "Xh Ym"
+ *
+ * @param ms - Duration in milliseconds (clamped to >= 0).
+ * @returns A formatted string like "12 minutes" or "1h 30m".
+ */
 function formatMs(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
-  const hours = Math.floor(minutes / 60);
-  const rem = minutes % 60;
-  return `${hours}h ${rem}m`;
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes !== 1 ? "s" : ""}`;
+  const hours = Math.floor(totalMinutes / 60);
+  const rem = totalMinutes % 60;
+  return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`;
 }
 
+/**
+ * Build a complete session summary including a human-readable narrative.
+ *
+ * The summary is a flat, serialisable object suitable for storage and
+ * display in the UI.  It combines timing data from the session stats
+ * with a generated narrative string.
+ *
+ * @param session - A fully-processed `BrowsingSession`.
+ * @returns A `SessionSummary` with all fields populated.
+ */
 export function buildSessionSummary(session: BrowsingSession): SessionSummary {
   const { events, stats } = session;
+
+  if (events.length === 0) {
+    return {
+      sessionId: session.id,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      entryDomain: "",
+      exitDomain: "",
+      inferredIntent: session.intent?.label ?? "unknown",
+      totalActiveTimeMs: 0,
+      productiveTimeMs: 0,
+      neutralTimeMs: 0,
+      distractionTimeMs: 0,
+      driftScore: 0,
+      driftPointCount: 0,
+      longestDistractionStreakMs: 0,
+      summaryLabel: "Empty session",
+      narrative: "Empty session.",
+    };
+  }
+
   const entry = events[0];
   const exit = events[events.length - 1];
 
@@ -28,8 +64,8 @@ export function buildSessionSummary(session: BrowsingSession): SessionSummary {
     sessionId: session.id,
     startTime: session.startTime,
     endTime: session.endTime,
-    entryDomain: entry?.domain ?? "",
-    exitDomain: exit?.domain ?? "",
+    entryDomain: entry.domain,
+    exitDomain: exit.domain,
     inferredIntent: session.intent?.label ?? "unknown",
     totalActiveTimeMs: session.totalDurationMs,
     productiveTimeMs: stats.productiveTimeMs,
@@ -43,6 +79,12 @@ export function buildSessionSummary(session: BrowsingSession): SessionSummary {
   };
 }
 
+/**
+ * Generate a multi-sentence narrative describing what happened in the session.
+ *
+ * @param session - The fully-processed session.
+ * @returns A human-readable paragraph string.
+ */
 function generateNarrative(session: BrowsingSession): string {
   const { events, stats, driftScore, intent } = session;
   if (events.length === 0) return "Empty session.";

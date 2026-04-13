@@ -1,9 +1,50 @@
 // ---------------------------------------------------------------------------
-// Drift – Core Data Models
+// Drift -- Core Data Models
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Semantic type aliases
+// ---------------------------------------------------------------------------
+
+/**
+ * Semantic type aliases provide documentation and IDE hints about what
+ * a `string` or `number` field represents, without introducing
+ * structural incompatibilities that would break plain literal
+ * assignments in tests, mocks, and consumer code.
+ */
+
+/** A unique identifier for a browsing event. */
+export type EventId = string;
+
+/** A unique identifier for a browsing session. */
+export type SessionId = string;
+
+/** A unique identifier for a transition between events. */
+export type TransitionId = string;
+
+/** A unique identifier for a drift point. */
+export type DriftPointId = string;
+
+/** A unique identifier for a graph node. */
+export type GraphNodeId = string;
+
+/** A unique identifier for a graph edge. */
+export type GraphEdgeId = string;
+
+/** Unix-epoch millisecond timestamp. */
+export type Timestamp = number;
+
+/** Non-negative duration in milliseconds. */
+export type DurationMs = number;
+
+// ---------------------------------------------------------------------------
+// Enums and union types
+// ---------------------------------------------------------------------------
+
+/** The classification bucket for an event or domain. */
 export type Category = "productive" | "neutral" | "distraction";
 
+/** How the user arrived at a page. */
 export type TransitionType =
   | "tab_switch"
   | "navigation"
@@ -11,6 +52,7 @@ export type TransitionType =
   | "revisit"
   | "unknown";
 
+/** The trigger that caused a drift point to be recorded. */
 export type DriftTrigger =
   | "productive_to_distraction"
   | "rapid_switching"
@@ -18,6 +60,7 @@ export type DriftTrigger =
   | "distraction_streak"
   | "repeated_bounce";
 
+/** High-level intent label for a session. */
 export type IntentLabel =
   | "work"
   | "study"
@@ -26,19 +69,29 @@ export type IntentLabel =
   | "mixed"
   | "unknown";
 
+/** Where a classification decision came from. */
+export type ClassificationSource = "rule_engine" | "user_override" | "ml";
+
 // ---------------------------------------------------------------------------
 // Browsing Event
 // ---------------------------------------------------------------------------
 
+/** The result of classifying a single browsing event. */
 export interface Classification {
   category: Category;
   reason: string;
-  source: "rule_engine" | "user_override" | "ml";
+  source: ClassificationSource;
 }
 
+/**
+ * A single browsing event representing a page visit with timing data.
+ *
+ * Events are the fundamental unit of data in Drift.  Each one captures a
+ * contiguous span of time the user spent on a particular URL.
+ */
 export interface BrowsingEvent {
-  id: string;
-  sessionId?: string;
+  id: EventId;
+  sessionId?: SessionId;
   tabId: number;
   windowId: number;
   rawUrl: string;
@@ -46,10 +99,10 @@ export interface BrowsingEvent {
   domain: string;
   path?: string;
   title?: string;
-  startTime: number;
-  endTime: number;
-  durationMs: number;
-  previousEventId?: string;
+  startTime: Timestamp;
+  endTime: Timestamp;
+  durationMs: DurationMs;
+  previousEventId?: EventId;
   transitionType?: TransitionType;
   classification?: Classification;
   category?: Category;
@@ -61,6 +114,10 @@ export interface BrowsingEvent {
 // Raw tracker event (before normalization)
 // ---------------------------------------------------------------------------
 
+/**
+ * The minimal event shape emitted by the tracker before the pipeline
+ * normalizes and enriches it.
+ */
 export interface RawTrackerEvent {
   tabId: number;
   windowId: number;
@@ -75,6 +132,7 @@ export interface RawTrackerEvent {
 // Session
 // ---------------------------------------------------------------------------
 
+/** Aggregate statistics for a single browsing session. */
 export interface SessionStats {
   eventCount: number;
   uniqueDomains: number;
@@ -88,20 +146,27 @@ export interface SessionStats {
   longestDistractionStreakMs: number;
   mostVisitedDomain: string;
   longestSinglePageMs: number;
+  /** Ratio of productive time to total active time (0-1). */
   focusRatio: number;
+  /** Ratio of distraction time to total active time (0-1). */
   distractionRatio: number;
   revisitCount: number;
 }
 
+/**
+ * A browsing session: a contiguous block of events separated from
+ * other sessions by an inactivity gap.
+ */
 export interface BrowsingSession {
-  id: string;
+  id: SessionId;
   events: BrowsingEvent[];
-  startTime: number;
-  endTime: number;
-  totalDurationMs: number;
-  entryEventId: string;
-  exitEventId: string;
+  startTime: Timestamp;
+  endTime: Timestamp;
+  totalDurationMs: DurationMs;
+  entryEventId: EventId;
+  exitEventId: EventId;
   intent?: SessionIntent;
+  /** Percentage of active time spent on distracting pages (0-100). */
   driftScore: number;
   stats: SessionStats;
   transitions: Transition[];
@@ -113,15 +178,17 @@ export interface BrowsingSession {
 // Transition
 // ---------------------------------------------------------------------------
 
+/** A navigation from one event/page to the next within a session. */
 export interface Transition {
-  id: string;
-  sessionId: string;
-  sourceEventId: string;
-  targetEventId: string;
+  id: TransitionId;
+  sessionId: SessionId;
+  sourceEventId: EventId;
+  targetEventId: EventId;
   sourceDomain: string;
   targetDomain: string;
   sourceNormalizedUrl: string;
   targetNormalizedUrl: string;
+  /** Gap between the source event's endTime and the target's startTime (ms). Clamped to >= 0. */
   timeGapMs: number;
   isCategoryShift: boolean;
   fromCategory?: Category;
@@ -132,8 +199,9 @@ export interface Transition {
 // Graph data
 // ---------------------------------------------------------------------------
 
+/** A node in the session navigation graph, representing a unique URL. */
 export interface GraphNode {
-  id: string;
+  id: GraphNodeId;
   normalizedUrl: string;
   domain: string;
   visitCount: number;
@@ -141,16 +209,18 @@ export interface GraphNode {
   category?: Category;
 }
 
+/** A directed edge in the session graph, representing one or more transitions between two URLs. */
 export interface GraphEdge {
-  id: string;
-  sourceNodeId: string;
-  targetNodeId: string;
+  id: GraphEdgeId;
+  sourceNodeId: GraphNodeId;
+  targetNodeId: GraphNodeId;
   count: number;
   avgTimeGapMs: number;
 }
 
+/** The full graph for a session. */
 export interface SessionGraph {
-  sessionId: string;
+  sessionId: SessionId;
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
@@ -159,12 +229,16 @@ export interface SessionGraph {
 // Drift
 // ---------------------------------------------------------------------------
 
+/**
+ * A single detected moment of attention drift within a session.
+ * Drift points reference the event that triggered them and the reason.
+ */
 export interface DriftPoint {
-  id: string;
-  sessionId: string;
-  eventId?: string;
-  transitionId?: string;
-  timestamp: number;
+  id: DriftPointId;
+  sessionId: SessionId;
+  eventId?: EventId;
+  transitionId?: TransitionId;
+  timestamp: Timestamp;
   reason: string;
   trigger: DriftTrigger;
 }
@@ -173,24 +247,27 @@ export interface DriftPoint {
 // Intent
 // ---------------------------------------------------------------------------
 
+/** The inferred intent of a session, based on the opening events. */
 export interface SessionIntent {
   label: IntentLabel;
+  /** Confidence score (0-1). */
   confidence: number;
-  basedOnEventIds: string[];
+  basedOnEventIds: EventId[];
 }
 
 // ---------------------------------------------------------------------------
 // Replay
 // ---------------------------------------------------------------------------
 
+/** A single step in the session replay timeline. */
 export interface ReplayStep {
   step: number;
-  eventId: string;
-  timestamp: number;
+  eventId: EventId;
+  timestamp: Timestamp;
   domain: string;
   normalizedUrl: string;
   title?: string;
-  durationMs: number;
+  durationMs: DurationMs;
   category: Category;
   drift: boolean;
   driftReasons?: string[];
@@ -200,10 +277,11 @@ export interface ReplayStep {
 // Summary
 // ---------------------------------------------------------------------------
 
+/** A human-readable summary of a session. */
 export interface SessionSummary {
-  sessionId: string;
-  startTime: number;
-  endTime: number;
+  sessionId: SessionId;
+  startTime: Timestamp;
+  endTime: Timestamp;
   entryDomain: string;
   exitDomain: string;
   inferredIntent: string;
@@ -211,6 +289,7 @@ export interface SessionSummary {
   productiveTimeMs: number;
   neutralTimeMs: number;
   distractionTimeMs: number;
+  /** Percentage of active time spent on distracting pages (0-100). */
   driftScore: number;
   driftPointCount: number;
   longestDistractionStreakMs: number;
@@ -222,14 +301,16 @@ export interface SessionSummary {
 // Session History (persisted summaries for past sessions)
 // ---------------------------------------------------------------------------
 
+/** A compact, serialisable summary of a session for long-term storage. */
 export interface SessionHistoryEntry {
-  sessionId: string;
-  startTime: number;
-  endTime: number;
+  sessionId: SessionId;
+  startTime: Timestamp;
+  endTime: Timestamp;
   totalActiveTimeMs: number;
   productiveTimeMs: number;
   neutralTimeMs: number;
   distractionTimeMs: number;
+  /** Percentage of active time spent on distracting pages (0-100). */
   driftScore: number;
   driftPointCount: number;
   summaryLabel: string;
@@ -243,14 +324,16 @@ export interface SessionHistoryEntry {
 // Weekly Report (aggregated across sessions)
 // ---------------------------------------------------------------------------
 
+/** A summary report covering a 7-day window. */
 export interface WeeklyReport {
-  periodStart: number;
-  periodEnd: number;
+  periodStart: Timestamp;
+  periodEnd: Timestamp;
   sessionCount: number;
   totalTimeMs: number;
   productiveTimeMs: number;
   neutralTimeMs: number;
   distractionTimeMs: number;
+  /** Average drift score across sessions (0-100). */
   averageDriftScore: number;
   topDomains: { domain: string; timeMs: number }[];
 }
@@ -259,22 +342,24 @@ export interface WeeklyReport {
 // Monthly Report (aggregated across sessions, 30 days)
 // ---------------------------------------------------------------------------
 
+/** A summary report covering a 30-day window. */
 export interface MonthlyReport {
-  periodStart: number;
-  periodEnd: number;
+  periodStart: Timestamp;
+  periodEnd: Timestamp;
   sessionCount: number;
   totalTimeMs: number;
   productiveTimeMs: number;
   neutralTimeMs: number;
   distractionTimeMs: number;
+  /** Average drift score across sessions (0-100). */
   averageDriftScore: number;
   topDomains: { domain: string; timeMs: number }[];
-  // Weekly trend: drift scores per week for sparkline
-  weeklyTrend: { weekStart: number; driftScore: number; totalMs: number }[];
-  // Daily average
+  /** Weekly trend: drift scores per week for sparkline. */
+  weeklyTrend: { weekStart: Timestamp; driftScore: number; totalMs: number }[];
+  /** Daily average active time (ms). */
   dailyAverageMs: number;
-  // Best/worst days
-  bestDay: { date: number; driftScore: number } | null;
-  worstDay: { date: number; driftScore: number } | null;
+  /** The day with the lowest (best) average drift score. */
+  bestDay: { date: Timestamp; driftScore: number } | null;
+  /** The day with the highest (worst) average drift score. */
+  worstDay: { date: Timestamp; driftScore: number } | null;
 }
-

@@ -1,0 +1,410 @@
+import SwiftUI
+import Combine
+import AppKit
+import ApplicationServices
+
+// MARK: - Window Tracker
+
+/// Monitors the frontmost application and its window title, recording
+/// time-segmented events into ``AppState/session``.
+///
+/// Uses a hybrid approach:
+/// - **NSWorkspace notifications** detect app-activation changes instantly.
+/// - A **1-second poll timer** captures window-title changes within the same
+///   app (e.g. switching browser tabs) and drives session-time accounting.
+///
+/// All mutable state lives on `@MainActor`. Timer callbacks hop to the main
+/// actor before touching any property, eliminating data races.
+@MainActor
+class WindowTracker: ObservableObject {
+
+    // MARK: - Singleton
+
+    static let shared = WindowTracker()
+
+    // MARK: - Published State
+
+    @Published private(set) var isTracking = false
+    @Published private(set) var isPaused = false
+    @Published private(set) var isIdle = false
+    @Published private(set) var activeApp: String = ""
+    @Published private(set) var activeTitle: String = ""
+    @Published private(set) var activeCategory: AppCategory = .neutral
+
+    // MARK: - Private State
+
+    private var pollTimer: Timer?
+    private var sessionTimer: Timer?
+    private var workspaceObserver: NSObjectProtocol?
+    private var lastEventTimestamp = Date()
+    private var previousApp: String = ""
+    private var previousBundleId: String?
+
+    /// Minimum duration (ms) to record an app-switch event.
+    /// Prevents micro-events from very rapid Cmd-Tab switching.
+    private let minimumEventDurationMs: TimeInterval = 500
+
+    /// Seconds of input inactivity before the session is considered idle.
+    private var idleThreshold: TimeInterval {
+        TimeInterval(max(AppState.shared.idleTimeout, 30))
+    }
+
+    // MARK: - Init
+
+    private init() {}
+
+    // MARK: - Lifecycle
+
+    /// Begins tracking the frontmost application.
+    ///
+    /// If accessibility permissions have not been granted the tracker still
+    /// runs but window titles will be unavailable (app names from
+    /// `NSWorkspace` remain accurate).
+    func start() {
+        guard !isTracking || isPaused else { return }
+
+        if !AXIsProcessTrusted() {
+            print("[WindowTracker] Accessibility not granted -- tracking without window titles")
+        }
+
+        if !isTracking {
+            AppState.shared.session = SessionData()
+            AppState.shared.session.isActive = true
+            AppState.shared.session.startTime = Date()
+        }
+
+        isTracking = true
+        isPaused = false
+        lastEventTimestamp = Date()
+
+        installWorkspaceObserver()
+        startTimers()
+    }
+
+    /// Pauses tracking without resetting the session.
+    func pause() {
+        isPaused = true
+        stopTimers()
+    }
+
+    /// Fully stops tracking and tears down all observers.
+    func stop() {
+        isTracking = false
+        isPaused = false
+        stopTimers()
+        removeWorkspaceObserver()
+    }
+
+    /// Saves the current session to history and resets for a fresh run.
+    func resetSession() {
+        AppState.shared.saveCurrentSession()
+        stop()
+        AppState.shared.session.reset()
+    }
+
+    /// Called by AppDelegate during applicationWillTerminate to persist
+    /// any in-progress session data before the process exits.
+    func persistBeforeExit() {
+        if isTracking {
+            AppState.shared.saveCurrentSession()
+        }
+        stop()
+    }
+
+    // MARK: - NSWorkspace Notification
+
+    /// Observes `NSWorkspace.didActivateApplicationNotification` so we react
+    /// to app switches without polling.
+    private func installWorkspaceObserver() {
+        removeWorkspaceObserver()
+        workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor in
+                guard let self, self.isTracking, !self.isPaused else { return }
+                self.handleAppActivation(notification: notification)
+            }
+        }
+    }
+
+    private func removeWorkspaceObserver() {
+        if let observer = workspaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            workspaceObserver = nil
+        }
+    }
+
+    /// Processes an app-activation notification.
+    private func handleAppActivation(notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            return
+        }
+        let appName = app.localizedName ?? "Unknown"
+        let bundleId = app.bundleIdentifier
+        let title = windowTitle(for: app) ?? appName
+        let isBrowser = Self.isBrowserBundle(bundleId)
+
+        var category = AppClassifier.classify(appName: appName, bundleId: bundleId)
+        if isBrowser, let url = extractURL(from: title, appName: appName) {
+            let domainCategory = AppClassifier.classifyDomain(url)
+            if domainCategory != .neutral { category = domainCategory }
+        }
+
+        recordAppSwitch(newApp: appName, newBundleId: bundleId, newTitle: title, newCategory: category, isBrowser: isBrowser)
+    }
+
+    // MARK: - Timers
+
+    private func startTimers() {
+        stopTimers()
+
+        // Poll timer -- captures title changes and idle state.
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.pollActiveWindow()
+                self?.checkIdle()
+            }
+        }
+        if let t = pollTimer { RunLoop.main.add(t, forMode: .common) }
+
+        // Session timer -- updates elapsed time.
+        sessionTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateSessionTime()
+            }
+        }
+        if let t = sessionTimer { RunLoop.main.add(t, forMode: .common) }
+    }
+
+    private func stopTimers() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+        sessionTimer?.invalidate()
+        sessionTimer = nil
+    }
+
+    // MARK: - Polling
+
+    /// Lightweight per-second poll. Detects title changes (tab switches) and
+    /// ensures state stays current if the notification was missed (e.g. full-
+    /// screen transitions).
+    private func pollActiveWindow() {
+        guard isTracking, !isPaused else { return }
+        guard let info = activeWindowInfo() else { return }
+
+        let appName = info.appName
+        let bundleId = info.bundleId
+        let title = info.windowTitle
+        let isBrowser = info.isBrowser
+
+        var category = AppClassifier.classify(appName: appName, bundleId: bundleId)
+        if isBrowser, let url = extractURL(from: title, appName: appName) {
+            let domainCategory = AppClassifier.classifyDomain(url)
+            if domainCategory != .neutral { category = domainCategory }
+        }
+
+        // Always update the displayed title.
+        activeTitle = title
+        activeCategory = category
+
+        // Only record a switch if the app actually changed and the
+        // notification path did not already handle it.
+        if appName != previousApp {
+            recordAppSwitch(
+                newApp: appName,
+                newBundleId: bundleId,
+                newTitle: title,
+                newCategory: category,
+                isBrowser: isBrowser
+            )
+        }
+    }
+
+    /// Accounts for time spent in the previous app and transitions to the new one.
+    private func recordAppSwitch(
+        newApp: String,
+        newBundleId: String?,
+        newTitle: String,
+        newCategory: AppCategory,
+        isBrowser: Bool
+    ) {
+        let now = Date()
+        let durationMs = now.timeIntervalSince(lastEventTimestamp) * 1000
+
+        // Record time for the PREVIOUS app, skipping negligible durations.
+        if !previousApp.isEmpty, durationMs >= minimumEventDurationMs {
+            let prevCategory = AppState.shared.session.currentCategory
+            switch prevCategory {
+            case .productive:  AppState.shared.session.productiveMs += durationMs
+            case .neutral:     AppState.shared.session.neutralMs += durationMs
+            case .distraction: AppState.shared.session.distractionMs += durationMs
+            }
+
+            let event = AppEvent(
+                owner: previousApp,
+                title: activeTitle,
+                isBrowser: isBrowser,
+                url: nil,
+                category: prevCategory,
+                timestamp: lastEventTimestamp,
+                durationMs: durationMs
+            )
+            AppState.shared.session.events.append(event)
+
+            // Cap event history to prevent unbounded memory growth.
+            if AppState.shared.session.events.count > 200 {
+                AppState.shared.session.events.removeFirst()
+            }
+        }
+
+        previousApp = newApp
+        previousBundleId = newBundleId
+        lastEventTimestamp = now
+        activeApp = newApp
+        activeTitle = newTitle
+        activeCategory = newCategory
+        AppState.shared.session.currentApp = newApp
+        AppState.shared.session.currentCategory = newCategory
+    }
+
+    private func updateSessionTime() {
+        guard let start = AppState.shared.session.startTime else { return }
+        AppState.shared.session.totalMs = Date().timeIntervalSince(start) * 1000
+    }
+
+    // MARK: - Idle Detection
+
+    /// Checks HID event sources for mouse and keyboard activity.
+    ///
+    /// On transition to idle the tracker pauses automatically. On return
+    /// from idle the timestamp is reset so idle seconds are not attributed
+    /// to any app.
+    private func checkIdle() {
+        let mouseIdle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .mouseMoved)
+        let keyIdle   = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown)
+        let clickIdle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .leftMouseDown)
+        let minIdle = min(mouseIdle, min(keyIdle, clickIdle))
+
+        if minIdle >= idleThreshold, !isIdle {
+            isIdle = true
+            pause()
+        } else if minIdle < idleThreshold, isIdle {
+            isIdle = false
+            // Reset timestamp so the idle period is not charged to any app.
+            lastEventTimestamp = Date()
+        }
+    }
+
+    // MARK: - Active Window (Accessibility API)
+
+    /// Snapshot of the frontmost window at a point in time.
+    struct WindowInfo {
+        let appName: String
+        let windowTitle: String
+        let bundleId: String?
+        let isBrowser: Bool
+    }
+
+    /// Queries `NSWorkspace` and the Accessibility API for the frontmost window.
+    ///
+    /// Returns `nil` only when no application is active (rare edge case during
+    /// fast user switching or when the login window is shown).
+    private func activeWindowInfo() -> WindowInfo? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+
+        let appName  = app.localizedName ?? "Unknown"
+        let bundleId = app.bundleIdentifier
+        let title    = windowTitle(for: app) ?? appName
+        let isBrowser = Self.isBrowserBundle(bundleId)
+
+        return WindowInfo(
+            appName: appName,
+            windowTitle: title,
+            bundleId: bundleId,
+            isBrowser: isBrowser
+        )
+    }
+
+    /// Retrieves the focused-window title via the Accessibility API.
+    ///
+    /// Returns `nil` when accessibility access has not been granted or the app
+    /// has no focused window (e.g. menu-bar-only utilities).
+    private func windowTitle(for app: NSRunningApplication) -> String? {
+        guard AXIsProcessTrusted() else { return nil }
+
+        let pid = app.processIdentifier
+        let axApp = AXUIElementCreateApplication(pid)
+
+        var windowRef: AnyObject?
+        let windowResult = AXUIElementCopyAttributeValue(
+            axApp,
+            kAXFocusedWindowAttribute as CFString,
+            &windowRef
+        )
+        // Safe check -- do NOT force-unwrap the AXUIElement.
+        guard windowResult == .success,
+              let window = windowRef,
+              CFGetTypeID(window) == AXUIElementGetTypeID() else {
+            return nil
+        }
+
+        var titleRef: AnyObject?
+        let titleResult = AXUIElementCopyAttributeValue(
+            window as! AXUIElement,
+            kAXTitleAttribute as CFString,
+            &titleRef
+        )
+        guard titleResult == .success, let title = titleRef as? String, !title.isEmpty else {
+            return nil
+        }
+        return title
+    }
+
+    // MARK: - Browser Detection
+
+    /// Bundle identifiers recognized as web browsers.
+    private static let browserBundleIds: Set<String> = [
+        "com.google.chrome",
+        "com.brave.browser",
+        "com.apple.safari",
+        "org.mozilla.firefox",
+        "com.microsoft.edgemac",
+        "company.thebrowser.browser",   // Arc
+        "com.operasoftware.opera",
+        "com.vivaldi.vivaldi",
+        "org.chromium.chromium",
+        "com.nickvision.webkit",        // GNOME Web / Epiphany
+        "com.nickvision.Application",   // Orion
+    ]
+
+    /// Checks whether a bundle identifier belongs to a known browser.
+    ///
+    /// The comparison is case-insensitive so it tolerates capitalization
+    /// differences across OS versions.
+    private static func isBrowserBundle(_ bundleId: String?) -> Bool {
+        guard let id = bundleId?.lowercased() else { return false }
+        return browserBundleIds.contains(id)
+    }
+
+    // MARK: - URL Extraction
+
+    /// Attempts to pull a domain from a browser's window title.
+    ///
+    /// Many browsers format their titles as "Page Title - BrowserName".
+    /// If the page-title portion looks like a bare domain (contains a dot,
+    /// no spaces) it is returned as-is.
+    private func extractURL(from title: String, appName: String) -> String? {
+        let separators = [" - ", " \u{2014} ", " \u{2013} "]   // —, –
+        for sep in separators {
+            if let range = title.range(of: sep, options: .backwards) {
+                let pageTitle = String(title[..<range.lowerBound])
+                if pageTitle.contains("."), !pageTitle.contains(" ") {
+                    return pageTitle
+                }
+            }
+        }
+        return nil
+    }
+}

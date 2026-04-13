@@ -9,7 +9,6 @@ import {
   DriftTrigger,
   SessionIntent,
   IntentLabel,
-  Category,
 } from "./types";
 import { generateId } from "./normalize";
 
@@ -17,15 +16,32 @@ import { generateId } from "./normalize";
 // Config
 // ---------------------------------------------------------------------------
 
+/** Window (ms) within which rapid tab switches are counted. */
 const RAPID_SWITCH_WINDOW_MS = 30_000;
+
+/** Minimum number of unique-domain switches to trigger the rapid-switching rule. */
 const RAPID_SWITCH_MIN_COUNT = 3;
-const DISTRACTION_STREAK_THRESHOLD_MS = 120_000; // 2 min streak
+
+/** Minimum streak duration (ms) of distraction events to trigger the streak rule. */
+const DISTRACTION_STREAK_THRESHOLD_MS = 120_000; // 2 min
+
+/** Minimum number of productive-to-distraction bounces to trigger the bounce rule. */
 const BOUNCE_MIN_OCCURRENCES = 3;
 
 // ---------------------------------------------------------------------------
 // Session intent heuristic
 // ---------------------------------------------------------------------------
 
+/**
+ * Infer the high-level intent of a session from its first few events.
+ *
+ * The heuristic examines up to the first 3 classified events and uses
+ * domain-specific signals (code repos, doc editors, streaming sites)
+ * to assign a label and confidence score.
+ *
+ * @param events - The session's events (should already be classified).
+ * @returns A `SessionIntent` with label, confidence, and source event IDs.
+ */
 export function inferSessionIntent(events: BrowsingEvent[]): SessionIntent {
   const seedEvents = events.slice(0, 3).filter((e) => e.category);
   if (seedEvents.length === 0) {
@@ -37,24 +53,29 @@ export function inferSessionIntent(events: BrowsingEvent[]): SessionIntent {
   const ids = seedEvents.map((e) => e.id);
 
   const productiveCount = categories.filter((c) => c === "productive").length;
-  const distractionCount = categories.filter(
-    (c) => c === "distraction",
-  ).length;
+  const distractionCount = categories.filter((c) => c === "distraction").length;
 
   // Check domain-specific hints
   const hasCode = domains.some((d) =>
-    ["github.com", "gitlab.com", "stackoverflow.com", "leetcode.com"].includes(
-      d,
-    ),
+    ["github.com", "gitlab.com", "stackoverflow.com", "leetcode.com",
+     "bitbucket.org", "codepen.io", "codesandbox.io", "stackblitz.com",
+     "replit.com", "dev.azure.com"].includes(d),
   );
   const hasDocs = domains.some((d) =>
-    ["docs.google.com", "notion.so", "overleaf.com"].includes(d),
+    ["docs.google.com", "notion.so", "overleaf.com", "coda.io",
+     "sheets.google.com", "slides.google.com", "quip.com"].includes(d),
   );
   const hasSearch = domains.some((d) =>
-    ["google.com", "bing.com", "duckduckgo.com"].includes(d),
+    ["google.com", "bing.com", "duckduckgo.com", "scholar.google.com",
+     "perplexity.ai"].includes(d),
   );
   const hasEntertainment = domains.some((d) =>
-    ["youtube.com", "netflix.com", "twitch.tv"].includes(d),
+    ["youtube.com", "netflix.com", "twitch.tv", "hulu.com",
+     "disneyplus.com", "spotify.com", "music.youtube.com"].includes(d),
+  );
+  const hasDesign = domains.some((d) =>
+    ["figma.com", "canva.com", "miro.com", "sketch.com",
+     "whimsical.com", "excalidraw.com"].includes(d),
   );
 
   let label: IntentLabel = "unknown";
@@ -64,6 +85,9 @@ export function inferSessionIntent(events: BrowsingEvent[]): SessionIntent {
     if (hasCode) {
       label = "work";
       confidence = 0.8;
+    } else if (hasDesign) {
+      label = "work";
+      confidence = 0.75;
     } else if (hasDocs) {
       label = "study";
       confidence = 0.7;
@@ -93,19 +117,26 @@ type DriftRule = (
   events: BrowsingEvent[],
   transitions: Transition[],
   sessionId: string,
+  eventById: ReadonlyMap<string, BrowsingEvent>,
 ) => DriftPoint[];
 
-// Rule 1: Productive → distraction transition
-const productiveToDistraction: DriftRule = (events, transitions, sessionId) => {
+/**
+ * Rule 1: Productive-to-distraction transition.
+ *
+ * Fires whenever a transition moves from a productive page to a
+ * distraction page.
+ */
+const productiveToDistraction: DriftRule = (_events, transitions, sessionId, eventById) => {
   const points: DriftPoint[] = [];
   for (const t of transitions) {
     if (t.fromCategory === "productive" && t.toCategory === "distraction") {
+      const targetEvent = eventById.get(t.targetEventId);
       points.push({
         id: generateId(),
         sessionId,
         transitionId: t.id,
         eventId: t.targetEventId,
-        timestamp: events.find((e) => e.id === t.targetEventId)?.startTime ?? 0,
+        timestamp: targetEvent?.startTime ?? 0,
         reason: `Switched from productive (${t.sourceDomain}) to distraction (${t.targetDomain})`,
         trigger: "productive_to_distraction",
       });
@@ -114,28 +145,43 @@ const productiveToDistraction: DriftRule = (events, transitions, sessionId) => {
   return points;
 };
 
-// Rule 2: Rapid tab switching
-const rapidSwitching: DriftRule = (events, _transitions, sessionId) => {
+/**
+ * Rule 2: Rapid tab switching.
+ *
+ * Fires when the user switches between >= RAPID_SWITCH_MIN_COUNT unique
+ * domains within RAPID_SWITCH_WINDOW_MS.  Uses a sliding-window approach
+ * (no array copies) for O(n) performance.
+ */
+const rapidSwitching: DriftRule = (events, _transitions, sessionId, _eventById) => {
   const points: DriftPoint[] = [];
-  for (let i = 0; i <= events.length - RAPID_SWITCH_MIN_COUNT; i++) {
-    const window = events.slice(i, i + RAPID_SWITCH_MIN_COUNT);
-    const timeSpan =
-      window[window.length - 1].startTime - window[0].startTime;
-    const uniqueDomains = new Set(window.map((e) => e.domain)).size;
+  const n = events.length;
+  if (n < RAPID_SWITCH_MIN_COUNT) return points;
 
-    if (timeSpan <= RAPID_SWITCH_WINDOW_MS && uniqueDomains >= RAPID_SWITCH_MIN_COUNT) {
+  for (let i = 0; i <= n - RAPID_SWITCH_MIN_COUNT; i++) {
+    const windowEnd = i + RAPID_SWITCH_MIN_COUNT;
+    const timeSpan = events[windowEnd - 1].startTime - events[i].startTime;
+
+    if (timeSpan > RAPID_SWITCH_WINDOW_MS) continue;
+
+    // Count unique domains in the window
+    const windowDomains = new Set<string>();
+    for (let j = i; j < windowEnd; j++) {
+      windowDomains.add(events[j].domain);
+    }
+
+    if (windowDomains.size >= RAPID_SWITCH_MIN_COUNT) {
       const alreadyMarked = points.some(
         (p) =>
           p.trigger === "rapid_switching" &&
-          Math.abs(p.timestamp - window[0].startTime) < RAPID_SWITCH_WINDOW_MS,
+          Math.abs(p.timestamp - events[i].startTime) < RAPID_SWITCH_WINDOW_MS,
       );
       if (!alreadyMarked) {
         points.push({
           id: generateId(),
           sessionId,
-          eventId: window[0].id,
-          timestamp: window[0].startTime,
-          reason: `Rapid switching between ${uniqueDomains} domains within ${Math.round(timeSpan / 1000)}s`,
+          eventId: events[i].id,
+          timestamp: events[i].startTime,
+          reason: `Rapid switching between ${windowDomains.size} domains within ${Math.round(timeSpan / 1000)}s`,
           trigger: "rapid_switching",
         });
       }
@@ -144,36 +190,43 @@ const rapidSwitching: DriftRule = (events, _transitions, sessionId) => {
   return points;
 };
 
-// Rule 3: Sharp domain jump (productive → unrelated distraction)
-const sharpJump: DriftRule = (events, transitions, sessionId) => {
+/**
+ * Rule 3: Sharp domain jump.
+ *
+ * Fires when the user makes an impulsive jump (< 2 s gap) from a
+ * productive page to an unrelated distraction page.
+ */
+const sharpJump: DriftRule = (_events, transitions, sessionId, eventById) => {
   const points: DriftPoint[] = [];
   for (const t of transitions) {
     if (
       t.fromCategory === "productive" &&
       t.toCategory === "distraction" &&
-      t.sourceDomain !== t.targetDomain
+      t.sourceDomain !== t.targetDomain &&
+      t.timeGapMs < 2000
     ) {
-      // Avoid duplicating productiveToDistraction – only fire if the gap is very small
-      // indicating an impulsive jump
-      if (t.timeGapMs < 2000) {
-        points.push({
-          id: generateId(),
-          sessionId,
-          transitionId: t.id,
-          eventId: t.targetEventId,
-          timestamp:
-            events.find((e) => e.id === t.targetEventId)?.startTime ?? 0,
-          reason: `Sharp jump from ${t.sourceDomain} to unrelated ${t.targetDomain}`,
-          trigger: "sharp_jump",
-        });
-      }
+      const targetEvent = eventById.get(t.targetEventId);
+      points.push({
+        id: generateId(),
+        sessionId,
+        transitionId: t.id,
+        eventId: t.targetEventId,
+        timestamp: targetEvent?.startTime ?? 0,
+        reason: `Sharp jump from ${t.sourceDomain} to unrelated ${t.targetDomain}`,
+        trigger: "sharp_jump",
+      });
     }
   }
   return points;
 };
 
-// Rule 4: Long distraction streak after productive start
-const distractionStreak: DriftRule = (events, _transitions, sessionId) => {
+/**
+ * Rule 4: Long distraction streak after a productive start.
+ *
+ * Fires when the user accumulates >= DISTRACTION_STREAK_THRESHOLD_MS
+ * of consecutive distraction events after having been productive.
+ */
+const distractionStreak: DriftRule = (events, _transitions, sessionId, _eventById) => {
   const points: DriftPoint[] = [];
   const firstProductive = events.find((e) => e.category === "productive");
   if (!firstProductive) return points;
@@ -185,7 +238,7 @@ const distractionStreak: DriftRule = (events, _transitions, sessionId) => {
     if (e.startTime < firstProductive.startTime) continue;
     if (e.category === "distraction") {
       if (!streakStart) streakStart = e;
-      streakMs += e.durationMs;
+      streakMs += Math.max(0, e.durationMs);
     } else {
       if (streakStart && streakMs >= DISTRACTION_STREAK_THRESHOLD_MS) {
         points.push({
@@ -201,6 +254,7 @@ const distractionStreak: DriftRule = (events, _transitions, sessionId) => {
       streakMs = 0;
     }
   }
+
   // Check trailing streak
   if (streakStart && streakMs >= DISTRACTION_STREAK_THRESHOLD_MS) {
     points.push({
@@ -215,10 +269,14 @@ const distractionStreak: DriftRule = (events, _transitions, sessionId) => {
   return points;
 };
 
-// Rule 5: Repeated bouncing back to distraction
-const repeatedBounce: DriftRule = (events, _transitions, sessionId) => {
+/**
+ * Rule 5: Repeated bouncing back to distraction.
+ *
+ * Fires when the user alternates productive -> distraction
+ * at least BOUNCE_MIN_OCCURRENCES times in a session.
+ */
+const repeatedBounce: DriftRule = (events, _transitions, sessionId, _eventById) => {
   const points: DriftPoint[] = [];
-  // Count how many times user goes productive→distraction→productive→distraction…
   let bounceCount = 0;
   let bounceStartEvent: BrowsingEvent | null = null;
 
@@ -256,16 +314,41 @@ const ALL_RULES: DriftRule[] = [
   repeatedBounce,
 ];
 
+/**
+ * Run all drift-detection rules against a session's events and transitions.
+ *
+ * Performance: builds an O(1) event-by-ID lookup map up front so
+ * individual rules avoid repeated linear scans.  Results are
+ * deduplicated by `eventId + trigger` and sorted by timestamp.
+ *
+ * @param sessionId   - The session ID.
+ * @param events      - The session's classified events.
+ * @param transitions - The session's transitions.
+ * @param rules       - Optional custom rule set (defaults to all rules).
+ * @returns Deduplicated, timestamp-sorted array of drift points.
+ */
 export function detectDrift(
   sessionId: string,
   events: BrowsingEvent[],
   transitions: Transition[],
   rules: DriftRule[] = ALL_RULES,
 ): DriftPoint[] {
+  if (events.length === 0) return [];
+
+  // Pre-build event lookup map -- O(n) once instead of O(n) per find call
+  const eventById = new Map<string, BrowsingEvent>();
+  for (const e of events) {
+    eventById.set(e.id, e);
+  }
+
   const allPoints: DriftPoint[] = [];
   for (const rule of rules) {
-    allPoints.push(...rule(events, transitions, sessionId));
+    const points = rule(events, transitions, sessionId, eventById);
+    for (const p of points) {
+      allPoints.push(p);
+    }
   }
+
   // Sort by timestamp and deduplicate by eventId+trigger
   allPoints.sort((a, b) => a.timestamp - b.timestamp);
   const seen = new Set<string>();
@@ -279,20 +362,31 @@ export function detectDrift(
 
 /**
  * Mark drift flags on events in-place based on detected drift points.
+ *
+ * After calling this, events referenced by drift points will have
+ * `drift = true` and a `driftReasons` array.
+ *
+ * @param events      - The session's events (mutated in-place).
+ * @param driftPoints - The drift points detected for this session.
  */
 export function applyDriftToEvents(
   events: BrowsingEvent[],
   driftPoints: DriftPoint[],
 ): void {
+  if (driftPoints.length === 0) return;
+
   const driftEventIds = new Set<string>();
   const reasonsByEvent = new Map<string, string[]>();
 
   for (const dp of driftPoints) {
     if (dp.eventId) {
       driftEventIds.add(dp.eventId);
-      const existing = reasonsByEvent.get(dp.eventId) ?? [];
-      existing.push(dp.reason);
-      reasonsByEvent.set(dp.eventId, existing);
+      const existing = reasonsByEvent.get(dp.eventId);
+      if (existing) {
+        existing.push(dp.reason);
+      } else {
+        reasonsByEvent.set(dp.eventId, [dp.reason]);
+      }
     }
   }
 

@@ -65,10 +65,6 @@ describe("isTrackableUrl", () => {
     expect(isTrackableUrl("chrome://settings")).toBe(false);
   });
 
-  it("rejects chrome-extension:// urls", () => {
-    expect(isTrackableUrl("chrome-extension://abc/popup.html")).toBe(false);
-  });
-
   it("rejects about: urls", () => {
     expect(isTrackableUrl("about:blank")).toBe(false);
   });

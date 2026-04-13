@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Pipeline – orchestrates the full processing flow
+// Pipeline -- orchestrates the full processing flow
 // ---------------------------------------------------------------------------
 
 import { BrowsingEvent, BrowsingSession } from "./types";
@@ -11,8 +11,8 @@ import { computeSessionStats, computeDriftScore, computeSummaryLabel } from "./m
 import { buildReplaySteps } from "./replay";
 import { buildSessionGraph } from "./graph";
 import { buildSessionSummary } from "./summaries";
-import { generateId } from "./normalize";
 
+/** The output of the full processing pipeline. */
 export interface ProcessedOutput {
   sessions: BrowsingSession[];
 }
@@ -20,14 +20,28 @@ export interface ProcessedOutput {
 /**
  * Run the full Drift processing pipeline on raw browsing events.
  *
- * 1. Classify events
- * 2. Sessionize
- * 3. For each session: build transitions, detect drift, compute metrics
+ * Steps:
+ * 1. Classify every event (productive / neutral / distraction).
+ * 2. Split events into sessions based on inactivity gaps.
+ * 3. For each session: build transitions, infer intent, detect drift,
+ *    compute metrics, and generate a summary label.
+ *
+ * Returns an empty session array when given an empty event list.
+ *
+ * @param events          - The browsing events to process (mutated in-place
+ *                          during classification and sessionization).
+ * @param gapThresholdMs  - Optional inactivity gap (ms) for session splits.
+ *                          Defaults to 10 minutes.
+ * @returns A `ProcessedOutput` containing fully-processed sessions.
  */
 export function processPipeline(
   events: BrowsingEvent[],
   gapThresholdMs?: number,
 ): ProcessedOutput {
+  if (events.length === 0) {
+    return { sessions: [] };
+  }
+
   // Step 1: classify
   classifyEvents(events);
 
@@ -52,16 +66,17 @@ export function processPipeline(
     const driftScore = computeDriftScore(stats);
     const summaryLabel = computeSummaryLabel(stats, driftScore);
 
+    const first = sessionEvents[0];
+    const last = sessionEvents[sessionEvents.length - 1];
+
     const session: BrowsingSession = {
       id: sessionId,
       events: sessionEvents,
-      startTime: sessionEvents[0].startTime,
-      endTime: sessionEvents[sessionEvents.length - 1].endTime,
-      totalDurationMs:
-        sessionEvents[sessionEvents.length - 1].endTime -
-        sessionEvents[0].startTime,
-      entryEventId: sessionEvents[0].id,
-      exitEventId: sessionEvents[sessionEvents.length - 1].id,
+      startTime: first.startTime,
+      endTime: last.endTime,
+      totalDurationMs: Math.max(0, last.endTime - first.startTime),
+      entryEventId: first.id,
+      exitEventId: last.id,
       intent,
       driftScore,
       stats,
@@ -77,7 +92,14 @@ export function processPipeline(
 }
 
 /**
- * Convenience: get all exportable shapes from a processed session.
+ * Export all derived shapes from a processed session.
+ *
+ * This is a convenience wrapper that builds the graph, replay steps,
+ * and narrative summary from an already-processed session.
+ *
+ * @param session - A fully-processed `BrowsingSession`.
+ * @returns An object containing the session itself plus graph, replay,
+ *          and summary representations.
  */
 export function exportSession(session: BrowsingSession) {
   return {

@@ -4,6 +4,18 @@
 
 import { BrowsingEvent, SessionStats, Category } from "./types";
 
+/**
+ * Compute aggregate statistics for a set of session events.
+ *
+ * Handles edge cases:
+ * - Empty event arrays return zero-valued stats.
+ * - Negative `durationMs` values are clamped to 0.
+ * - Single-event sessions produce valid stats with 0 transitions.
+ * - Division-by-zero is guarded when computing ratios.
+ *
+ * @param events - The session's browsing events.
+ * @returns A `SessionStats` object with all aggregate metrics.
+ */
 export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
   if (events.length === 0) {
     return emptyStats();
@@ -27,16 +39,18 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
 
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
-    const cat = e.category ?? "neutral";
+    const cat: Category = e.category ?? "neutral";
+    // Guard against negative durations from bad data
+    const dur = Math.max(0, e.durationMs);
 
     // Time by category
-    if (cat === "productive") productiveTimeMs += e.durationMs;
-    else if (cat === "distraction") distractionTimeMs += e.durationMs;
-    else neutralTimeMs += e.durationMs;
+    if (cat === "productive") productiveTimeMs += dur;
+    else if (cat === "distraction") distractionTimeMs += dur;
+    else neutralTimeMs += dur;
 
     // Domain tracking
     uniqueDomains.add(e.domain);
-    domainTime.set(e.domain, (domainTime.get(e.domain) ?? 0) + e.durationMs);
+    domainTime.set(e.domain, (domainTime.get(e.domain) ?? 0) + dur);
 
     // Revisits
     if (visitedUrls.has(e.normalizedUrl)) {
@@ -45,8 +59,8 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
     visitedUrls.add(e.normalizedUrl);
 
     // Longest single page
-    if (e.durationMs > longestSinglePageMs) {
-      longestSinglePageMs = e.durationMs;
+    if (dur > longestSinglePageMs) {
+      longestSinglePageMs = dur;
     }
 
     // Category switches
@@ -56,7 +70,7 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
 
     // Streaks
     if (cat === currentStreakCategory) {
-      currentStreakMs += e.durationMs;
+      currentStreakMs += dur;
     } else {
       // Finalize previous streak
       if (currentStreakCategory === "productive") {
@@ -71,7 +85,7 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
         );
       }
       currentStreakCategory = cat;
-      currentStreakMs = e.durationMs;
+      currentStreakMs = dur;
     }
   }
 
@@ -88,7 +102,7 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
     );
   }
 
-  // Most visited domain
+  // Most visited domain by total time
   let mostVisitedDomain = "";
   let maxTime = 0;
   for (const [domain, time] of domainTime) {
@@ -104,7 +118,7 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
     eventCount: events.length,
     uniqueDomains: uniqueDomains.size,
     transitionCount: Math.max(0, events.length - 1),
-    driftPointCount: events.filter((e) => e.drift).length,
+    driftPointCount: 0, // Set by pipeline after drift detection
     categorySwitchCount,
     productiveTimeMs,
     neutralTimeMs,
@@ -119,6 +133,11 @@ export function computeSessionStats(events: BrowsingEvent[]): SessionStats {
   };
 }
 
+/**
+ * Return a zero-valued `SessionStats` for empty sessions.
+ *
+ * @returns An empty stats object with all numeric fields set to 0.
+ */
 function emptyStats(): SessionStats {
   return {
     eventCount: 0,
@@ -141,16 +160,30 @@ function emptyStats(): SessionStats {
 
 /**
  * Compute a drift score: percentage of active time spent in distraction.
+ *
+ * The score is an integer between 0 and 100 inclusive.  Returns 0 for
+ * sessions with no active time.
+ *
+ * @param stats - The session stats to compute the score from.
+ * @returns An integer drift score (0 = fully focused, 100 = fully distracted).
  */
 export function computeDriftScore(stats: SessionStats): number {
   const total =
     stats.productiveTimeMs + stats.neutralTimeMs + stats.distractionTimeMs;
-  if (total === 0) return 0;
-  return Math.round((stats.distractionTimeMs / total) * 100);
+  if (total <= 0) return 0;
+  return Math.round(
+    Math.min(100, Math.max(0, (stats.distractionTimeMs / total) * 100)),
+  );
 }
 
 /**
- * Generate a concise session label from stats and drift score.
+ * Generate a concise human-readable session label from stats and drift score.
+ *
+ * Labels are intentionally short so they fit in UI badges and sidebar entries.
+ *
+ * @param stats      - The session statistics.
+ * @param driftScore - The session's drift score (0-100).
+ * @returns A short descriptive label string.
  */
 export function computeSummaryLabel(
   stats: SessionStats,
