@@ -291,40 +291,35 @@ struct AuthView: View {
 
     // MARK: - Messages
 
-    private var messageArea: some View {
-        Group {
-            if let error = errorMessage {
-                HStack(spacing: Space.sm) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .font(TypeScale.caption)
-                    Text(error)
-                        .font(TypeScale.caption)
-                }
-                .foregroundStyle(.distraction)
-                .padding(Space.md - 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.distraction.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .accessibilityLabel("Error: \(error)")
-                .accessibilityAddTraits(.isStaticText)
+    @ViewBuilder private var messageArea: some View {
+        if let error = errorMessage {
+            HStack(spacing: Space.sm) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(TypeScale.caption)
+                Text(error)
+                    .font(TypeScale.caption)
             }
-
-            if let success = successMessage {
-                HStack(spacing: Space.sm) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(TypeScale.caption)
-                    Text(success)
-                        .font(TypeScale.caption)
-                }
-                .foregroundStyle(.productive)
-                .padding(Space.md - 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.productive.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .accessibilityLabel("Success: \(success)")
+            .foregroundStyle(Color.distraction)
+            .padding(Space.md - 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.distraction.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .accessibilityLabel("Error: \(error)")
+        } else if let success = successMessage {
+            HStack(spacing: Space.sm) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(TypeScale.caption)
+                Text(success)
+                    .font(TypeScale.caption)
             }
+            .foregroundStyle(Color.productive)
+            .padding(Space.md - 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.productive.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .accessibilityLabel("Success: \(success)")
         }
     }
 
