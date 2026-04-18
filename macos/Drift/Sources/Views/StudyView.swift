@@ -3,89 +3,60 @@ import UserNotifications
 import ApplicationServices
 import Combine
 
-// MARK: - Study View (Main Orchestrator)
+// MARK: - Study View
 
 struct StudyView: View {
     @StateObject private var viewModel = StudyViewModel()
     @StateObject private var blocker = FocusBlocker.shared
-    @Namespace private var timerNamespace
 
     var body: some View {
         ZStack {
-            // Subtle ambient background -- barely noticeable, never distracting
-            AmbientBackground(mode: viewModel.mode, progress: viewModel.progress)
+            // Ambient layered background
+            AmbientBackground(
+                mode: viewModel.mode,
+                driftFraction: viewModel.driftFraction
+            )
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: Space.xxl) {
-                    // Blocked-site banner
-                    BlockedBanner(
-                        isVisible: $viewModel.showBlockedBanner,
-                        site: blocker.lastBlockedSite
-                    )
-
-                    // Header with mode pill
-                    StudyHeader(mode: viewModel.mode, modeLabel: viewModel.modeLabel)
-
-                    // Timer ring -- clean, simple strokes
-                    TimerRingView(
-                        timeRemaining: viewModel.timeRemaining,
-                        progress: viewModel.progress,
-                        mode: viewModel.mode,
-                        modeLabel: viewModel.modeLabel,
-                        ringColor: viewModel.ringColor
-                    )
-                    .padding(.vertical, Space.sm)
-
-                    // Subject input
-                    SubjectInput(
-                        subject: $viewModel.subject,
-                        isDisabled: viewModel.mode != .idle
-                    )
-
-                    // Timer controls -- big play/pause, small skip/stop
-                    TimerControls(
-                        mode: viewModel.mode,
-                        onStart: viewModel.startFocus,
-                        onStop: { viewModel.showStopConfirmation = true },
-                        onSkip: viewModel.skipPhase
-                    )
-                    .alert("End Focus Session?", isPresented: $viewModel.showStopConfirmation) {
-                        Button("Keep Going", role: .cancel) { }
-                        Button("End Session", role: .destructive) { viewModel.stopStudy() }
-                    } message: {
-                        Text("You still have time left. Ending early means losing your focus streak.")
+                VStack(spacing: Space.lg) {
+                    if viewModel.showBlockedBanner {
+                        BlockedBanner(
+                            isVisible: $viewModel.showBlockedBanner,
+                            site: blocker.lastBlockedSite
+                        )
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
-                    // Duration configuration
-                    DurationConfig(
-                        focusDuration: $viewModel.focusDuration,
-                        breakDuration: $viewModel.breakDuration,
-                        isDisabled: viewModel.mode != .idle
-                    )
+                    heroRingCard
 
-                    // Focus session stats
-                    FocusStatsView(
-                        sessionCount: viewModel.sessionCount,
-                        totalFocusTime: viewModel.totalFocusTime
-                    )
+                    sessionStatsRow
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
 
-                    // Separator
-                    Rectangle()
-                        .fill(Color.sep.opacity(0.15))
-                        .frame(height: 1)
-                        .padding(.vertical, Space.xxs)
-
-                    // Focus Blocker section -- native panel style
-                    FocusBlockerSection(blocker: blocker)
+                    if viewModel.mode == .idle {
+                        FocusBlockerSection(blocker: blocker)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    } else if blocker.isBlocking {
+                        activeBlockerBadge
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    }
                 }
                 .padding(Space.page)
             }
+
+            // Completion flash overlay
+            if viewModel.showCompletion {
+                CompletionOverlay()
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
         }
-        .onChange(of: viewModel.focusDuration) { _, newValue in
-            if viewModel.mode == .idle { viewModel.timeRemaining = newValue * 60 }
+        .animation(Anim.appear, value: viewModel.mode)
+        .animation(Anim.appear, value: viewModel.showCompletion)
+        .onChange(of: viewModel.focusDuration) { _, v in
+            if viewModel.mode == .idle { viewModel.timeRemaining = v * 60 }
         }
-        .onChange(of: blocker.blockedAttempts) { _, newValue in
-            guard newValue > 0 else { return }
+        .onChange(of: blocker.blockedAttempts) { _, v in
+            guard v > 0 else { return }
             withAnimation(Anim.appear) { viewModel.showBlockedBanner = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
                 withAnimation(Anim.quick) { viewModel.showBlockedBanner = false }
@@ -98,14 +69,209 @@ struct StudyView: View {
             viewModel.togglePlayPause()
             return .handled
         }
-        .onKeyPress("s", modifiers: .command) {
-            if viewModel.mode != .idle { viewModel.skipPhase() }
-            return .handled
-        }
         .onKeyPress(.escape) {
             if viewModel.mode != .idle { viewModel.showStopConfirmation = true }
             return .handled
         }
+    }
+
+    // MARK: - Hero Ring Card
+
+    @ViewBuilder
+    private var heroRingCard: some View {
+        VStack(spacing: 0) {
+            heroHeader
+                .padding(.horizontal, Space.xl)
+                .padding(.top, Space.xl)
+                .padding(.bottom, Space.sm)
+
+            // Hero timer ring
+            HeroTimerRing(
+                timeRemaining: viewModel.timeRemaining,
+                progress: viewModel.progress,
+                mode: viewModel.mode,
+                modeLabel: viewModel.modeLabel,
+                ringColor: viewModel.ringColor,
+                focusPercent: viewModel.focusPercent,
+                completionFlash: viewModel.completionRingFlash
+            )
+            .padding(.vertical, Space.xl)
+
+            VStack(spacing: Space.lg) {
+                if viewModel.mode == .idle {
+                    SubjectInput(subject: $viewModel.subject)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    DurationConfig(
+                        focusDuration: $viewModel.focusDuration,
+                        breakDuration: $viewModel.breakDuration
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                } else if !viewModel.subject.isEmpty {
+                    HStack(spacing: Space.sm) {
+                        Image(systemName: "pencil.line")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                        Text(viewModel.subject)
+                            .font(TypeScale.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .padding(.horizontal, Space.xl)
+            .animation(Anim.appear, value: viewModel.mode)
+
+            Spacer(minLength: Space.xl)
+
+            // Controls — generous vertical space
+            HeroControls(
+                mode: viewModel.mode,
+                onStart: viewModel.startFocus,
+                onStop: { viewModel.showStopConfirmation = true },
+                onSkip: viewModel.skipPhase
+            )
+            .padding(.horizontal, Space.xl)
+            .padding(.bottom, Space.xl)
+            .alert("End Focus Session?", isPresented: $viewModel.showStopConfirmation) {
+                Button("Keep Going", role: .cancel) {}
+                Button("End Session", role: .destructive) { viewModel.stopStudy() }
+            } message: {
+                Text("Ending early means losing your focus streak.")
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(Color(.controlBackgroundColor))
+                .shadow(color: .black.opacity(0.06), radius: 20, y: 6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
+                )
+        )
+    }
+
+    @ViewBuilder
+    private var heroHeader: some View {
+        HStack(alignment: .center) {
+            if viewModel.mode == .idle {
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text("Focus")
+                        .font(.system(size: 26, weight: .bold))
+                        .tracking(-0.5)
+                    Text("Deep work, distraction-free")
+                        .font(TypeScale.body)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(spacing: Space.xs) {
+                    StatusDot(status: viewModel.mode == .focus ? .tracking : .paused)
+                    Text(viewModel.modeLabel.uppercased())
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(viewModel.ringColor)
+                        .tracking(2)
+                }
+            }
+            Spacer()
+            if viewModel.mode != .idle {
+                HStack(spacing: Space.xxs) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.accent.opacity(0.6))
+                    Text("Session \(viewModel.sessionCount + 1)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, Space.sm)
+                .padding(.vertical, Space.xxs)
+                .background(Capsule().fill(Color.primary.opacity(0.05)))
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            }
+        }
+        .animation(Anim.appear, value: viewModel.mode)
+    }
+
+    // MARK: - Session Stats Row
+
+    @ViewBuilder
+    private var sessionStatsRow: some View {
+        HStack(spacing: Space.md) {
+            StatMetricChip(
+                icon: "brain.head.profile",
+                value: formatStudyTime(viewModel.totalFocusTime),
+                label: "Focus Time",
+                color: Color.productive
+            )
+            StatMetricChip(
+                icon: "hand.raised.fill",
+                value: "\(blocker.blockedAttempts)",
+                label: "Drift Events",
+                color: Color.distraction
+            )
+            .opacity(viewModel.mode != .idle || blocker.blockedAttempts > 0 ? 1 : 0.4)
+            StatMetricChip(
+                icon: "checkmark.circle.fill",
+                value: "\(viewModel.sessionCount)",
+                label: "Sessions",
+                color: Color.accent
+            )
+        }
+        .animation(Anim.quick, value: blocker.blockedAttempts)
+    }
+
+    // MARK: - Active Blocker Badge (shown during focus when blocking)
+
+    @ViewBuilder
+    private var activeBlockerBadge: some View {
+        VStack(alignment: .leading, spacing: Space.md) {
+            HStack(spacing: Space.sm) {
+                DriftTag(text: "\(blocker.blockedSites.count) sites blocked", color: Color.distraction)
+                Spacer()
+                HStack(spacing: Space.xxs) {
+                    Circle()
+                        .fill(Color.distraction)
+                        .frame(width: Space.xs, height: Space.xs)
+                    Text("Blocking Active")
+                        .font(TypeScale.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.distraction)
+                }
+            }
+
+            if !blocker.blockedSites.isEmpty {
+                let preview = Array(blocker.blockedSites.prefix(4))
+                HStack(spacing: Space.xs) {
+                    ForEach(preview, id: \.self) { site in
+                        Text(site)
+                            .font(TypeScale.tiny)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, Space.xs)
+                            .padding(.vertical, Space.xxxs)
+                            .background(
+                                Capsule().fill(Color.primary.opacity(0.06))
+                                    .overlay(Capsule().strokeBorder(Color.sep.opacity(0.12), lineWidth: 0.5))
+                            )
+                            .lineLimit(1)
+                    }
+                    if blocker.blockedSites.count > 4 {
+                        Text("+\(blocker.blockedSites.count - 4) more")
+                            .font(TypeScale.tiny)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.md)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(Color.distraction.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(Color.distraction.opacity(0.12), lineWidth: 0.5)
+                )
+        )
     }
 }
 
@@ -115,7 +281,6 @@ struct StudyView: View {
 final class StudyViewModel: ObservableObject {
     enum StudyMode: Equatable { case idle, focus, rest }
 
-    // Timer state
     @Published var mode: StudyMode = .idle
     @Published var timeRemaining: Int = 25 * 60
     @Published var totalFocusTime: Int = 0
@@ -123,92 +288,84 @@ final class StudyViewModel: ObservableObject {
     @Published var subject: String = ""
     @Published var focusDuration: Int = 25
     @Published var breakDuration: Int = 5
-
-    // UI state
     @Published var showStopConfirmation = false
     @Published var showBlockedBanner = false
+    @Published var showCompletion = false
+    @Published var completionRingFlash = false
 
-    // Timer management -- use Date-based tracking for accuracy across
-    // background/foreground transitions instead of naive decrement.
     private var timerCancellable: AnyCancellable?
     private var phaseEndDate: Date?
     private var phaseTotalSeconds: Int = 0
-
-    // VoiceOver periodic announcement interval (seconds)
     private var lastAnnouncedMinute: Int = -1
 
-    // Computed
     var progress: CGFloat {
         switch mode {
-        case .idle: return 0
+        case .idle:  return 0
         case .focus: return 1 - CGFloat(timeRemaining) / CGFloat(focusDuration * 60)
-        case .rest: return 1 - CGFloat(timeRemaining) / CGFloat(breakDuration * 60)
+        case .rest:  return 1 - CGFloat(timeRemaining) / CGFloat(breakDuration * 60)
         }
+    }
+
+    /// Fraction of elapsed focus time vs total elapsed time (0…1), for ambient drift
+    var driftFraction: CGFloat {
+        guard totalFocusTime + FocusBlocker.shared.blockedAttempts > 0 else { return 0 }
+        let drift = CGFloat(FocusBlocker.shared.blockedAttempts)
+        let total = CGFloat(totalFocusTime / 60) + drift
+        return total > 0 ? min(drift / total, 1) : 0
+    }
+
+    /// 0-100 focus purity score (100 = no drift events)
+    var focusPercent: Int {
+        guard mode != .idle else { return 100 }
+        let attempts = FocusBlocker.shared.blockedAttempts
+        if attempts == 0 { return 100 }
+        let focusMins = max(1, (focusDuration * 60 - timeRemaining) / 60)
+        return max(0, 100 - Int(Double(attempts) / Double(focusMins) * 20))
     }
 
     var ringColor: Color {
         switch mode {
-        case .idle, .focus: return .accent
-        case .rest: return .productive
+        case .idle, .focus: return Color.accent
+        case .rest:         return Color.productive
         }
     }
 
     var modeLabel: String {
         switch mode {
-        case .idle: return "Ready"
+        case .idle:  return "Ready"
         case .focus: return "Focus"
-        case .rest: return "Break"
+        case .rest:  return "Break"
         }
     }
 
-    // MARK: - Lifecycle
-
-    func onAppear() {
-        // No-op here; timer only starts on user action.
-    }
-
-    func onDisappear() {
-        stopTimer()
-    }
-
-    // MARK: - Pomodoro Actions
+    func onAppear() {}
+    func onDisappear() { stopTimer() }
 
     func startFocus() {
         mode = .focus
         phaseTotalSeconds = focusDuration * 60
         timeRemaining = phaseTotalSeconds
         phaseEndDate = Date().addingTimeInterval(TimeInterval(phaseTotalSeconds))
-
-        // Ensure WindowTracker is running for focus mode detection
         if !WindowTracker.shared.isTracking && AXIsProcessTrusted() {
             WindowTracker.shared.start()
         }
         AppState.shared.focusModeActive = true
-
-        // Auto-activate Focus Blocker when starting a focus session
         let blocker = FocusBlocker.shared
         if !blocker.isBlocking {
             blocker.startBlocking(durationMinutes: focusDuration, password: nil)
         }
-
         startTimer()
     }
 
     func stopStudy() {
         stopTimer()
-        if mode == .focus {
-            totalFocusTime += (focusDuration * 60 - timeRemaining)
-        }
+        if mode == .focus { totalFocusTime += (focusDuration * 60 - timeRemaining) }
         mode = .idle
         timeRemaining = focusDuration * 60
         phaseEndDate = nil
         AppState.shared.focusModeActive = false
-
-        // Auto-stop Focus Blocker
         let blocker = FocusBlocker.shared
-        if blocker.isBlocking {
-            let _ = blocker.stopBlocking(password: nil)
-        }
+        if blocker.isBlocking { let _ = blocker.stopBlocking(password: nil) }
     }
 
     func skipPhase() {
@@ -223,11 +380,7 @@ final class StudyViewModel: ObservableObject {
     }
 
     func togglePlayPause() {
-        if mode == .idle {
-            startFocus()
-        }
-        // Timer auto-runs; space in active mode is a no-op
-        // (could be extended to pause if desired).
+        if mode == .idle { startFocus() }
     }
 
     private func startBreak() {
@@ -239,17 +392,12 @@ final class StudyViewModel: ObservableObject {
         sendNotification(title: "Focus complete!", body: "Take a \(breakDuration)-minute break.")
     }
 
-    // MARK: - Date-based Timer (survives background/foreground)
-
     private func startTimer() {
         stopTimer()
         lastAnnouncedMinute = -1
-
         timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
-                self?.tick()
-            }
+            .sink { [weak self] _ in self?.tick() }
     }
 
     private func stopTimer() {
@@ -261,59 +409,50 @@ final class StudyViewModel: ObservableObject {
         guard let endDate = phaseEndDate else { return }
         let remaining = max(0, Int(endDate.timeIntervalSinceNow.rounded(.up)))
         timeRemaining = remaining
-
-        // VoiceOver: announce every 5 minutes, at 1 minute, and at 10 seconds
         announceTimeIfNeeded(remaining)
-
         guard remaining <= 0 else { return }
         stopTimer()
-
+        triggerCompletionAnimation()
         if mode == .focus {
             sessionCount += 1
             totalFocusTime += phaseTotalSeconds
-            startBreak()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+                self?.startBreak()
+            }
         } else {
             sendNotification(title: "Break over!", body: "Time to focus again.")
-            startFocus()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+                self?.startFocus()
+            }
         }
     }
 
-    // MARK: - Accessibility Announcements
+    private func triggerCompletionAnimation() {
+        withAnimation(Anim.appear) { completionRingFlash = true }
+        withAnimation(Anim.appear.delay(0.4)) { showCompletion = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+            withAnimation(Anim.appear) {
+                self?.completionRingFlash = false
+                self?.showCompletion = false
+            }
+        }
+    }
 
     private func announceTimeIfNeeded(_ seconds: Int) {
         let currentMinute = seconds / 60
         let shouldAnnounce: Bool
-
-        if seconds == 10 {
-            shouldAnnounce = true
-        } else if seconds == 60 {
-            shouldAnnounce = true
-        } else if currentMinute > 0 && currentMinute % 5 == 0 && seconds % 60 == 0 && currentMinute != lastAnnouncedMinute {
-            shouldAnnounce = true
-        } else {
-            shouldAnnounce = false
-        }
-
+        if seconds == 10 { shouldAnnounce = true }
+        else if seconds == 60 { shouldAnnounce = true }
+        else if currentMinute > 0 && currentMinute % 5 == 0 && seconds % 60 == 0 && currentMinute != lastAnnouncedMinute { shouldAnnounce = true }
+        else { shouldAnnounce = false }
         guard shouldAnnounce else { return }
         lastAnnouncedMinute = currentMinute
-
-        let label: String
-        if seconds < 60 {
-            label = "\(seconds) seconds remaining"
-        } else {
-            label = "\(currentMinute) minute\(currentMinute == 1 ? "" : "s") remaining"
-        }
-        NSAccessibility.post(
-            element: NSApp as Any,
-            notification: .announcementRequested,
-            userInfo: [
-                NSAccessibility.NotificationUserInfoKey.announcement: label,
-                NSAccessibility.NotificationUserInfoKey.priority: NSAccessibilityPriorityLevel.high.rawValue
-            ]
-        )
+        let label = seconds < 60 ? "\(seconds) seconds remaining" : "\(currentMinute) minute\(currentMinute == 1 ? "" : "s") remaining"
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+            NSAccessibility.NotificationUserInfoKey.announcement: label,
+            NSAccessibility.NotificationUserInfoKey.priority: NSAccessibilityPriorityLevel.high.rawValue
+        ])
     }
-
-    // MARK: - Notifications
 
     private func sendNotification(title: String, body: String) {
         let center = UNUserNotificationCenter.current()
@@ -323,28 +462,23 @@ final class StudyViewModel: ObservableObject {
             content.title = title
             content.body = body
             content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: UUID().uuidString,
-                content: content,
-                trigger: nil
-            )
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             center.add(request)
         }
     }
 }
 
 // MARK: - Ambient Background
-// Barely-noticeable glow. No psychedelic gradients, no breathing animation.
 
 private struct AmbientBackground: View {
     let mode: StudyViewModel.StudyMode
-    let progress: CGFloat
+    let driftFraction: CGFloat
 
-    private var baseColor: Color {
+    private var primaryColor: Color {
         switch mode {
-        case .idle: return .clear
-        case .focus: return .accent
-        case .rest: return .productive
+        case .idle:  return .clear
+        case .focus: return Color.accent
+        case .rest:  return Color.productive
         }
     }
 
@@ -352,17 +486,303 @@ private struct AmbientBackground: View {
         ZStack {
             Color("Background")
 
+            // Primary radial — breathes from center
             if mode != .idle {
-                // Single very subtle radial wash -- static, no animation
                 RadialGradient(
-                    colors: [baseColor.opacity(0.04), .clear],
+                    colors: [
+                        primaryColor.opacity(mode == .focus ? 0.08 : 0.06),
+                        .clear
+                    ],
                     center: .center,
                     startRadius: 60,
                     endRadius: 400
                 )
                 .ignoresSafeArea()
+                .animation(Anim.appear, value: mode)
+            }
+
+            // Secondary ambient — bottom-right drift tint when distraction is high
+            if driftFraction > 0.25 {
+                RadialGradient(
+                    colors: [Color.distraction.opacity(0.03 * min(driftFraction * 4, 1)), .clear],
+                    center: .bottomTrailing,
+                    startRadius: 0,
+                    endRadius: 300
+                )
+                .ignoresSafeArea()
+                .animation(Anim.appear, value: driftFraction > 0.25)
             }
         }
+    }
+}
+
+// MARK: - Hero Timer Ring (260pt, premium)
+
+private struct HeroTimerRing: View {
+    let timeRemaining: Int
+    let progress: CGFloat
+    let mode: StudyViewModel.StudyMode
+    let modeLabel: String
+    let ringColor: Color
+    let focusPercent: Int
+    let completionFlash: Bool
+
+    private let ringSize: CGFloat = 260
+    private let trackWidth: CGFloat = 10
+
+    // Flash state — ring turns productive green on completion
+    private var strokeColor: Color {
+        completionFlash ? Color.productive : ringColor
+    }
+
+    var body: some View {
+        ZStack {
+            // Track
+            Circle()
+                .stroke(Color.sep.opacity(0.10), lineWidth: trackWidth)
+                .frame(width: ringSize, height: ringSize)
+
+            // Progress arc with angular gradient + glow
+            if progress > 0 || completionFlash {
+                let trimTo: CGFloat = completionFlash ? 1.0 : min(progress, 1.0)
+                Circle()
+                    .trim(from: 0, to: trimTo)
+                    .stroke(
+                        AngularGradient(
+                            colors: [strokeColor.opacity(0.6), strokeColor],
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        ),
+                        style: StrokeStyle(lineWidth: trackWidth, lineCap: .round)
+                    )
+                    .frame(width: ringSize, height: ringSize)
+                    .rotationEffect(.degrees(-90))
+                    .shadow(color: strokeColor.opacity(0.35), radius: 12)
+                    .animation(
+                        completionFlash
+                            ? .spring(response: 0.55, dampingFraction: 0.72)
+                            : .linear(duration: 0.8),
+                        value: trimTo
+                    )
+                    .animation(Anim.appear, value: completionFlash)
+            }
+
+            // Center content
+            VStack(spacing: Space.xs) {
+                Text(formatCountdown(timeRemaining))
+                    .font(.system(size: 54, weight: .bold, design: .monospaced))
+                    .tracking(-2)
+                    .contentTransition(.numericText())
+                    .animation(Anim.count, value: timeRemaining)
+                    .foregroundStyle(Color.primary)
+
+                Text(modeLabel.uppercased())
+                    .font(TypeScale.caption)
+                    .foregroundStyle(mode == .idle
+                        ? Color.secondary.opacity(0.4)
+                        : ringColor.opacity(0.85))
+                    .tracking(2.5)
+                    .animation(Anim.quick, value: mode)
+
+                // Focus % badge — only shown during focus
+                if mode == .focus {
+                    focusBadge
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(formatCountdown(timeRemaining))
+    }
+
+    @ViewBuilder
+    private var focusBadge: some View {
+        let pct = focusPercent
+        let badgeColor: Color = pct >= 80 ? Color.productive : pct >= 50 ? Color.streak : Color.distraction
+        Text("\(pct)% focus")
+            .font(TypeScale.tiny)
+            .fontWeight(.semibold)
+            .foregroundStyle(badgeColor)
+            .padding(.horizontal, Space.xs)
+            .padding(.vertical, Space.xxxs)
+            .background(
+                Capsule()
+                    .fill(badgeColor.opacity(0.12))
+                    .overlay(Capsule().strokeBorder(badgeColor.opacity(0.25), lineWidth: 0.5))
+            )
+            .contentTransition(.numericText())
+            .animation(Anim.count, value: pct)
+    }
+
+    private var accessibilityLabel: String {
+        "\(modeLabel) timer. \(timeRemaining / 60) minutes and \(timeRemaining % 60) seconds remaining"
+    }
+
+    private func formatCountdown(_ s: Int) -> String {
+        String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+// MARK: - Hero Controls
+
+private struct HeroControls: View {
+    let mode: StudyViewModel.StudyMode
+    let onStart: () -> Void
+    let onStop: () -> Void
+    let onSkip: () -> Void
+
+    var body: some View {
+        Group {
+            if mode == .idle {
+                startButton
+            } else {
+                activeControls
+            }
+        }
+        .animation(Anim.tap, value: mode)
+    }
+
+    // Large 64×64 primary play circle
+    @ViewBuilder
+    private var startButton: some View {
+        VStack(spacing: Space.md) {
+            Button(action: onStart) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accent)
+                        .frame(width: 64, height: 64)
+                        .shadow(color: Color.accent.opacity(0.40), radius: 14, y: 4)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                        .offset(x: 2) // optical alignment for play icon
+                }
+            }
+            .buttonStyle(DriftButtonStyle(variant: .primary))
+            .keyboardShortcut(.defaultAction)
+            .accessibilityLabel("Start focus session")
+            .accessibilityHint("Press Space to start")
+
+            Text("Press Space or click to start")
+                .font(TypeScale.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+    }
+
+    @ViewBuilder
+    private var activeControls: some View {
+        HStack(spacing: Space.xxl) {
+            // Stop — secondary ghost circle
+            Button(action: onStop) {
+                ZStack {
+                    Circle()
+                        .fill(Color.primary.opacity(0.06))
+                        .overlay(Circle().strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(DriftButtonStyle(variant: .ghost))
+            .accessibilityLabel("Stop session")
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+
+            // Primary skip / advance — large filled circle
+            Button(action: onSkip) {
+                ZStack {
+                    Circle()
+                        .fill(mode == .focus ? Color.productive : Color.accent)
+                        .frame(width: 64, height: 64)
+                        .shadow(
+                            color: (mode == .focus ? Color.productive : Color.accent).opacity(0.38),
+                            radius: 14, y: 4
+                        )
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .buttonStyle(DriftButtonStyle(variant: .primary))
+            .accessibilityLabel(mode == .focus ? "Skip to break" : "Skip break, start focus")
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        }
+        .frame(maxWidth: .infinity)
+        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+    }
+}
+
+// MARK: - Session Stats Metric Chip
+
+private struct StatMetricChip: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: Space.xs) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(color.opacity(0.75))
+                .accessibilityHidden(true)
+
+            MetricPair(
+                value: value,
+                label: label,
+                valueFont: TypeScale.monoMd,
+                color: Color.primary,
+                alignment: .center
+            )
+        }
+        .frame(maxWidth: .infinity)
+        .insetCard(padding: Space.md, radius: Radius.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+// MARK: - Completion Overlay
+
+private struct CompletionOverlay: View {
+    @State private var appeared = false
+
+    var body: some View {
+        VStack(spacing: Space.md) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 44, weight: .medium))
+                .foregroundStyle(Color.productive)
+                .scaleEffect(appeared ? 1 : 0.5)
+                .animation(Anim.appear, value: appeared)
+
+            Text("Session Complete")
+                .font(TypeScale.h2)
+                .foregroundStyle(Color.primary)
+                .opacity(appeared ? 1 : 0)
+                .animation(Anim.appear.delay(0.1), value: appeared)
+
+            Text("Great work. Take a well-earned break.")
+                .font(TypeScale.body)
+                .foregroundStyle(.secondary)
+                .opacity(appeared ? 1 : 0)
+                .animation(Anim.appear.delay(0.18), value: appeared)
+        }
+        .padding(Space.xxxl)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                .fill(Color(.controlBackgroundColor).opacity(0.95))
+                .shadow(color: Color.productive.opacity(0.18), radius: 28, y: 8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                        .strokeBorder(Color.productive.opacity(0.20), lineWidth: 0.5)
+                )
+        )
+        .onAppear { appeared = true }
     }
 }
 
@@ -378,7 +798,7 @@ private struct BlockedBanner: View {
                 Image(systemName: "shield.checkered")
                     .font(TypeScale.heading)
                     .foregroundStyle(.white)
-                Text("\(site) was blocked!")
+                Text("\(site) was blocked")
                     .font(TypeScale.heading)
                     .foregroundStyle(.white)
                 Spacer()
@@ -387,10 +807,10 @@ private struct BlockedBanner: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss blocked site banner")
+                .accessibilityLabel("Dismiss")
             }
             .padding(.horizontal, Space.lg)
             .padding(.vertical, Space.md)
@@ -398,123 +818,9 @@ private struct BlockedBanner: View {
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .fill(Color.distraction)
             )
-            .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(site) was blocked")
         }
-    }
-}
-
-// MARK: - Study Header
-
-private struct StudyHeader: View {
-    let mode: StudyViewModel.StudyMode
-    let modeLabel: String
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: Space.xxs) {
-                Text("Focus Timer")
-                    .font(TypeScale.hero)
-                    .tracking(-0.5)
-                Text("Pomodoro-style deep work sessions")
-                    .font(TypeScale.body)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-
-            if mode != .idle {
-                ModePill(mode: mode, label: modeLabel)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
-            }
-        }
-        .animation(Anim.appear, value: mode)
-    }
-}
-
-// MARK: - Mode Pill
-
-private struct ModePill: View {
-    let mode: StudyViewModel.StudyMode
-    let label: String
-
-    private var pillColor: Color {
-        mode == .focus ? .accent : .productive
-    }
-
-    var body: some View {
-        HStack(spacing: Space.xs) {
-            Circle()
-                .fill(pillColor)
-                .frame(width: 7, height: 7)
-            Text(label)
-                .font(TypeScale.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(pillColor)
-        }
-        .padding(.horizontal, Space.md)
-        .padding(.vertical, Space.xs)
-        .background(Capsule().fill(pillColor.opacity(0.1)))
-        .accessibilityLabel("Current mode: \(label)")
-    }
-}
-
-// MARK: - Timer Ring View
-// Clean, simple strokes. No breathing glow -- the UI should be CALM during focus.
-
-private struct TimerRingView: View {
-    let timeRemaining: Int
-    let progress: CGFloat
-    let mode: StudyViewModel.StudyMode
-    let modeLabel: String
-    let ringColor: Color
-
-    var body: some View {
-        ZStack {
-            // Outer track
-            Circle()
-                .stroke(Color.sep.opacity(0.2), lineWidth: 6)
-                .frame(width: 220, height: 220)
-
-            // Progress ring -- simple solid stroke, no angular gradient
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    ringColor,
-                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                )
-                .frame(width: 220, height: 220)
-                .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 0.8), value: progress)
-
-            // Center content
-            VStack(spacing: Space.xs) {
-                Text(formatCountdown(timeRemaining))
-                    .font(TypeScale.mono)
-                    .tracking(-2)
-                    .contentTransition(.numericText())
-                    .animation(Anim.count, value: timeRemaining)
-
-                Text(modeLabel)
-                    .font(TypeScale.heading)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(timerAccessibilityLabel)
-        .accessibilityValue(formatCountdown(timeRemaining))
-    }
-
-    private var timerAccessibilityLabel: String {
-        let minutes = timeRemaining / 60
-        let seconds = timeRemaining % 60
-        return "\(modeLabel) timer. \(minutes) minutes and \(seconds) seconds remaining"
-    }
-
-    private func formatCountdown(_ totalSeconds: Int) -> String {
-        let m = totalSeconds / 60
-        let s = totalSeconds % 60
-        return String(format: "%d:%02d", m, s)
     }
 }
 
@@ -522,252 +828,125 @@ private struct TimerRingView: View {
 
 private struct SubjectInput: View {
     @Binding var subject: String
-    let isDisabled: Bool
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: Space.md) {
             Image(systemName: "pencil.line")
                 .font(TypeScale.body)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(isFocused ? Color.accent.opacity(0.6) : Color.primary.opacity(0.28))
+                .animation(Anim.quick, value: isFocused)
             TextField("What are you working on?", text: $subject)
                 .textFieldStyle(.plain)
                 .font(TypeScale.body)
+                .focused($isFocused)
                 .accessibilityLabel("Focus subject")
-                .accessibilityHint("Enter what you are working on")
         }
-        .padding(Space.lg)
-        .driftCard(padding: 0)
-        .padding(0) // card provides its own visual; inner padding above is sufficient
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.5 : 1)
-        .animation(Anim.quick, value: isDisabled)
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.md)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(
+                            isFocused ? Color.accent.opacity(0.25) : Color.sep.opacity(0.12),
+                            lineWidth: isFocused ? 1 : 0.5
+                        )
+                )
+        )
+        .animation(Anim.quick, value: isFocused)
+        .accessibilityElement(children: .combine)
     }
 }
 
-// MARK: - Timer Controls
-// Big play/pause, small skip/stop. Dead simple.
-
-private struct TimerControls: View {
-    let mode: StudyViewModel.StudyMode
-    let onStart: () -> Void
-    let onStop: () -> Void
-    let onSkip: () -> Void
-
-    var body: some View {
-        HStack(spacing: Space.md) {
-            if mode == .idle {
-                startButton
-            } else {
-                // Big play/pause (skip forward) is the primary action
-                skipButton
-                // Small stop is secondary
-                stopButton
-            }
-        }
-        .animation(Anim.tap, value: mode)
-    }
-
-    private var startButton: some View {
-        Button(action: onStart) {
-            HStack(spacing: Space.sm) {
-                Image(systemName: "play.fill")
-                    .font(TypeScale.heading)
-                Text("Start Focus")
-                    .font(TypeScale.heading)
-            }
-            .padding(.horizontal, Space.xxxl)
-            .padding(.vertical, Space.md)
-            .background(Capsule().fill(Color.accent))
-            .foregroundStyle(.white)
-        }
-        .driftButton()
-        .transition(.scale(scale: 0.9).combined(with: .opacity))
-        .accessibilityLabel("Start focus session")
-        .accessibilityHint("Press Space to start")
-    }
-
-    private var stopButton: some View {
-        Button(action: onStop) {
-            HStack(spacing: Space.xs) {
-                Image(systemName: "stop.fill")
-                    .font(TypeScale.caption)
-                Text("Stop")
-                    .font(TypeScale.body)
-                    .fontWeight(.medium)
-            }
-            .padding(.horizontal, Space.lg)
-            .padding(.vertical, Space.sm)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Capsule().strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5))
-            )
-            .foregroundStyle(.secondary)
-        }
-        .driftButton(.ghost)
-        .transition(.scale(scale: 0.9).combined(with: .opacity))
-        .accessibilityLabel("Stop session")
-        .accessibilityHint("Press Escape to stop")
-    }
-
-    private var skipButton: some View {
-        Button(action: onSkip) {
-            HStack(spacing: Space.xs) {
-                Image(systemName: "forward.fill")
-                    .font(TypeScale.heading)
-                Text(mode == .focus ? "Skip to Break" : "Skip Break")
-                    .font(TypeScale.heading)
-            }
-            .padding(.horizontal, Space.xxl)
-            .padding(.vertical, Space.md)
-            .background(Capsule().fill(Color.accent))
-            .foregroundStyle(.white)
-        }
-        .driftButton()
-        .transition(.scale(scale: 0.9).combined(with: .opacity))
-        .accessibilityLabel(mode == .focus ? "Skip to break" : "Skip break")
-        .accessibilityHint("Command S to skip")
-    }
-}
-
-// MARK: - Duration Configuration
+// MARK: - Duration Config
 
 private struct DurationConfig: View {
     @Binding var focusDuration: Int
     @Binding var breakDuration: Int
-    let isDisabled: Bool
 
     var body: some View {
-        HStack(spacing: Space.xxl) {
-            DurationPicker(
+        VStack(spacing: Space.md) {
+            DurationChipRow(
                 icon: "brain.head.profile",
                 label: "Focus",
                 selection: $focusDuration,
-                options: [15, 25, 30, 45, 60],
-                suffix: "m"
+                options: [15, 25, 30, 45, 60]
             )
-
-            DurationPicker(
+            Divider().opacity(0.25)
+            DurationChipRow(
                 icon: "cup.and.saucer",
                 label: "Break",
                 selection: $breakDuration,
-                options: [3, 5, 10, 15],
-                suffix: "m"
+                options: [3, 5, 10, 15]
             )
         }
-        .driftCard(padding: Space.lg)
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.4 : 1)
-        .animation(Anim.quick, value: isDisabled)
+        .padding(Space.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.primary.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
+                )
+        )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Duration settings")
     }
 }
 
-private struct DurationPicker: View {
+private struct DurationChipRow: View {
     let icon: String
     let label: String
     @Binding var selection: Int
     let options: [Int]
-    let suffix: String
 
     var body: some View {
         HStack(spacing: Space.md) {
-            Image(systemName: icon)
-                .font(TypeScale.caption)
-                .foregroundStyle(.tertiary)
-            Text(label)
-                .font(TypeScale.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.secondary)
-            Picker("", selection: $selection) {
-                ForEach(options, id: \.self) { value in
-                    Text("\(value)\(suffix)").tag(value)
-                }
+            HStack(spacing: Space.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                Text(label)
+                    .font(TypeScale.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.menu)
-            .frame(width: 64)
-            .accessibilityLabel("\(label) duration")
+            .frame(width: 52, alignment: .leading)
+
+            HStack(spacing: Space.xs) {
+                ForEach(options, id: \.self) { opt in
+                    Button {
+                        withAnimation(Anim.tap) { selection = opt }
+                    } label: {
+                        Text("\(opt)m")
+                            .font(.system(size: 12, weight: selection == opt ? .semibold : .regular))
+                            .foregroundStyle(selection == opt ? Color.accent : Color.secondary)
+                            .padding(.horizontal, Space.md)
+                            .padding(.vertical, Space.xs)
+                            .background(
+                                Capsule()
+                                    .fill(selection == opt
+                                          ? Color.accent.opacity(0.12)
+                                          : Color.primary.opacity(0.05))
+                                    .animation(Anim.quick, value: selection == opt)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(opt) minute \(label.lowercased())")
+                }
+                Spacer()
+            }
         }
-    }
-}
-
-// MARK: - Focus Stats View
-
-private struct FocusStatsView: View {
-    let sessionCount: Int
-    let totalFocusTime: Int
-
-    var body: some View {
-        HStack(spacing: 0) {
-            StatItem(
-                icon: "checkmark.circle",
-                iconColor: Color.accent.opacity(0.6),
-                value: "\(sessionCount)",
-                label: "Sessions"
-            )
-
-            Rectangle()
-                .fill(Color.sep.opacity(0.3))
-                .frame(width: 1, height: 36)
-
-            StatItem(
-                icon: "clock",
-                iconColor: Color.productive.opacity(0.6),
-                value: formatStudyTime(totalFocusTime),
-                label: "Total Focus"
-            )
-        }
-        .driftCard(padding: Space.lg)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Focus statistics")
-    }
-
-    private func formatStudyTime(_ totalSeconds: Int) -> String {
-        if totalSeconds < 60 { return "\(totalSeconds)s" }
-        let m = totalSeconds / 60
-        if m < 60 { return "\(m)m" }
-        let h = m / 60
-        return "\(h)h \(m % 60)m"
-    }
-}
-
-private struct StatItem: View {
-    let icon: String
-    let iconColor: Color
-    let value: String
-    let label: String
-
-    var body: some View {
-        VStack(spacing: Space.xs) {
-            Image(systemName: icon)
-                .font(TypeScale.caption)
-                .foregroundStyle(iconColor)
-            Text(value)
-                .font(TypeScale.title)
-                .fontDesign(.monospaced)
-                .contentTransition(.numericText())
-                .animation(Anim.count, value: value)
-            Text(label)
-                .font(TypeScale.tiny)
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .tracking(0.3)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(value)")
     }
 }
 
 // MARK: - Focus Blocker Section
-// Looks like a native panel, not a custom card.
 
 private struct FocusBlockerSection: View {
     @ObservedObject var blocker: FocusBlocker
-
-    // Blocker-specific UI state
-    @State private var showBlockerSetup = false
+    @State private var showSetup = false
     @State private var blockerDuration: Int = 30
     @State private var blockerPassword: String = ""
     @State private var blockerPasswordConfirm: String = ""
@@ -775,122 +954,113 @@ private struct FocusBlockerSection: View {
     @State private var stopPassword: String = ""
     @State private var stopPasswordError = false
     @State private var showBlockerStopConfirmation = false
-
-    // Tick for countdown refresh
     @State private var tickCancellable: AnyCancellable?
 
     var body: some View {
         VStack(spacing: Space.xl) {
-            // Header
-            BlockerHeader(isBlocking: blocker.isBlocking)
+            blockerHeader
 
             if blocker.isBlocking {
-                ActiveBlockingView(
-                    blocker: blocker,
-                    showStopDialog: $showStopDialog,
-                    stopPassword: $stopPassword,
-                    stopPasswordError: $stopPasswordError,
-                    showStopConfirmation: $showBlockerStopConfirmation
-                )
+                activeBlockingContent
             } else {
-                BlockerSetupView(
-                    blocker: blocker,
-                    showSetup: $showBlockerSetup,
-                    duration: $blockerDuration,
-                    password: $blockerPassword,
-                    passwordConfirm: $blockerPasswordConfirm
-                )
+                idleBlockerContent
             }
         }
+        .padding(Space.xl)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(Color(.controlBackgroundColor))
+                .shadow(color: .black.opacity(0.04), radius: 12, y: 3)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
+                )
+        )
         .onAppear { startTick() }
         .onDisappear { tickCancellable?.cancel() }
         .animation(Anim.appear, value: blocker.isBlocking)
+        .animation(Anim.appear, value: showSetup)
     }
 
-    private func startTick() {
-        tickCancellable = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { _ in
-                // Triggers re-evaluation of blocker's computed properties
-                blocker.objectWillChange.send()
+    @ViewBuilder
+    private var blockerHeader: some View {
+        HStack(alignment: .center, spacing: Space.md) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                    .fill(blocker.isBlocking
+                          ? Color.distraction.opacity(0.10)
+                          : Color.accent.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "shield.checkered")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(blocker.isBlocking ? Color.distraction : Color.accent)
             }
-    }
-}
-
-// MARK: - Blocker Header
-
-private struct BlockerHeader: View {
-    let isBlocking: Bool
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: Space.xxs) {
-                HStack(spacing: Space.sm) {
-                    Image(systemName: "shield.checkered")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.accent)
-                    Text("Focus Blocker")
-                        .font(TypeScale.title)
-                        .tracking(-0.3)
-                }
-                Text("Block distracting websites while you work")
-                    .font(TypeScale.body)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Focus Blocker")
+                    .font(.system(size: 15, weight: .semibold))
+                Text(blocker.isBlocking
+                     ? "Blocking \(blocker.blockedSites.count) sites"
+                     : "Block distracting sites")
+                    .font(TypeScale.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-
-            if isBlocking {
-                HStack(spacing: Space.xs) {
+            if blocker.isBlocking {
+                HStack(spacing: Space.xxs) {
                     Circle()
                         .fill(Color.distraction)
-                        .frame(width: 7, height: 7)
-                    Text("Blocking")
-                        .font(TypeScale.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.distraction)
+                        .frame(width: 6, height: 6)
+                    Text("Active")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.distraction)
                 }
-                .padding(.horizontal, Space.md)
-                .padding(.vertical, Space.xs)
-                .background(Capsule().fill(Color.distraction.opacity(0.1)))
+                .padding(.horizontal, Space.sm)
+                .padding(.vertical, Space.xxs)
+                .background(Capsule().fill(Color.distraction.opacity(0.10)))
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Focus Blocker. \(isBlocking ? "Currently blocking distracting sites" : "Not active")")
+        .accessibilityLabel("Focus Blocker. \(blocker.isBlocking ? "Currently blocking sites" : "Inactive")")
     }
-}
 
-// MARK: - Active Blocking View
+    // MARK: - Active Blocking
 
-private struct ActiveBlockingView: View {
-    @ObservedObject var blocker: FocusBlocker
-    @Binding var showStopDialog: Bool
-    @Binding var stopPassword: String
-    @Binding var stopPasswordError: Bool
-    @Binding var showStopConfirmation: Bool
-
-    @State private var blockedBounce = false
-
-    var body: some View {
+    @ViewBuilder
+    private var activeBlockingContent: some View {
         VStack(spacing: Space.lg) {
-            // Countdown card
             BlockerCountdown(blocker: blocker)
 
-            // Stats row
-            BlockerStats(
-                blockedAttempts: blocker.blockedAttempts,
-                siteCount: blocker.blockedSites.count,
-                lastBlockedSite: blocker.lastBlockedSite,
-                bounce: blockedBounce
-            )
-            .onChange(of: blocker.blockedAttempts) { _, _ in
-                withAnimation(Anim.tap) { blockedBounce = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(Anim.tap) { blockedBounce = false }
+            if blocker.blockedAttempts > 0 {
+                HStack(spacing: Space.sm) {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.distraction.opacity(0.7))
+                    Text("\(blocker.blockedAttempts) attempt\(blocker.blockedAttempts == 1 ? "" : "s") blocked")
+                        .font(TypeScale.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.distraction)
+                    Spacer()
+                    if let last = blocker.lastBlockedSite {
+                        Text(last)
+                            .font(TypeScale.caption)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
                 }
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.sm)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                        .fill(Color.distraction.opacity(0.06))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                .strokeBorder(Color.distraction.opacity(0.10), lineWidth: 0.5)
+                        )
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // Stop Early
             if showStopDialog {
                 StopPasswordView(
                     blocker: blocker,
@@ -898,132 +1068,304 @@ private struct ActiveBlockingView: View {
                     passwordError: $stopPasswordError,
                     showDialog: $showStopDialog
                 )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else {
                 Button {
                     if blocker.passwordRequired {
                         showStopDialog = true
                     } else {
-                        showStopConfirmation = true
+                        showBlockerStopConfirmation = true
                     }
                 } label: {
                     HStack(spacing: Space.sm) {
                         Image(systemName: blocker.passwordRequired ? "lock.fill" : "stop.fill")
-                            .font(TypeScale.caption)
-                        Text("Stop Early")
-                            .font(TypeScale.body)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 12))
+                        Text("Stop Blocking")
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .padding(.horizontal, Space.xxl)
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.md)
                     .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(Capsule().strokeBorder(Color.distraction.opacity(0.12), lineWidth: 0.5))
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                    .strokeBorder(Color.distraction.opacity(0.15), lineWidth: 0.5)
+                            )
                     )
-                    .foregroundStyle(.distraction)
+                    .foregroundStyle(Color.distraction)
                 }
                 .driftButton(.danger)
-                .alert("Stop Blocking?", isPresented: $showStopConfirmation) {
-                    Button("Keep Blocking", role: .cancel) { }
-                    Button("Stop Blocking", role: .destructive) {
-                        let _ = blocker.stopBlocking(password: nil)
-                    }
+                .alert("Stop Blocking?", isPresented: $showBlockerStopConfirmation) {
+                    Button("Keep Blocking", role: .cancel) {}
+                    Button("Stop", role: .destructive) { let _ = blocker.stopBlocking(password: nil) }
                 } message: {
-                    Text("Distracting sites will become accessible again. Are you sure?")
+                    Text("Distracting sites will become accessible again.")
                 }
                 .accessibilityLabel("Stop blocking early")
             }
         }
     }
+
+    // MARK: - Idle Blocker
+
+    @ViewBuilder
+    private var idleBlockerContent: some View {
+        VStack(spacing: Space.lg) {
+            BlockedSitesList(
+                blocker: blocker,
+                newSite: .constant("")
+            )
+
+            if showSetup {
+                blockerSetupPanel
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else {
+                Button {
+                    withAnimation(Anim.appear) { showSetup = true }
+                } label: {
+                    HStack(spacing: Space.sm) {
+                        Image(systemName: "shield.checkered")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Start Focus Block")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Space.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .fill(Color.accent.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                    .strokeBorder(Color.accent.opacity(0.15), lineWidth: 0.5)
+                            )
+                    )
+                    .foregroundStyle(Color.accent)
+                }
+                .driftButton(.secondary)
+                .accessibilityLabel("Set up focus blocker")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var blockerSetupPanel: some View {
+        VStack(spacing: Space.lg) {
+            HStack {
+                HStack(spacing: Space.xs) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                    Text("Duration")
+                        .font(TypeScale.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("", selection: $blockerDuration) {
+                    Text("30 min").tag(30)
+                    Text("1 hour").tag(60)
+                    Text("2 hours").tag(120)
+                    Text("3 hours").tag(180)
+                    Text("4 hours").tag(240)
+                }
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                .accessibilityLabel("Blocking duration")
+            }
+
+            Divider().opacity(0.25)
+
+            VStack(alignment: .leading, spacing: Space.sm) {
+                HStack {
+                    HStack(spacing: Space.xs) {
+                        Image(systemName: "lock")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                        Text("Lock Password")
+                            .font(TypeScale.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text("Optional")
+                        .font(TypeScale.tiny)
+                        .foregroundStyle(.quaternary)
+                }
+
+                SecureField("Set a password to prevent early stop", text: $blockerPassword)
+                    .textFieldStyle(.plain)
+                    .font(TypeScale.caption)
+                    .padding(Space.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                            .fill(Color.primary.opacity(0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                    .strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5)
+                            )
+                    )
+                    .accessibilityLabel("Set lock password")
+
+                if !blockerPassword.isEmpty {
+                    SecureField("Confirm password", text: $blockerPasswordConfirm)
+                        .textFieldStyle(.plain)
+                        .font(TypeScale.caption)
+                        .padding(Space.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                .fill(Color.primary.opacity(0.04))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                        .strokeBorder(
+                                            passwordsMatch ? Color.sep.opacity(0.15) : Color.distraction.opacity(0.2),
+                                            lineWidth: 0.5
+                                        )
+                                )
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .accessibilityLabel("Confirm lock password")
+
+                    if !blockerPasswordConfirm.isEmpty && !passwordsMatch {
+                        Text("Passwords do not match")
+                            .font(TypeScale.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.distraction)
+                            .transition(.opacity)
+                    }
+                }
+            }
+
+            HStack(spacing: Space.md) {
+                Button {
+                    withAnimation(Anim.quick) {
+                        showSetup = false
+                        blockerPassword = ""
+                        blockerPasswordConfirm = ""
+                    }
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 13, weight: .medium))
+                        .padding(.horizontal, Space.xl)
+                        .padding(.vertical, Space.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                .fill(Color.primary.opacity(0.05))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                        .strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5)
+                                )
+                        )
+                        .foregroundStyle(.secondary)
+                }
+                .driftButton(.ghost)
+                .accessibilityLabel("Cancel setup")
+
+                Button(action: startBlocker) {
+                    HStack(spacing: Space.sm) {
+                        Image(systemName: "shield.checkered")
+                            .font(.system(size: 13))
+                        Text("Start Blocking")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Space.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .fill(canStart ? Color.accent : Color.accent.opacity(0.4))
+                    )
+                    .foregroundStyle(.white)
+                }
+                .driftButton()
+                .disabled(!canStart)
+                .accessibilityLabel("Start blocking")
+            }
+        }
+        .padding(Space.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.primary.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
+                )
+        )
+    }
+
+    private var passwordsMatch: Bool { blockerPassword == blockerPasswordConfirm }
+    private var canStart: Bool { blockerPassword.isEmpty || (passwordsMatch && !blockerPasswordConfirm.isEmpty) }
+
+    private func startBlocker() {
+        let pw = blockerPassword.isEmpty ? nil : blockerPassword
+        blocker.startBlocking(durationMinutes: blockerDuration, password: pw)
+        withAnimation(Anim.quick) {
+            showSetup = false
+            blockerPassword = ""
+            blockerPasswordConfirm = ""
+        }
+    }
+
+    private func startTick() {
+        tickCancellable = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in blocker.objectWillChange.send() }
+    }
 }
 
 // MARK: - Blocker Countdown
-// Clean ring, no breathing glow.
 
 private struct BlockerCountdown: View {
     @ObservedObject var blocker: FocusBlocker
 
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.sep.opacity(0.2), lineWidth: 5)
-                .frame(width: 140, height: 140)
-
-            Circle()
-                .trim(from: 0, to: min(blocker.progress, 1.0))
-                .stroke(
-                    Color.distraction,
-                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                )
-                .frame(width: 140, height: 140)
-                .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 1), value: blocker.progress)
-
-            VStack(spacing: Space.xxs) {
-                Text(blocker.timeRemainingFormatted)
-                    .font(TypeScale.mono)
-                    .tracking(-1)
-                    .contentTransition(.numericText())
-                    .animation(Anim.count, value: blocker.timeRemainingFormatted)
-                Text("remaining")
-                    .sectionLabel()
-            }
-        }
-        .padding(.vertical, Space.sm)
-        .frame(maxWidth: .infinity)
-        .driftCard(padding: Space.xl)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Blocking timer: \(blocker.timeRemainingFormatted) remaining")
-    }
-}
-
-// MARK: - Blocker Stats
-
-private struct BlockerStats: View {
-    let blockedAttempts: Int
-    let siteCount: Int
-    let lastBlockedSite: String?
-    let bounce: Bool
-
-    var body: some View {
-        HStack(spacing: 0) {
-            StatItem(
-                icon: "hand.raised.fill",
-                iconColor: Color.distraction.opacity(0.6),
-                value: "\(blockedAttempts)",
-                label: "Blocked"
-            )
-            .scaleEffect(bounce ? 1.05 : 1.0)
-
-            Rectangle().fill(Color.sep.opacity(0.3)).frame(width: 1, height: 36)
-
-            StatItem(
-                icon: "globe",
-                iconColor: Color.accent.opacity(0.6),
-                value: "\(siteCount)",
-                label: "Sites"
-            )
-
-            if let lastSite = lastBlockedSite {
-                Rectangle().fill(Color.sep.opacity(0.3)).frame(width: 1, height: 36)
-
-                VStack(spacing: Space.xs) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.streak.opacity(0.6))
-                    Text(lastSite)
-                        .font(TypeScale.body)
-                        .fontWeight(.semibold)
-                        .lineLimit(1)
-                    Text("Last Blocked")
-                        .sectionLabel()
+        HStack(spacing: Space.xl) {
+            ZStack {
+                Circle()
+                    .stroke(Color.sep.opacity(0.12), lineWidth: 6)
+                    .frame(width: 100, height: 100)
+                Circle()
+                    .trim(from: 0, to: min(blocker.progress, 1.0))
+                    .stroke(
+                        Color.distraction,
+                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                    )
+                    .frame(width: 100, height: 100)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 1), value: blocker.progress)
+                VStack(spacing: 2) {
+                    Text(blocker.timeRemainingFormatted)
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .contentTransition(.numericText())
+                        .animation(Anim.count, value: blocker.timeRemainingFormatted)
+                    Text("left")
+                        .font(TypeScale.tiny)
+                        .foregroundStyle(.tertiary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
                 }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Last blocked site: \(lastSite)")
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Blocking timer: \(blocker.timeRemainingFormatted) remaining")
+
+            VStack(alignment: .leading, spacing: Space.sm) {
+                Text("Protecting your focus")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Distracting sites are blocked.\nStay in the zone.")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(2)
+            }
+            Spacer()
         }
-        .driftCard(padding: Space.lg)
+        .padding(Space.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.distraction.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(Color.distraction.opacity(0.10), lineWidth: 0.5)
+                )
+        )
     }
 }
 
@@ -1040,7 +1382,7 @@ private struct StopPasswordView: View {
             HStack(spacing: Space.sm) {
                 Image(systemName: "lock.fill")
                     .font(TypeScale.body)
-                    .foregroundStyle(.distraction)
+                    .foregroundStyle(Color.distraction)
                 Text("Enter password to stop blocking")
                     .font(TypeScale.body)
                     .fontWeight(.medium)
@@ -1054,7 +1396,7 @@ private struct StopPasswordView: View {
                     .padding(Space.md)
                     .background(
                         RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.primary.opacity(0.04))
                             .overlay(
                                 RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                                     .strokeBorder(
@@ -1072,7 +1414,10 @@ private struct StopPasswordView: View {
                         .fontWeight(.semibold)
                         .padding(.horizontal, Space.lg)
                         .padding(.vertical, Space.md)
-                        .background(Capsule().fill(Color.distraction))
+                        .background(
+                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                .fill(Color.distraction)
+                        )
                         .foregroundStyle(.white)
                 }
                 .driftButton(.danger)
@@ -1088,248 +1433,41 @@ private struct StopPasswordView: View {
                         .fontWeight(.medium)
                         .padding(.horizontal, Space.md)
                         .padding(.vertical, Space.md)
-                        .background(Capsule().fill(.ultraThinMaterial))
+                        .background(
+                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                .fill(Color.primary.opacity(0.05))
+                        )
                         .foregroundStyle(.secondary)
                 }
                 .driftButton(.ghost)
-                .accessibilityLabel("Cancel unlock")
+                .accessibilityLabel("Cancel")
             }
 
             if passwordError {
                 Text("Incorrect password")
                     .font(TypeScale.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(.distraction)
+                    .foregroundStyle(Color.distraction)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .driftCard(padding: Space.lg)
+        .padding(Space.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.distraction.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(Color.distraction.opacity(0.10), lineWidth: 0.5)
+                )
+        )
         .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     private func attemptStop() {
-        let success = blocker.stopBlocking(password: password)
-        if success {
-            withAnimation(Anim.quick) {
-                showDialog = false
-                password = ""
-                passwordError = false
-            }
+        if blocker.stopBlocking(password: password) {
+            withAnimation(Anim.quick) { showDialog = false; password = ""; passwordError = false }
         } else {
-            withAnimation(Anim.quick) {
-                passwordError = true
-            }
-        }
-    }
-}
-
-// MARK: - Blocker Setup View
-
-private struct BlockerSetupView: View {
-    @ObservedObject var blocker: FocusBlocker
-    @Binding var showSetup: Bool
-    @Binding var duration: Int
-    @Binding var password: String
-    @Binding var passwordConfirm: String
-
-    // Sites list
-    @State private var showSitesList = false
-    @State private var newBlockedSite: String = ""
-
-    private var passwordsMatch: Bool {
-        password == passwordConfirm
-    }
-
-    private var canStart: Bool {
-        if password.isEmpty { return true }
-        return passwordsMatch && !passwordConfirm.isEmpty
-    }
-
-    var body: some View {
-        VStack(spacing: Space.lg) {
-            // Blocked sites list (collapsible)
-            BlockedSitesList(
-                blocker: blocker,
-                showList: $showSitesList,
-                newSite: $newBlockedSite
-            )
-
-            if showSetup {
-                setupPanel
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else {
-                startBlockButton
-            }
-        }
-        .animation(Anim.tap, value: showSetup)
-    }
-
-    private var setupPanel: some View {
-        VStack(spacing: Space.lg) {
-            // Duration picker
-            HStack(spacing: Space.md) {
-                Image(systemName: "clock")
-                    .font(TypeScale.body)
-                    .foregroundStyle(.tertiary)
-                Text("Duration")
-                    .font(TypeScale.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("", selection: $duration) {
-                    Text("30 min").tag(30)
-                    Text("1 hour").tag(60)
-                    Text("2 hours").tag(120)
-                    Text("3 hours").tag(180)
-                    Text("4 hours").tag(240)
-                }
-                .pickerStyle(.menu)
-                .frame(width: 110)
-                .accessibilityLabel("Blocking duration")
-            }
-
-            Divider().opacity(0.3)
-
-            // Password (optional)
-            VStack(alignment: .leading, spacing: Space.md) {
-                HStack(spacing: Space.sm) {
-                    Image(systemName: "lock")
-                        .font(TypeScale.body)
-                        .foregroundStyle(.tertiary)
-                    Text("Lock Password")
-                        .font(TypeScale.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("Optional")
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.tertiary)
-                }
-
-                SecureField("Set a password to prevent early stop", text: $password)
-                    .textFieldStyle(.plain)
-                    .font(TypeScale.caption)
-                    .padding(Space.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                            .fill(Color.primary.opacity(0.03))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                    .strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5)
-                            )
-                    )
-                    .accessibilityLabel("Set lock password")
-
-                if !password.isEmpty {
-                    SecureField("Confirm password", text: $passwordConfirm)
-                        .textFieldStyle(.plain)
-                        .font(TypeScale.caption)
-                        .padding(Space.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                .fill(Color.primary.opacity(0.03))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                        .strokeBorder(
-                                            passwordsMatch ? Color.sep.opacity(0.15) : Color.distraction.opacity(0.2),
-                                            lineWidth: 0.5
-                                        )
-                                )
-                        )
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .accessibilityLabel("Confirm lock password")
-
-                    if !passwordConfirm.isEmpty && !passwordsMatch {
-                        Text("Passwords do not match")
-                            .font(TypeScale.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.distraction)
-                            .transition(.opacity)
-                    }
-                }
-            }
-
-            // Start / Cancel buttons
-            HStack(spacing: Space.md) {
-                Button {
-                    withAnimation(Anim.quick) {
-                        showSetup = false
-                        password = ""
-                        passwordConfirm = ""
-                    }
-                } label: {
-                    Text("Cancel")
-                        .font(TypeScale.body)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, Space.xl)
-                        .padding(.vertical, Space.md)
-                        .background(
-                            Capsule()
-                                .fill(.ultraThinMaterial)
-                                .overlay(Capsule().strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5))
-                        )
-                        .foregroundStyle(.secondary)
-                }
-                .driftButton(.ghost)
-                .accessibilityLabel("Cancel blocker setup")
-
-                Button(action: startBlocker) {
-                    HStack(spacing: Space.sm) {
-                        Image(systemName: "shield.checkered")
-                            .font(TypeScale.body)
-                        Text("Start Blocking")
-                            .font(TypeScale.body)
-                            .fontWeight(.semibold)
-                    }
-                    .padding(.horizontal, Space.xxl)
-                    .padding(.vertical, Space.md)
-                    .background(Capsule().fill(Color.accent))
-                    .foregroundStyle(.white)
-                }
-                .driftButton()
-                .disabled(!canStart)
-                .opacity(canStart ? 1 : 0.5)
-                .accessibilityLabel("Start blocking distracting sites")
-            }
-            .padding(.top, Space.xxs)
-        }
-        .driftCard(padding: Space.lg)
-    }
-
-    private var startBlockButton: some View {
-        Button {
-            withAnimation(Anim.quick) { showSetup = true }
-        } label: {
-            HStack(spacing: Space.sm) {
-                Image(systemName: "shield.checkered")
-                    .font(TypeScale.heading)
-                Text("Start Focus Block")
-                    .font(TypeScale.heading)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Space.md)
-            .background(
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(Color.accent.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(Color.accent.opacity(0.12), lineWidth: 0.5)
-                    )
-            )
-            .foregroundStyle(.accent)
-        }
-        .driftButton(.secondary)
-        .accessibilityLabel("Set up focus blocker")
-    }
-
-    private func startBlocker() {
-        let pw = password.isEmpty ? nil : password
-        blocker.startBlocking(durationMinutes: duration, password: pw)
-
-        withAnimation(Anim.quick) {
-            showSetup = false
-            password = ""
-            passwordConfirm = ""
+            withAnimation(Anim.quick) { passwordError = true }
         }
     }
 }
@@ -1338,46 +1476,47 @@ private struct BlockerSetupView: View {
 
 private struct BlockedSitesList: View {
     @ObservedObject var blocker: FocusBlocker
-    @Binding var showList: Bool
     @Binding var newSite: String
+    @State private var showList = false
+    @State private var localNewSite: String = ""
 
     var body: some View {
         VStack(spacing: Space.md) {
             Button {
-                withAnimation(Anim.quick) { showList.toggle() }
+                withAnimation(Anim.tap) { showList.toggle() }
             } label: {
                 HStack {
                     Image(systemName: "globe")
-                        .font(TypeScale.body)
+                        .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                     Text("Blocked Sites")
-                        .font(TypeScale.body)
+                        .font(TypeScale.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(blocker.blockedSites.count) sites")
+                    Text("\(blocker.blockedSites.count)")
                         .font(TypeScale.caption)
+                        .fontWeight(.semibold)
                         .foregroundStyle(.tertiary)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.quaternary)
                         .rotationEffect(.degrees(showList ? 90 : 0))
                         .animation(Anim.quick, value: showList)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Blocked sites: \(blocker.blockedSites.count) sites")
-            .accessibilityHint("Activate to \(showList ? "collapse" : "expand") the list")
+            .accessibilityLabel("Blocked sites: \(blocker.blockedSites.count)")
+            .accessibilityHint("Activate to \(showList ? "collapse" : "expand")")
 
             if showList {
                 VStack(spacing: Space.sm) {
-                    // Add new site
                     HStack(spacing: Space.sm) {
                         Image(systemName: "plus.circle")
-                            .font(TypeScale.body)
-                            .foregroundStyle(.accent.opacity(0.6))
-                        TextField("Add domain (e.g. example.com)", text: $newSite)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.accent.opacity(0.6))
+                        TextField("Add domain (e.g. reddit.com)", text: $localNewSite)
                             .textFieldStyle(.plain)
                             .font(TypeScale.caption)
                             .onSubmit { addSite() }
@@ -1392,35 +1531,31 @@ private struct BlockedSitesList: View {
                                 .foregroundStyle(.white)
                         }
                         .driftButton()
-                        .disabled(newSite.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .opacity(newSite.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
-                        .accessibilityLabel("Add site to block list")
+                        .disabled(localNewSite.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .opacity(localNewSite.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
+                        .accessibilityLabel("Add site")
                     }
                     .padding(Space.md)
                     .background(
                         RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.primary.opacity(0.04))
                             .overlay(
                                 RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                    .strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5)
+                                    .strokeBorder(Color.sep.opacity(0.12), lineWidth: 0.5)
                             )
                     )
 
-                    // Sites grid
                     LazyVGrid(columns: [
                         GridItem(.flexible(), spacing: Space.sm),
                         GridItem(.flexible(), spacing: Space.sm),
                     ], spacing: Space.sm) {
                         ForEach(blocker.blockedSites, id: \.self) { site in
                             BlockedSiteChip(site: site) {
-                                withAnimation(Anim.quick) {
-                                    blocker.removeSite(site)
-                                }
+                                withAnimation(Anim.quick) { blocker.removeSite(site) }
                             }
                         }
                     }
 
-                    // Reset to defaults
                     Button {
                         withAnimation(Anim.quick) { blocker.resetToDefaults() }
                     } label: {
@@ -1434,22 +1569,26 @@ private struct BlockedSitesList: View {
                         .foregroundStyle(.tertiary)
                     }
                     .driftButton(.ghost)
-                    .padding(.top, Space.xxs)
-                    .accessibilityLabel("Reset blocked sites to defaults")
+                    .accessibilityLabel("Reset to default blocked sites")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .driftCard(padding: Space.lg)
+        .padding(Space.md)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.primary.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
+                )
+        )
     }
 
     private func addSite() {
-        let site = newSite.trimmingCharacters(in: .whitespaces)
+        let site = localNewSite.trimmingCharacters(in: .whitespaces)
         guard !site.isEmpty else { return }
-        withAnimation(Anim.quick) {
-            blocker.addSite(site)
-            newSite = ""
-        }
+        withAnimation(Anim.quick) { blocker.addSite(site); localNewSite = "" }
     }
 }
 
@@ -1475,31 +1614,41 @@ struct BlockedSiteChip: View {
             Button(action: onRemove) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(removeHovered ? .distraction : Color.secondary.opacity(0.5))
+                    .foregroundStyle(removeHovered ? Color.distraction : Color.secondary.opacity(0.5))
                     .frame(width: 16, height: 16)
                     .background(
-                        Circle()
-                            .fill(removeHovered ? Color.distraction.opacity(0.1) : Color.primary.opacity(0.04))
+                        Circle().fill(
+                            removeHovered
+                                ? Color.distraction.opacity(0.10)
+                                : Color.primary.opacity(0.04)
+                        )
                     )
             }
             .buttonStyle(.plain)
             .onHover { h in removeHovered = h }
-            .accessibilityLabel("Remove \(site) from block list")
+            .accessibilityLabel("Remove \(site)")
         }
         .padding(.horizontal, Space.md)
         .padding(.vertical, Space.sm)
         .background(
             RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                .fill(isHovered ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
+                .fill(isHovered ? Color.primary.opacity(0.05) : Color.primary.opacity(0.02))
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                         .strokeBorder(Color.sep.opacity(isHovered ? 0.15 : 0.08), lineWidth: 0.5)
                 )
         )
-        .onHover { h in
-            withAnimation(Anim.quick) { isHovered = h }
-        }
+        .onHover { h in withAnimation(Anim.quick) { isHovered = h } }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Blocked site: \(site)")
+        .accessibilityLabel("Blocked: \(site)")
     }
+}
+
+// MARK: - Helpers
+
+private func formatStudyTime(_ totalSeconds: Int) -> String {
+    if totalSeconds < 60 { return "\(totalSeconds)s" }
+    let m = totalSeconds / 60
+    if m < 60 { return "\(m)m" }
+    return "\(m / 60)h \(m % 60)m"
 }

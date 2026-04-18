@@ -12,12 +12,12 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: Space.xl) {
+            VStack(alignment: .leading, spacing: Space.xxl) {
                 headerSection
+                    .padding(.bottom, Space.xs)
 
                 ForEach(SettingsSectionID.allCases) { section in
                     sectionView(for: section)
-                        .transition(.opacity)
                 }
             }
             .padding(Space.page)
@@ -84,9 +84,15 @@ struct SettingsView: View {
             id: .appearance,
             title: "Appearance",
             icon: "paintbrush",
+            iconColor: Color.accent,
             expandedSections: $expandedSections
         ) {
-            SettingsRow(icon: "paintbrush", label: "Theme", hint: "Choose light, dark, or follow system") {
+            SettingsPickerRow(
+                icon: "paintbrush",
+                iconColor: Color.accent,
+                title: "Theme",
+                subtitle: "Light, dark, or follow system"
+            ) {
                 Picker("Theme", selection: Binding(
                     get: { appState.theme },
                     set: { appState.setTheme($0) }
@@ -96,7 +102,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .frame(width: 210)
                 .accessibilityLabel("Theme selector")
                 .accessibilityValue(appState.theme.label)
                 .accessibilityHint("Choose between light, dark, or system theme")
@@ -111,13 +117,15 @@ struct SettingsView: View {
             id: .tracking,
             title: "Tracking",
             icon: "scope",
+            iconColor: Color.productive,
             expandedSections: $expandedSections
         ) {
             VStack(spacing: 0) {
                 SettingsToggleRow(
-                    label: "Launch at Login",
-                    hint: "Start Drift automatically when you log in",
                     icon: "power",
+                    iconColor: Color.productive,
+                    title: "Launch at Login",
+                    subtitle: "Start Drift automatically when you log in",
                     isOn: Binding(
                         get: { appState.launchAtLogin },
                         set: { newValue in
@@ -127,12 +135,14 @@ struct SettingsView: View {
                     )
                 )
 
-                SettingsDivider()
+                DriftDivider()
+                    .padding(.horizontal, Space.lg)
 
                 SettingsToggleRow(
-                    label: "Desktop Notifications",
-                    hint: "Get notified about drift events",
                     icon: "bell",
+                    iconColor: Color.streak,
+                    title: "Desktop Notifications",
+                    subtitle: "Get notified about drift events",
                     isOn: Binding(
                         get: { appState.notificationsEnabled },
                         set: { newValue in
@@ -142,9 +152,15 @@ struct SettingsView: View {
                     )
                 )
 
-                SettingsDivider()
+                DriftDivider()
+                    .padding(.horizontal, Space.lg)
 
-                SettingsRow(icon: "moon.zzz", label: "Idle Timeout", hint: "Pause tracking after inactivity") {
+                SettingsPickerRow(
+                    icon: "moon.zzz",
+                    iconColor: .secondary,
+                    title: "Idle Timeout",
+                    subtitle: "Pause tracking after inactivity"
+                ) {
                     Picker("Idle Timeout", selection: Binding(
                         get: { appState.idleTimeout },
                         set: { newValue in
@@ -184,12 +200,14 @@ struct SettingsView: View {
             id: .shortcuts,
             title: "Keyboard Shortcuts",
             icon: "command",
+            iconColor: Color.accent,
             expandedSections: $expandedSections
         ) {
             VStack(spacing: 0) {
-                KeyboardShortcutRow(label: "Toggle Tracking", keys: ["\u{2318}", "\u{21E7}", "D"])
-                SettingsDivider()
-                KeyboardShortcutRow(label: "Reset Session", keys: ["\u{2318}", "\u{21E7}", "R"])
+                PremiumKeyboardShortcutRow(label: "Toggle Tracking", keys: ["\u{2318}", "\u{21E7}", "D"])
+                DriftDivider()
+                    .padding(.horizontal, Space.lg)
+                PremiumKeyboardShortcutRow(label: "Reset Session", keys: ["\u{2318}", "\u{21E7}", "R"])
             }
         }
     }
@@ -201,6 +219,7 @@ struct SettingsView: View {
             id: .account,
             title: "Account",
             icon: "person.circle",
+            iconColor: Color.accent,
             expandedSections: $expandedSections
         ) {
             if let user = appState.user {
@@ -211,53 +230,105 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
     private func signedInAccountContent(user: User) -> some View {
         VStack(spacing: 0) {
-            SettingsRow(icon: "envelope", label: "Email") {
+            // Avatar + email header card
+            accountAvatarRow(user: user)
+
+            DriftDivider()
+                .padding(.horizontal, Space.lg)
+
+            // Plan row
+            SettingsInfoRow(
+                icon: "crown",
+                iconColor: planColor(for: user.plan),
+                title: "Plan"
+            ) {
+                PremiumPlanBadge(plan: user.plan)
+            }
+
+            DriftDivider()
+                .padding(.horizontal, Space.lg)
+
+            // Plan action
+            if user.plan == "free" {
+                upgradeProRow
+            } else {
+                manageSubscriptionRow
+            }
+
+            DriftDivider()
+                .padding(.horizontal, Space.lg)
+
+            signOutRow
+        }
+    }
+
+    @ViewBuilder
+    private func accountAvatarRow(user: User) -> some View {
+        HStack(spacing: Space.md) {
+            // Avatar circle with initials
+            ZStack {
+                Circle()
+                    .fill(Color.accent.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Text(user.initials)
+                    .font(TypeScale.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.accent)
+            }
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: Space.xxxs) {
+                Text(user.displayName)
+                    .font(TypeScale.bodyMd)
+                    .fontWeight(.medium)
                 Text(user.email)
-                    .font(TypeScale.body)
+                    .font(TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .accessibilityLabel("Email address")
-                    .accessibilityValue(user.email)
             }
 
-            SettingsDivider()
+            Spacer()
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.md)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Signed in as \(user.displayName), \(user.email)")
+    }
 
-            SettingsRow(icon: "crown", label: "Plan") {
-                PlanBadge(plan: user.plan)
+    private var upgradeProRow: some View {
+        HStack {
+            Spacer()
+            PrimaryButton("Upgrade to Pro", icon: "sparkles", color: Color.accent, isFullWidth: true) {
+                upgradeToPro()
             }
+            Spacer()
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.md)
+    }
 
-            SettingsDivider()
+    private var manageSubscriptionRow: some View {
+        SettingsActionRow(
+            icon: "creditcard",
+            iconColor: .secondary,
+            title: "Manage Subscription"
+        ) {
+            Task { await openBillingPortal() }
+        }
+    }
 
-            if user.plan == "free" {
-                SettingsActionButton(
-                    title: "Upgrade to Pro",
-                    icon: "sparkles",
-                    style: .accent
-                ) {
-                    upgradeToPro()
-                }
-            } else {
-                SettingsActionButton(
-                    title: "Manage Subscription",
-                    icon: "creditcard",
-                    style: .secondary
-                ) {
-                    Task { await openBillingPortal() }
-                }
-            }
-
-            SettingsDivider()
-
-            SettingsActionButton(
-                title: "Sign Out",
-                icon: "rectangle.portrait.and.arrow.right",
-                style: .destructive
-            ) {
-                appState.logout()
-            }
+    private var signOutRow: some View {
+        SettingsActionRow(
+            icon: "rectangle.portrait.and.arrow.right",
+            iconColor: Color.distraction,
+            title: "Sign Out",
+            titleColor: Color.distraction
+        ) {
+            appState.logout()
         }
     }
 
@@ -266,7 +337,7 @@ struct SettingsView: View {
             HStack(spacing: Space.md) {
                 ZStack {
                     Circle()
-                        .fill(Color.drift.opacity(0.08))
+                        .fill(Color.primary.opacity(0.06))
                         .frame(width: 36, height: 36)
                     Image(systemName: "person.crop.circle")
                         .font(.system(size: 18))
@@ -276,7 +347,7 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: Space.xxxs) {
                     Text("Not signed in")
-                        .font(TypeScale.body)
+                        .font(TypeScale.bodyMd)
                         .fontWeight(.semibold)
                     Text("Sign in to sync your data across devices.")
                         .font(TypeScale.caption)
@@ -284,16 +355,18 @@ struct SettingsView: View {
                 }
                 Spacer()
             }
+            .padding(.horizontal, Space.lg)
+            .padding(.top, Space.sm)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Not signed in. Sign in to sync your data across devices.")
 
-            SettingsActionButton(
-                title: "Sign In",
-                icon: "person.crop.circle",
-                style: .accent
-            ) {
-                appState.showSignIn = true
+            HStack {
+                PrimaryButton("Sign In", icon: "person.crop.circle", color: Color.accent, isFullWidth: true) {
+                    appState.showSignIn = true
+                }
             }
+            .padding(.horizontal, Space.lg)
+            .padding(.bottom, Space.md)
         }
     }
 
@@ -304,10 +377,15 @@ struct SettingsView: View {
             id: .about,
             title: "About",
             icon: "info.circle",
+            iconColor: Color.accent,
             expandedSections: $expandedSections
         ) {
             VStack(spacing: 0) {
-                SettingsRow(icon: "number", label: "Version") {
+                SettingsInfoRow(
+                    icon: "number",
+                    iconColor: .secondary,
+                    title: "Version"
+                ) {
                     Text(appVersionString)
                         .font(TypeScale.monoSm)
                         .foregroundStyle(.secondary)
@@ -315,10 +393,15 @@ struct SettingsView: View {
                         .accessibilityValue(appVersionString)
                 }
 
-                SettingsDivider()
+                DriftDivider()
+                    .padding(.horizontal, Space.lg)
 
-                SettingsRow(icon: "globe", label: "Website") {
-                    SettingsExternalLink(title: "Visit drift.app") {
+                SettingsInfoRow(
+                    icon: "globe",
+                    iconColor: Color.accent,
+                    title: "Website"
+                ) {
+                    PremiumExternalLink(title: "drift.app") {
                         if let url = URL(string: "https://drift.app") {
                             NSWorkspace.shared.open(url)
                         }
@@ -344,26 +427,62 @@ struct SettingsView: View {
             id: .dangerZone,
             title: "Danger Zone",
             icon: "exclamationmark.triangle",
+            iconColor: Color.distraction,
             expandedSections: $expandedSections
         ) {
-            SettingsActionButton(
-                title: "Reset All Data",
-                icon: "trash",
-                style: .destructive
-            ) {
-                showResetConfirmation = true
+            VStack(alignment: .leading, spacing: Space.sm) {
+                HStack(spacing: Space.md) {
+                    IconBadge(systemName: "trash", color: Color.distraction, size: 28)
+
+                    VStack(alignment: .leading, spacing: Space.xxxs) {
+                        Text("Reset All Data")
+                            .font(TypeScale.bodyMd)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.distraction)
+                        Text("Permanently erase all sessions, preferences, and sign-in state.")
+                            .font(TypeScale.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showResetConfirmation = true
+                    } label: {
+                        Text("Reset")
+                            .font(TypeScale.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.distraction)
+                            .padding(.horizontal, Space.md)
+                            .padding(.vertical, Space.xxs + 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                    .fill(Color.distraction.opacity(0.10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                            .strokeBorder(Color.distraction.opacity(0.22), lineWidth: 0.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Reset All Data")
+                    .accessibilityHint("Opens a confirmation dialog before erasing all data")
+                }
+                .padding(Space.md)
             }
-            .accessibilityHint("Opens a confirmation dialog before erasing all data")
+            .accentCard(color: Color.distraction, padding: 0, radius: Radius.md)
+            .padding(.horizontal, Space.lg)
+            .padding(.vertical, Space.md)
         }
     }
 
-    // MARK: - Computed Properties
+    // MARK: - Helpers
 
-    private var planColor: Color {
-        switch appState.user?.plan {
-        case "pro": return Color.drift
+    private func planColor(for plan: String) -> Color {
+        switch plan {
+        case "pro": return Color.accent
         case "team": return .purple
-        default: return .secondary
+        default: return Color(.secondaryLabelColor)
         }
     }
 
@@ -409,8 +528,6 @@ struct SettingsView: View {
         appState.logout()
         appState.session.reset()
         appState.pastSessions.removeAll()
-        appState.currentStreak = 0
-        appState.totalTrackedMs = 0
         appState.theme = .system
         appState.idleTimeout = 300
         appState.notificationsEnabled = true
@@ -438,8 +555,11 @@ struct CollapsibleSettingsSection<Content: View>: View {
     let id: SettingsSectionID
     let title: String
     let icon: String
+    var iconColor: Color = Color.accent
     @Binding var expandedSections: Set<SettingsSectionID>
     @ViewBuilder let content: () -> Content
+
+    @State private var headerHovered = false
 
     private var isExpanded: Bool {
         expandedSections.contains(id)
@@ -447,9 +567,9 @@ struct CollapsibleSettingsSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Section header (tappable to collapse/expand)
+            // Section header — tappable to collapse/expand
             Button {
-                withAnimation(Anim.tap) {
+                withAnimation(Anim.appear) {
                     if isExpanded {
                         expandedSections.remove(id)
                     } else {
@@ -459,8 +579,8 @@ struct CollapsibleSettingsSection<Content: View>: View {
             } label: {
                 HStack(spacing: Space.xs) {
                     Image(systemName: icon)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundStyle(iconColor.opacity(0.7))
                     Text(title)
                         .sectionLabel()
                     Spacer()
@@ -468,241 +588,296 @@ struct CollapsibleSettingsSection<Content: View>: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.quaternary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .animation(Anim.tap, value: isExpanded)
                 }
+                .padding(.vertical, Space.xs)
+                .padding(.horizontal, Space.xxxs)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
+                        .fill(headerHovered ? Color.primary.opacity(0.04) : .clear)
+                )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { headerHovered = $0 }
             .accessibilityLabel("\(title) section")
             .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
             .accessibilityHint("Double-tap to \(isExpanded ? "collapse" : "expand") this section")
-            .padding(.bottom, isExpanded ? Space.md : 0)
 
-            // Collapsible content
+            // Collapsible content card
             if isExpanded {
                 VStack(spacing: 0) {
                     content()
-                        .padding(.horizontal, Space.lg)
-                        .padding(.vertical, Space.md)
                 }
                 .driftCard(padding: 0)
-                .transition(.opacity)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .padding(.top, Space.sm)
             }
         }
-        .animation(Anim.tap, value: isExpanded)
-    }
-}
-
-// MARK: - Reusable Settings Row
-
-struct SettingsRow<Trailing: View>: View {
-    let icon: String
-    let label: String
-    var hint: String? = nil
-    @ViewBuilder let trailing: () -> Trailing
-
-    var body: some View {
-        HStack {
-            HStack(spacing: Space.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: Space.xl, alignment: .center)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxxs) {
-                    Text(label)
-                        .font(TypeScale.body)
-                        .fontWeight(.medium)
-                    if let hint {
-                        Text(hint)
-                            .font(TypeScale.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            Spacer()
-            trailing()
-        }
-        .accessibilityElement(children: .contain)
+        .animation(Anim.appear, value: isExpanded)
     }
 }
 
 // MARK: - Settings Toggle Row
 
 struct SettingsToggleRow: View {
-    let label: String
-    let hint: String
     let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String?
     @Binding var isOn: Bool
+    @State private var isHovered = false
+
+    init(
+        icon: String,
+        iconColor: Color = Color.accent,
+        title: String,
+        subtitle: String? = nil,
+        isOn: Binding<Bool>
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.title = title
+        self.subtitle = subtitle
+        self._isOn = isOn
+    }
 
     var body: some View {
-        Toggle(isOn: $isOn.animation(Anim.quick)) {
-            HStack(spacing: Space.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: Space.xl, alignment: .center)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxxs) {
-                    Text(label)
-                        .font(TypeScale.body)
-                        .fontWeight(.medium)
-                    Text(hint)
+        HStack(spacing: Space.md) {
+            IconBadge(systemName: icon, color: iconColor, size: 28)
+
+            VStack(alignment: .leading, spacing: Space.xxxs) {
+                Text(title)
+                    .font(TypeScale.bodyMd)
+                if let sub = subtitle {
+                    Text(sub)
                         .font(TypeScale.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
+
+            Spacer()
+
+            Toggle("", isOn: $isOn.animation(Anim.quick))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .accessibilityLabel(title)
+                .accessibilityValue(isOn ? "Enabled" : "Disabled")
         }
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .accessibilityLabel(label)
-        .accessibilityValue(isOn ? "Enabled" : "Disabled")
-        .accessibilityHint(hint)
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.sm + 2)
+        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - Settings Divider
+// MARK: - Settings Picker Row (icon + label + trailing control)
 
-private struct SettingsDivider: View {
+struct SettingsPickerRow<Trailing: View>: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String?
+    @ViewBuilder let trailing: () -> Trailing
+    @State private var isHovered = false
+
+    init(
+        icon: String,
+        iconColor: Color = Color.accent,
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing
+    }
+
     var body: some View {
-        Divider()
-            .padding(.vertical, Space.sm)
+        HStack(spacing: Space.md) {
+            IconBadge(systemName: icon, color: iconColor, size: 28)
+
+            VStack(alignment: .leading, spacing: Space.xxxs) {
+                Text(title)
+                    .font(TypeScale.bodyMd)
+                if let sub = subtitle {
+                    Text(sub)
+                        .font(TypeScale.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Spacer()
+
+            trailing()
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.sm + 2)
+        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - Keyboard Shortcut Row
+// MARK: - Settings Info Row (read-only label + trailing value)
 
-struct KeyboardShortcutRow: View {
+struct SettingsInfoRow<Trailing: View>: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    @ViewBuilder let trailing: () -> Trailing
+    @State private var isHovered = false
+
+    init(
+        icon: String,
+        iconColor: Color = .secondary,
+        title: String,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.title = title
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        HStack(spacing: Space.md) {
+            IconBadge(systemName: icon, color: iconColor, size: 28)
+
+            Text(title)
+                .font(TypeScale.bodyMd)
+
+            Spacer()
+
+            trailing()
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.sm + 2)
+        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+// MARK: - Settings Action Row (tappable row with disclosure arrow)
+
+struct SettingsActionRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    var titleColor: Color = .primary
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.md) {
+                IconBadge(systemName: icon, color: iconColor, size: 28)
+
+                Text(title)
+                    .font(TypeScale.bodyMd)
+                    .foregroundStyle(titleColor)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.quaternary)
+            }
+            .padding(.horizontal, Space.lg)
+            .padding(.vertical, Space.sm + 2)
+            .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+// MARK: - Premium Keyboard Shortcut Row
+
+struct PremiumKeyboardShortcutRow: View {
     let label: String
     let keys: [String]
+    @State private var isHovered = false
 
     var body: some View {
-        HStack {
+        HStack(spacing: Space.md) {
+            IconBadge(systemName: "keyboard", color: Color.accent, size: 28)
+
             Text(label)
-                .font(TypeScale.body)
-                .fontWeight(.medium)
+                .font(TypeScale.bodyMd)
+
             Spacer()
+
             HStack(spacing: Space.xxxs + 1) {
                 ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
-                    Text(key)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .frame(minWidth: 22, minHeight: 22)
-                        .padding(.horizontal, Space.xxs)
-                        .background(
-                            RoundedRectangle(cornerRadius: Radius.sm)
-                                .fill(Color.cardBg)
-                                .shadow(color: .black.opacity(0.06), radius: 0.5, y: 0.5)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Radius.sm)
-                                        .stroke(Color.sep.opacity(0.15), lineWidth: 1)
-                                )
-                        )
+                    KeyBadge(key: key)
                 }
             }
         }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.sm + 2)
+        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(keys.joined(separator: " "))")
     }
 }
 
-// MARK: - Plan Badge
+// MARK: - Premium Plan Badge
 
-private struct PlanBadge: View {
+private struct PremiumPlanBadge: View {
     let plan: String
 
     private var color: Color {
         switch plan {
-        case "pro": return Color.drift
+        case "pro": return Color.accent
         case "team": return .purple
-        default: return .secondary
+        default: return Color(.secondaryLabelColor)
         }
     }
+
+    private var isPro: Bool { plan == "pro" || plan == "team" }
 
     var body: some View {
-        Text(plan.capitalized)
-            .font(TypeScale.caption)
-            .fontWeight(.semibold)
-            .padding(.horizontal, Space.md)
-            .padding(.vertical, Space.xxxs + 1)
-            .background(color.opacity(0.12))
-            .foregroundStyle(color)
-            .clipShape(Capsule())
-            .accessibilityLabel("Current plan")
-            .accessibilityValue(plan.capitalized)
-    }
-}
-
-// MARK: - Settings Action Button
-
-enum SettingsButtonStyle {
-    case accent, secondary, destructive
-}
-
-struct SettingsActionButton: View {
-    let title: String
-    let icon: String
-    let style: SettingsButtonStyle
-    let action: () -> Void
-    @State private var isHovered = false
-
-    private var foregroundColor: Color {
-        switch style {
-        case .accent: return .white
-        case .secondary: return .primary
-        case .destructive: return .distraction
-        }
-    }
-
-    private var backgroundColor: Color {
-        switch style {
-        case .accent:
-            return Color.drift
-        case .secondary:
-            return Color.primary.opacity(isHovered ? 0.08 : 0.05)
-        case .destructive:
-            return Color.distraction.opacity(isHovered ? 0.12 : 0.06)
-        }
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Space.xs) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                Text(title)
-                    .font(TypeScale.body)
-                    .fontWeight(.medium)
+        HStack(spacing: Space.xxs) {
+            if isPro {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(color)
             }
-            .foregroundStyle(foregroundColor)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Space.sm + 1)
-            .background(
-                RoundedRectangle(cornerRadius: Radius.sm)
-                    .fill(backgroundColor)
-            )
+            Text(plan.capitalized)
+                .font(TypeScale.tiny)
+                .fontWeight(.bold)
+                .foregroundStyle(color)
         }
-        .driftButton()
-        .opacity(isHovered ? 0.92 : 1)
-        .animation(Anim.quick, value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
-        }
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint(accessibilityHintText)
-    }
-
-    private var accessibilityHintText: String {
-        switch style {
-        case .accent: return "Double-tap to activate"
-        case .secondary: return "Double-tap to activate"
-        case .destructive: return "Double-tap to perform this destructive action"
-        }
+        .padding(.horizontal, Space.sm)
+        .padding(.vertical, Space.xxxs + 1)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.10))
+                .overlay(Capsule().strokeBorder(color.opacity(0.25), lineWidth: 0.5))
+        )
+        .accessibilityLabel("Current plan")
+        .accessibilityValue(plan.capitalized)
     }
 }
 
-// MARK: - Settings External Link
+// MARK: - Premium External Link
 
-struct SettingsExternalLink: View {
+struct PremiumExternalLink: View {
     let title: String
     let action: () -> Void
     @State private var isHovered = false
@@ -711,18 +886,15 @@ struct SettingsExternalLink: View {
         Button(action: action) {
             HStack(spacing: Space.xxs) {
                 Text(title)
-                    .font(TypeScale.body)
+                    .font(TypeScale.bodySm)
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 10, weight: .medium))
             }
-            .foregroundStyle(isHovered ? Color.drift : .secondary)
+            .foregroundStyle(isHovered ? Color.accent : Color(.secondaryLabelColor))
+            .animation(Anim.hover, value: isHovered)
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(Anim.quick) {
-                isHovered = hovering
-            }
-        }
+        .onHover { isHovered = $0 }
         .accessibilityLabel("\(title), opens in browser")
         .accessibilityAddTraits(.isLink)
     }
