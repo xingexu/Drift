@@ -19,6 +19,7 @@ struct DriftApp: App {
                 .environmentObject(networkMonitor)
                 .frame(minWidth: 860, minHeight: 560)
                 .background(Color("Background"))
+                .tint(appState.accentColor)
                 .onAppear {
                     configureMainWindow()
                 }
@@ -31,6 +32,19 @@ struct DriftApp: App {
         .handlesExternalEvents(matching: Set(arrayLiteral: "main"))
         .commands {
             CommandGroup(replacing: .newItem) {}
+
+            CommandMenu("Go") {
+                Button("Home")     { AppState.shared.currentTab = .home }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("Session")  { AppState.shared.currentTab = .session }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("Focus")    { AppState.shared.currentTab = .focus }
+                    .keyboardShortcut("3", modifiers: .command)
+                Button("History")  { AppState.shared.currentTab = .history }
+                    .keyboardShortcut("4", modifiers: .command)
+                Button("Settings") { AppState.shared.currentTab = .settings }
+                    .keyboardShortcut("5", modifiers: .command)
+            }
 
             CommandMenu("Tracking") {
                 Button(tracker.isTracking ? "Pause Tracking" : "Start Tracking") {

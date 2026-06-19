@@ -6,27 +6,292 @@ struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var showResetConfirmation = false
     @State private var showResetSuccess = false
-    @State private var expandedSections: Set<SettingsSectionID> = Set(SettingsSectionID.allCases)
     @State private var checkoutError: String?
     @State private var showCheckoutError = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: Space.xxl) {
-                headerSection
-                    .padding(.bottom, Space.xs)
 
-                ForEach(SettingsSectionID.allCases) { section in
-                    sectionView(for: section)
+                // Page header
+                HStack {
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        Text("Settings")
+                            .font(.system(size: 32, weight: .bold))
+                            .tracking(-0.8)
+
+                        Text("Customize your Drift experience.")
+                            .font(TypeScale.bodyMd)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                // APPEARANCE
+                settingsSection("APPEARANCE", icon: "sun.max") {
+                    VStack(spacing: 0) {
+                        SettingsPickerRow(
+                            icon: "display",
+                            iconColor: .secondary,
+                            title: "Theme",
+                            subtitle: "Light or dark — Drift adapts throughout."
+                        ) {
+                            Picker(selection: Binding(
+                                get: { appState.theme },
+                                set: { appState.setTheme($0) }
+                            )) {
+                                Text(AppTheme.light.label).tag(AppTheme.light)
+                                Text(AppTheme.dark.label).tag(AppTheme.dark)
+                            } label: { EmptyView() }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 160)
+                            .accessibilityLabel("Theme selector")
+                            .accessibilityValue(appState.theme.label)
+                        }
+
+                        DriftDivider()
+
+                        SettingsToggleRow(
+                            icon: "waveform.path.ecg",
+                            iconColor: .secondary,
+                            title: "Reduce motion",
+                            subtitle: "Minimize decorative animations.",
+                            isOn: Binding(
+                                get: { appState.reduceMotion },
+                                set: { appState.setReduceMotion($0) }
+                            )
+                        )
+
+                        DriftDivider()
+
+                        SettingsPickerRow(
+                            icon: "square.grid.2x2",
+                            iconColor: .secondary,
+                            title: "Density",
+                            subtitle: "Compact fits more on screen; spacious breathes."
+                        ) {
+                            Picker(selection: Binding(
+                                get: { appState.density },
+                                set: { appState.setDensity($0) }
+                            )) {
+                                Text("Compact").tag("Compact")
+                                Text("Comfortable").tag("Comfortable")
+                                Text("Spacious").tag("Spacious")
+                            } label: { EmptyView() }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 260)
+                            .accessibilityLabel("Density selector")
+                            .accessibilityValue(appState.density)
+                        }
+                    }
+                    .sectionCard()
+                }
+
+                // TRACKING
+                settingsSection("TRACKING", icon: "chart.bar.xaxis") {
+                    VStack(spacing: 0) {
+                        SettingsToggleRow(
+                            icon: "arrow.up.right.circle",
+                            iconColor: .green,
+                            title: "Launch at login",
+                            subtitle: "Start Drift automatically when you log in.",
+                            isOn: Binding(
+                                get: { appState.launchAtLogin },
+                                set: { newValue in
+                                    appState.launchAtLogin = newValue
+                                    UserDefaults.standard.set(newValue, forKey: "drift_launch_login")
+                                }
+                            )
+                        )
+
+                        DriftDivider()
+
+                        SettingsToggleRow(
+                            icon: "bell",
+                            iconColor: .orange,
+                            title: "Desktop notifications",
+                            subtitle: "Be notified about Drift events.",
+                            isOn: Binding(
+                                get: { appState.notificationsEnabled },
+                                set: { newValue in
+                                    appState.notificationsEnabled = newValue
+                                    UserDefaults.standard.set(newValue, forKey: "drift_notifications")
+                                }
+                            )
+                        )
+
+                        DriftDivider()
+
+                        SettingsPickerRow(
+                            icon: "timer",
+                            iconColor: .secondary,
+                            title: "Idle timeout",
+                            subtitle: "Pause tracking after inactivity."
+                        ) {
+                            Picker(selection: Binding(
+                                get: { appState.idleTimeout },
+                                set: { newValue in
+                                    appState.idleTimeout = newValue
+                                    UserDefaults.standard.set(newValue, forKey: "drift_idle_timeout")
+                                }
+                            )) {
+                                Text("2 min").tag(120)
+                                Text("5 min").tag(300)
+                                Text("10 min").tag(600)
+                                Text("15 min").tag(900)
+                            } label: { EmptyView() }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 220)
+                            .accessibilityLabel("Idle timeout duration")
+                            .accessibilityValue(idleTimeoutLabel)
+                        }
+                    }
+                    .sectionCard()
+                }
+
+                // KEYBOARD SHORTCUTS
+                settingsSection("KEYBOARD SHORTCUTS", icon: "keyboard") {
+                    VStack(spacing: 0) {
+                        SettingsShortcutRow(
+                            icon: "1.circle", title: "Home",     keys: ["1"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "2.circle", title: "Session",  keys: ["2"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "3.circle", title: "Focus",    keys: ["3"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "4.circle", title: "History",  keys: ["4"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "5.circle", title: "Settings", keys: ["5"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "record.circle",
+                            title: "Toggle tracking",
+                            keys: ["\u{2318}", "\u{21E7}", "D"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "arrow.counterclockwise",
+                            title: "Reset session",
+                            keys: ["\u{2318}", "\u{21E7}", "R"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "play.pause",
+                            title: "Play / Pause focus timer",
+                            keys: ["Space"]
+                        )
+                        DriftDivider()
+                        SettingsShortcutRow(
+                            icon: "xmark.circle",
+                            title: "Stop focus session",
+                            keys: ["Esc"]
+                        )
+                    }
+                    .sectionCard()
+                }
+
+                // ABOUT
+                settingsSection("ABOUT", icon: "info.circle") {
+                    VStack(spacing: 0) {
+                        SettingsInfoRow(
+                            icon: "number",
+                            iconColor: .secondary,
+                            title: "Version"
+                        ) {
+                            Text(appVersionString)
+                                .font(TypeScale.monoSm)
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel("App version")
+                                .accessibilityValue(appVersionString)
+                        }
+
+                        DriftDivider()
+
+                        SettingsInfoRow(
+                            icon: "globe",
+                            iconColor: appState.accentColor,
+                            title: "Website"
+                        ) {
+                            PremiumExternalLink(title: "drift.app") {
+                                if let url = URL(string: "https://drift.app") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                        }
+                    }
+                    .sectionCard()
+                }
+
+                // DANGER ZONE
+                settingsSection("DANGER ZONE", icon: "exclamationmark.triangle") {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        HStack(spacing: Space.md) {
+                            IconBadge(systemName: "trash", color: Color.distraction, size: 28)
+
+                            VStack(alignment: .leading, spacing: Space.xxxs) {
+                                Text("Reset All Data")
+                                    .font(TypeScale.bodyMd)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.distraction)
+                                Text("Permanently erase all sessions, preferences, and sign-in state.")
+                                    .font(TypeScale.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                showResetConfirmation = true
+                            } label: {
+                                Text("Reset")
+                                    .font(TypeScale.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.distraction)
+                                    .padding(.horizontal, Space.md)
+                                    .padding(.vertical, Space.xxs + 1)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                            .fill(Color.distraction.opacity(0.10))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                                    .strokeBorder(Color.distraction.opacity(0.28), lineWidth: 0.5)
+                                            )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Reset All Data")
+                            .accessibilityHint("Opens a confirmation dialog before erasing all data")
+                        }
+                        .padding(Space.md)
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                                    .strokeBorder(Color.distraction.opacity(0.22), lineWidth: 0.5)
+                            )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
                 }
             }
             .padding(Space.page)
         }
         .alert("Reset All Data?", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Reset Everything", role: .destructive) {
-                resetAllData()
-            }
+            Button("Reset Everything", role: .destructive) { resetAllData() }
         } message: {
             Text("This will permanently erase all local data including session history, preferences, and sign-in state. This action cannot be undone.")
         }
@@ -42,372 +307,39 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
-            Text("Settings")
-                .font(TypeScale.title)
-                .tracking(-0.5)
-                .accessibilityAddTraits(.isHeader)
-            Text("Customize your Drift experience")
-                .font(TypeScale.body)
-                .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: - Section Router
+    // MARK: - Section Builder
 
     @ViewBuilder
-    private func sectionView(for section: SettingsSectionID) -> some View {
-        switch section {
-        case .appearance:
-            appearanceSection
-        case .tracking:
-            trackingSection
-        case .shortcuts:
-            shortcutsSection
-        case .account:
-            accountSection
-        case .about:
-            aboutSection
-        case .dangerZone:
-            dangerZoneSection
-        }
-    }
+    private func settingsSection<Content: View>(
+        _ title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            HStack(spacing: Space.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
 
-    // MARK: - Appearance
-
-    private var appearanceSection: some View {
-        CollapsibleSettingsSection(
-            id: .appearance,
-            title: "Appearance",
-            icon: "paintbrush",
-            iconColor: Color.accent,
-            expandedSections: $expandedSections
-        ) {
-            SettingsPickerRow(
-                icon: "paintbrush",
-                iconColor: Color.accent,
-                title: "Theme",
-                subtitle: "Light, dark, or follow system"
-            ) {
-                Picker("Theme", selection: Binding(
-                    get: { appState.theme },
-                    set: { appState.setTheme($0) }
-                )) {
-                    ForEach(AppTheme.allCases, id: \.self) { theme in
-                        Label(theme.label, systemImage: theme.icon).tag(theme)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 210)
-                .accessibilityLabel("Theme selector")
-                .accessibilityValue(appState.theme.label)
-                .accessibilityHint("Choose between light, dark, or system theme")
+                Text(title)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(.secondary)
             }
+
+            content()
         }
     }
 
-    // MARK: - Tracking
-
-    private var trackingSection: some View {
-        CollapsibleSettingsSection(
-            id: .tracking,
-            title: "Tracking",
-            icon: "scope",
-            iconColor: Color.productive,
-            expandedSections: $expandedSections
-        ) {
-            VStack(spacing: 0) {
-                SettingsToggleRow(
-                    icon: "power",
-                    iconColor: Color.productive,
-                    title: "Launch at Login",
-                    subtitle: "Start Drift automatically when you log in",
-                    isOn: Binding(
-                        get: { appState.launchAtLogin },
-                        set: { newValue in
-                            appState.launchAtLogin = newValue
-                            UserDefaults.standard.set(newValue, forKey: "drift_launch_login")
-                        }
-                    )
-                )
-
-                DriftDivider()
-                    .padding(.horizontal, Space.lg)
-
-                SettingsToggleRow(
-                    icon: "bell",
-                    iconColor: Color.streak,
-                    title: "Desktop Notifications",
-                    subtitle: "Get notified about drift events",
-                    isOn: Binding(
-                        get: { appState.notificationsEnabled },
-                        set: { newValue in
-                            appState.notificationsEnabled = newValue
-                            UserDefaults.standard.set(newValue, forKey: "drift_notifications")
-                        }
-                    )
-                )
-
-                DriftDivider()
-                    .padding(.horizontal, Space.lg)
-
-                SettingsPickerRow(
-                    icon: "moon.zzz",
-                    iconColor: .secondary,
-                    title: "Idle Timeout",
-                    subtitle: "Pause tracking after inactivity"
-                ) {
-                    Picker("Idle Timeout", selection: Binding(
-                        get: { appState.idleTimeout },
-                        set: { newValue in
-                            appState.idleTimeout = newValue
-                            UserDefaults.standard.set(newValue, forKey: "drift_idle_timeout")
-                        }
-                    )) {
-                        Text("2 min").tag(120)
-                        Text("5 min").tag(300)
-                        Text("10 min").tag(600)
-                        Text("15 min").tag(900)
-                    }
-                    .labelsHidden()
-                    .frame(width: 100)
-                    .accessibilityLabel("Idle timeout duration")
-                    .accessibilityValue(idleTimeoutLabel)
-                    .accessibilityHint("Select how long before tracking pauses due to inactivity")
-                }
-            }
-        }
-    }
+    // MARK: - Helpers
 
     private var idleTimeoutLabel: String {
         switch appState.idleTimeout {
-        case 120: return "2 minutes"
-        case 300: return "5 minutes"
-        case 600: return "10 minutes"
-        case 900: return "15 minutes"
-        default: return "\(appState.idleTimeout / 60) minutes"
-        }
-    }
-
-    // MARK: - Keyboard Shortcuts
-
-    private var shortcutsSection: some View {
-        CollapsibleSettingsSection(
-            id: .shortcuts,
-            title: "Keyboard Shortcuts",
-            icon: "command",
-            iconColor: Color.accent,
-            expandedSections: $expandedSections
-        ) {
-            VStack(spacing: 0) {
-                PremiumKeyboardShortcutRow(label: "Toggle Tracking", keys: ["\u{2318}", "\u{21E7}", "D"])
-                DriftDivider()
-                    .padding(.horizontal, Space.lg)
-                PremiumKeyboardShortcutRow(label: "Reset Session", keys: ["\u{2318}", "\u{21E7}", "R"])
-            }
-        }
-    }
-
-    // MARK: - Account
-
-    private var accountSection: some View {
-        CollapsibleSettingsSection(
-            id: .account,
-            title: "Account",
-            icon: "person.circle",
-            iconColor: Color.accent,
-            expandedSections: $expandedSections
-        ) {
-            if let user = appState.user {
-                signedInAccountContent(user: user)
-            } else {
-                signedOutAccountContent
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func signedInAccountContent(user: User) -> some View {
-        VStack(spacing: 0) {
-            // Avatar + email header card
-            accountAvatarRow(user: user)
-
-            DriftDivider()
-                .padding(.horizontal, Space.lg)
-
-            // Plan row
-            SettingsInfoRow(
-                icon: "crown",
-                iconColor: planColor(for: user.plan),
-                title: "Plan"
-            ) {
-                PremiumPlanBadge(plan: user.plan)
-            }
-
-            DriftDivider()
-                .padding(.horizontal, Space.lg)
-
-            // Plan action
-            if user.plan == "free" {
-                upgradeProRow
-            } else {
-                manageSubscriptionRow
-            }
-
-            DriftDivider()
-                .padding(.horizontal, Space.lg)
-
-            signOutRow
-        }
-    }
-
-    @ViewBuilder
-    private func accountAvatarRow(user: User) -> some View {
-        HStack(spacing: Space.md) {
-            // Avatar circle with initials
-            ZStack {
-                Circle()
-                    .fill(Color.accent.opacity(0.12))
-                    .frame(width: 36, height: 36)
-                Text(user.initials)
-                    .font(TypeScale.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.accent)
-            }
-            .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: Space.xxxs) {
-                Text(user.displayName)
-                    .font(TypeScale.bodyMd)
-                    .fontWeight(.medium)
-                Text(user.email)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.md)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Signed in as \(user.displayName), \(user.email)")
-    }
-
-    private var upgradeProRow: some View {
-        HStack {
-            Spacer()
-            PrimaryButton("Upgrade to Pro", icon: "sparkles", color: Color.accent, isFullWidth: true) {
-                upgradeToPro()
-            }
-            Spacer()
-        }
-        .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.md)
-    }
-
-    private var manageSubscriptionRow: some View {
-        SettingsActionRow(
-            icon: "creditcard",
-            iconColor: .secondary,
-            title: "Manage Subscription"
-        ) {
-            Task { await openBillingPortal() }
-        }
-    }
-
-    private var signOutRow: some View {
-        SettingsActionRow(
-            icon: "rectangle.portrait.and.arrow.right",
-            iconColor: Color.distraction,
-            title: "Sign Out",
-            titleColor: Color.distraction
-        ) {
-            appState.logout()
-        }
-    }
-
-    private var signedOutAccountContent: some View {
-        VStack(spacing: Space.md) {
-            HStack(spacing: Space.md) {
-                ZStack {
-                    Circle()
-                        .fill(Color.primary.opacity(0.06))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.tertiary)
-                }
-                .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: Space.xxxs) {
-                    Text("Not signed in")
-                        .font(TypeScale.bodyMd)
-                        .fontWeight(.semibold)
-                    Text("Sign in to sync your data across devices.")
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, Space.lg)
-            .padding(.top, Space.sm)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Not signed in. Sign in to sync your data across devices.")
-
-            HStack {
-                PrimaryButton("Sign In", icon: "person.crop.circle", color: Color.accent, isFullWidth: true) {
-                    appState.showSignIn = true
-                }
-            }
-            .padding(.horizontal, Space.lg)
-            .padding(.bottom, Space.md)
-        }
-    }
-
-    // MARK: - About
-
-    private var aboutSection: some View {
-        CollapsibleSettingsSection(
-            id: .about,
-            title: "About",
-            icon: "info.circle",
-            iconColor: Color.accent,
-            expandedSections: $expandedSections
-        ) {
-            VStack(spacing: 0) {
-                SettingsInfoRow(
-                    icon: "number",
-                    iconColor: .secondary,
-                    title: "Version"
-                ) {
-                    Text(appVersionString)
-                        .font(TypeScale.monoSm)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("App version")
-                        .accessibilityValue(appVersionString)
-                }
-
-                DriftDivider()
-                    .padding(.horizontal, Space.lg)
-
-                SettingsInfoRow(
-                    icon: "globe",
-                    iconColor: Color.accent,
-                    title: "Website"
-                ) {
-                    PremiumExternalLink(title: "drift.app") {
-                        if let url = URL(string: "https://drift.app") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                }
-            }
+        case 120:  return "2 minutes"
+        case 300:  return "5 minutes"
+        case 600:  return "10 minutes"
+        case 900:  return "15 minutes"
+        default:   return "\(appState.idleTimeout / 60) minutes"
         }
     }
 
@@ -420,105 +352,7 @@ struct SettingsView: View {
         return version
     }
 
-    // MARK: - Danger Zone
-
-    private var dangerZoneSection: some View {
-        CollapsibleSettingsSection(
-            id: .dangerZone,
-            title: "Danger Zone",
-            icon: "exclamationmark.triangle",
-            iconColor: Color.distraction,
-            expandedSections: $expandedSections
-        ) {
-            VStack(alignment: .leading, spacing: Space.sm) {
-                HStack(spacing: Space.md) {
-                    IconBadge(systemName: "trash", color: Color.distraction, size: 28)
-
-                    VStack(alignment: .leading, spacing: Space.xxxs) {
-                        Text("Reset All Data")
-                            .font(TypeScale.bodyMd)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.distraction)
-                        Text("Permanently erase all sessions, preferences, and sign-in state.")
-                            .font(TypeScale.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Button {
-                        showResetConfirmation = true
-                    } label: {
-                        Text("Reset")
-                            .font(TypeScale.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.distraction)
-                            .padding(.horizontal, Space.md)
-                            .padding(.vertical, Space.xxs + 1)
-                            .background(
-                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                    .fill(Color.distraction.opacity(0.10))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                            .strokeBorder(Color.distraction.opacity(0.22), lineWidth: 0.5)
-                                    )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Reset All Data")
-                    .accessibilityHint("Opens a confirmation dialog before erasing all data")
-                }
-                .padding(Space.md)
-            }
-            .accentCard(color: Color.distraction, padding: 0, radius: Radius.md)
-            .padding(.horizontal, Space.lg)
-            .padding(.vertical, Space.md)
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func planColor(for plan: String) -> Color {
-        switch plan {
-        case "pro": return Color.accent
-        case "team": return .purple
-        default: return Color(.secondaryLabelColor)
-        }
-    }
-
     // MARK: - Actions
-
-    private func upgradeToPro() {
-        Task {
-            do {
-                let response = try await APIClient.shared.startCheckout(plan: "pro", interval: "month")
-                if let url = URL(string: response.url) {
-                    NSWorkspace.shared.open(url)
-                } else {
-                    checkoutError = "Received an invalid checkout URL. Please try again."
-                    showCheckoutError = true
-                }
-            } catch {
-                checkoutError = "Could not start checkout: \(error.localizedDescription)"
-                showCheckoutError = true
-            }
-        }
-    }
-
-    private func openBillingPortal() async {
-        do {
-            let response = try await APIClient.shared.openBillingPortal()
-            if let url = URL(string: response.url) {
-                NSWorkspace.shared.open(url)
-            } else {
-                checkoutError = "Received an invalid portal URL. Please try again."
-                showCheckoutError = true
-            }
-        } catch {
-            checkoutError = "Could not open billing portal: \(error.localizedDescription)"
-            showCheckoutError = true
-        }
-    }
 
     private func resetAllData() {
         let defaults = UserDefaults.standard
@@ -528,7 +362,15 @@ struct SettingsView: View {
         appState.logout()
         appState.session.reset()
         appState.pastSessions.removeAll()
-        appState.theme = .system
+        // Route through setters so each default is re-persisted to the freshly
+        // cleared UserDefaults (direct assignment skipped persistence, leaving
+        // state and disk out of sync) and no preference is silently missed.
+        appState.setTheme(.system)
+        appState.setDensity("Spacious")
+        appState.setTypography("Sora")
+        appState.setHomeLayout("Hero")
+        appState.setReduceMotion(false)
+        appState.setAccentColor(DriftDesign.accents.first?.name ?? appState.accentColorName)
         appState.idleTimeout = 300
         appState.notificationsEnabled = true
         appState.launchAtLogin = true
@@ -536,85 +378,21 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Section Identifier
+// MARK: - Section Card Modifier
 
-enum SettingsSectionID: String, CaseIterable, Identifiable {
-    case appearance
-    case tracking
-    case shortcuts
-    case account
-    case about
-    case dangerZone
-
-    var id: String { rawValue }
-}
-
-// MARK: - Collapsible Settings Section
-
-struct CollapsibleSettingsSection<Content: View>: View {
-    let id: SettingsSectionID
-    let title: String
-    let icon: String
-    var iconColor: Color = Color.accent
-    @Binding var expandedSections: Set<SettingsSectionID>
-    @ViewBuilder let content: () -> Content
-
-    @State private var headerHovered = false
-
-    private var isExpanded: Bool {
-        expandedSections.contains(id)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Section header — tappable to collapse/expand
-            Button {
-                withAnimation(Anim.appear) {
-                    if isExpanded {
-                        expandedSections.remove(id)
-                    } else {
-                        expandedSections.insert(id)
-                    }
-                }
-            } label: {
-                HStack(spacing: Space.xs) {
-                    Image(systemName: icon)
-                        .font(.system(size: 9.5, weight: .bold))
-                        .foregroundStyle(iconColor.opacity(0.7))
-                    Text(title)
-                        .sectionLabel()
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.quaternary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .animation(Anim.tap, value: isExpanded)
-                }
-                .padding(.vertical, Space.xs)
-                .padding(.horizontal, Space.xxxs)
-                .background(
-                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                        .fill(headerHovered ? Color.primary.opacity(0.04) : .clear)
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .onHover { headerHovered = $0 }
-            .accessibilityLabel("\(title) section")
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-            .accessibilityHint("Double-tap to \(isExpanded ? "collapse" : "expand") this section")
-
-            // Collapsible content card
-            if isExpanded {
-                VStack(spacing: 0) {
-                    content()
-                }
-                .driftCard(padding: 0)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .padding(.top, Space.sm)
-            }
-        }
-        .animation(Anim.appear, value: isExpanded)
+private extension View {
+    func sectionCard() -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 }
 
@@ -667,14 +445,14 @@ struct SettingsToggleRow: View {
         }
         .padding(.horizontal, Space.lg)
         .padding(.vertical, Space.sm + 2)
-        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
         .animation(Anim.hover, value: isHovered)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - Settings Picker Row (icon + label + trailing control)
+// MARK: - Settings Picker Row
 
 struct SettingsPickerRow<Trailing: View>: View {
     let icon: String
@@ -718,14 +496,14 @@ struct SettingsPickerRow<Trailing: View>: View {
         }
         .padding(.horizontal, Space.lg)
         .padding(.vertical, Space.sm + 2)
-        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
         .animation(Anim.hover, value: isHovered)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - Settings Info Row (read-only label + trailing value)
+// MARK: - Settings Info Row
 
 struct SettingsInfoRow<Trailing: View>: View {
     let icon: String
@@ -759,14 +537,14 @@ struct SettingsInfoRow<Trailing: View>: View {
         }
         .padding(.horizontal, Space.lg)
         .padding(.vertical, Space.sm + 2)
-        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
         .animation(Anim.hover, value: isHovered)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - Settings Action Row (tappable row with disclosure arrow)
+// MARK: - Settings Action Row
 
 struct SettingsActionRow: View {
     let icon: String
@@ -793,7 +571,7 @@ struct SettingsActionRow: View {
             }
             .padding(.horizontal, Space.lg)
             .padding(.vertical, Space.sm + 2)
-            .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+            .background(isHovered ? Color.primary.opacity(0.05) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -804,18 +582,19 @@ struct SettingsActionRow: View {
     }
 }
 
-// MARK: - Premium Keyboard Shortcut Row
+// MARK: - Settings Shortcut Row
 
-struct PremiumKeyboardShortcutRow: View {
-    let label: String
+struct SettingsShortcutRow: View {
+    let icon: String
+    let title: String
     let keys: [String]
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Space.md) {
-            IconBadge(systemName: "keyboard", color: Color.accent, size: 28)
+            IconBadge(systemName: icon, color: Color(.secondaryLabelColor), size: 28)
 
-            Text(label)
+            Text(title)
                 .font(TypeScale.bodyMd)
 
             Spacer()
@@ -828,50 +607,11 @@ struct PremiumKeyboardShortcutRow: View {
         }
         .padding(.horizontal, Space.lg)
         .padding(.vertical, Space.sm + 2)
-        .background(isHovered ? Color.primary.opacity(0.03) : .clear)
+        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
         .animation(Anim.hover, value: isHovered)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(keys.joined(separator: " "))")
-    }
-}
-
-// MARK: - Premium Plan Badge
-
-private struct PremiumPlanBadge: View {
-    let plan: String
-
-    private var color: Color {
-        switch plan {
-        case "pro": return Color.accent
-        case "team": return .purple
-        default: return Color(.secondaryLabelColor)
-        }
-    }
-
-    private var isPro: Bool { plan == "pro" || plan == "team" }
-
-    var body: some View {
-        HStack(spacing: Space.xxs) {
-            if isPro {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(color)
-            }
-            Text(plan.capitalized)
-                .font(TypeScale.tiny)
-                .fontWeight(.bold)
-                .foregroundStyle(color)
-        }
-        .padding(.horizontal, Space.sm)
-        .padding(.vertical, Space.xxxs + 1)
-        .background(
-            Capsule()
-                .fill(color.opacity(0.10))
-                .overlay(Capsule().strokeBorder(color.opacity(0.25), lineWidth: 0.5))
-        )
-        .accessibilityLabel("Current plan")
-        .accessibilityValue(plan.capitalized)
+        .accessibilityLabel("\(title): \(keys.joined(separator: " "))")
     }
 }
 

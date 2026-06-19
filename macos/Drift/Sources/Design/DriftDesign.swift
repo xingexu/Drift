@@ -6,14 +6,35 @@ import SwiftUI
 // Rules: NO magic numbers in views. NO inline colors. NO custom shadows.
 // Everything — color, spacing, type, animation, elevation — lives here.
 
+// MARK: - Accent Color Palette
+
+/// A named accent color preset used in the Appearance settings.
+struct AccentOption {
+    let name: String
+    let color: Color
+}
+
+/// Namespace for design-system constants that aren't view modifiers.
+enum DriftDesign {
+    /// The six built-in accent color presets. Blue (Drift brand) is the default.
+    static let accents: [AccentOption] = [
+        AccentOption(name: "indigo",  color: Color(red: 0.616, green: 0.765, blue: 0.992)),  // #9DC3FD — Drift brand blue
+        AccentOption(name: "violet",  color: Color(red: 0.612, green: 0.388, blue: 0.957)),
+        AccentOption(name: "rose",    color: Color(red: 0.957, green: 0.267, blue: 0.455)),
+        AccentOption(name: "emerald", color: Color(red: 0.133, green: 0.773, blue: 0.502)),
+        AccentOption(name: "amber",   color: Color(red: 0.984, green: 0.671, blue: 0.137)),
+        AccentOption(name: "sky",     color: Color(red: 0.125, green: 0.706, blue: 0.929)),
+    ]
+}
+
 // MARK: - Color Palette
 
 extension Color {
     // Brand
-    /// Primary accent — electric indigo, Linear-inspired
-    static let accent      = Color(red: 0.420, green: 0.525, blue: 0.960)   // #6B86F5
+    /// Primary accent — Drift brand light blue
+    static let accent      = Color(red: 0.616, green: 0.765, blue: 0.992)   // #9DC3FD (Drift brand blue)
     /// Accent pressed/hover state — slightly deeper
-    static let accentDeep  = Color(red: 0.318, green: 0.424, blue: 0.882)   // #516BE1
+    static let accentDeep  = Color(red: 0.447, green: 0.616, blue: 0.882)   // #729DE1
 
     // Semantic states
     /// Focused / productive — vivid green

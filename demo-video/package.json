@@ -1,0 +1,28 @@
+{
+  "name": "demo-video",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "preview": "npx remotion studio src/index.ts",
+    "render": "npx remotion render src/index.ts DriftDemo out/drift-demo.mp4",
+    "render:landing": "npx remotion render src/index.ts DriftLandingDemo out/drift-landing-demo.mp4",
+    "render:all": "npm run render && npm run render:landing"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@remotion/cli": "^4.0.448",
+    "@remotion/player": "^4.0.448",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "remotion": "^4.0.448"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.2"
+  }
+}

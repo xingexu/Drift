@@ -29,16 +29,30 @@ class WindowTracker: ObservableObject {
     @Published private(set) var isIdle = false
     @Published private(set) var activeApp: String = ""
     @Published private(set) var activeTitle: String = ""
+    @Published private(set) var activeURL: String = ""
     @Published private(set) var activeCategory: AppCategory = .neutral
 
     // MARK: - Private State
 
     private var pollTimer: Timer?
     private var sessionTimer: Timer?
+    /// Idle checker runs for the whole tracking lifetime — including while
+    /// paused — so a session that auto-paused on idle can auto-resume when the
+    /// user returns. (pollTimer/sessionTimer stop on pause; this one does not.)
+    private var idleTimer: Timer?
     private var workspaceObserver: NSObjectProtocol?
     private var lastEventTimestamp = Date()
     private var previousApp: String = ""
     private var previousBundleId: String?
+
+    /// True only when the current pause was triggered automatically by idle
+    /// detection (vs. a manual user pause). Manual pauses must NOT auto-resume.
+    private var pausedDueToIdle = false
+    /// Wall-clock time the current pause began, used to exclude paused spans
+    /// from `totalMs` so focus % isn't diluted by time away.
+    private var pauseStartedAt: Date?
+    /// Cumulative paused milliseconds for the active session.
+    private var pausedAccumulatedMs: TimeInterval = 0
 
     /// Minimum duration (ms) to record an app-switch event.
     /// Prevents micro-events from very rapid Cmd-Tab switching.
@@ -72,19 +86,31 @@ class WindowTracker: ObservableObject {
             AppState.shared.session = SessionData()
             AppState.shared.session.isActive = true
             AppState.shared.session.startTime = Date()
+            pausedAccumulatedMs = 0
+            pauseStartedAt = nil
+        } else if let pausedAt = pauseStartedAt {
+            // Resuming a paused session — bank the paused span so it's excluded
+            // from elapsed time.
+            pausedAccumulatedMs += Date().timeIntervalSince(pausedAt) * 1000
+            pauseStartedAt = nil
         }
 
+        pausedDueToIdle = false
         isTracking = true
         isPaused = false
         lastEventTimestamp = Date()
 
         installWorkspaceObserver()
         startTimers()
+        startIdleTimer()
     }
 
-    /// Pauses tracking without resetting the session.
+    /// Pauses tracking without resetting the session. The idle checker keeps
+    /// running so an idle-triggered pause can later auto-resume.
     func pause() {
+        guard isTracking, !isPaused else { return }
         isPaused = true
+        pauseStartedAt = Date()
         stopTimers()
     }
 
@@ -92,7 +118,9 @@ class WindowTracker: ObservableObject {
     func stop() {
         isTracking = false
         isPaused = false
+        pausedDueToIdle = false
         stopTimers()
+        stopIdleTimer()
         removeWorkspaceObserver()
     }
 
@@ -101,6 +129,8 @@ class WindowTracker: ObservableObject {
         AppState.shared.saveCurrentSession()
         stop()
         AppState.shared.session.reset()
+        pausedAccumulatedMs = 0
+        pauseStartedAt = nil
     }
 
     /// Called by AppDelegate during applicationWillTerminate to persist
@@ -147,13 +177,29 @@ class WindowTracker: ObservableObject {
         let title = windowTitle(for: app) ?? appName
         let isBrowser = Self.isBrowserBundle(bundleId)
 
+        // For browsers, attempt to fetch the real tab URL immediately.
+        var resolvedURL: String? = nil
+        if isBrowser {
+            resolvedURL = getActiveTabURL(for: app)
+        }
+
+        let domainForClassification = resolvedURL.flatMap { domainFromURL($0) }
+            ?? (isBrowser ? extractURL(from: title, appName: appName) : nil)
+
         var category = AppClassifier.classify(appName: appName, bundleId: bundleId)
-        if isBrowser, let url = extractURL(from: title, appName: appName) {
-            let domainCategory = AppClassifier.classifyDomain(url)
+        if let domain = domainForClassification {
+            let domainCategory = AppClassifier.classifyDomain(domain)
             if domainCategory != .neutral { category = domainCategory }
         }
 
-        recordAppSwitch(newApp: appName, newBundleId: bundleId, newTitle: title, newCategory: category, isBrowser: isBrowser)
+        recordAppSwitch(
+            newApp: appName,
+            newBundleId: bundleId,
+            newTitle: title,
+            newURL: resolvedURL,
+            newCategory: category,
+            isBrowser: isBrowser
+        )
     }
 
     // MARK: - Timers
@@ -161,11 +207,11 @@ class WindowTracker: ObservableObject {
     private func startTimers() {
         stopTimers()
 
-        // Poll timer -- captures title changes and idle state.
+        // Poll timer -- captures title changes. (Idle is handled by idleTimer,
+        // which must survive pause; this timer stops while paused.)
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.pollActiveWindow()
-                self?.checkIdle()
             }
         }
         if let t = pollTimer { RunLoop.main.add(t, forMode: .common) }
@@ -186,6 +232,22 @@ class WindowTracker: ObservableObject {
         sessionTimer = nil
     }
 
+    /// Idle checker — independent of pause so return-from-idle can resume.
+    private func startIdleTimer() {
+        stopIdleTimer()
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkIdle()
+            }
+        }
+        if let t = idleTimer { RunLoop.main.add(t, forMode: .common) }
+    }
+
+    private func stopIdleTimer() {
+        idleTimer?.invalidate()
+        idleTimer = nil
+    }
+
     // MARK: - Polling
 
     /// Lightweight per-second poll. Detects title changes (tab switches) and
@@ -200,14 +262,26 @@ class WindowTracker: ObservableObject {
         let title = info.windowTitle
         let isBrowser = info.isBrowser
 
+        // For browsers: try AppleScript first for the real tab URL, fall back to title parsing.
+        var resolvedURL: String? = nil
+        if isBrowser, let frontApp = NSWorkspace.shared.frontmostApplication {
+            if let tabURL = getActiveTabURL(for: frontApp) {
+                resolvedURL = tabURL
+            }
+        }
+
+        let domainForClassification = resolvedURL.flatMap { domainFromURL($0) }
+            ?? (isBrowser ? extractURL(from: title, appName: appName) : nil)
+
         var category = AppClassifier.classify(appName: appName, bundleId: bundleId)
-        if isBrowser, let url = extractURL(from: title, appName: appName) {
-            let domainCategory = AppClassifier.classifyDomain(url)
+        if let domain = domainForClassification {
+            let domainCategory = AppClassifier.classifyDomain(domain)
             if domainCategory != .neutral { category = domainCategory }
         }
 
-        // Always update the displayed title.
+        // Always update the displayed state.
         activeTitle = title
+        activeURL = resolvedURL ?? ""
         activeCategory = category
 
         // Only record a switch if the app actually changed and the
@@ -217,6 +291,7 @@ class WindowTracker: ObservableObject {
                 newApp: appName,
                 newBundleId: bundleId,
                 newTitle: title,
+                newURL: resolvedURL,
                 newCategory: category,
                 isBrowser: isBrowser
             )
@@ -228,6 +303,7 @@ class WindowTracker: ObservableObject {
         newApp: String,
         newBundleId: String?,
         newTitle: String,
+        newURL: String? = nil,
         newCategory: AppCategory,
         isBrowser: Bool
     ) {
@@ -245,7 +321,7 @@ class WindowTracker: ObservableObject {
                 owner: previousApp,
                 title: activeTitle,
                 isBrowser: isBrowser,
-                url: nil,
+                url: activeURL.isEmpty ? nil : activeURL,
                 category: prevCategory,
                 timestamp: lastEventTimestamp,
                 durationMs: durationMs
@@ -263,6 +339,7 @@ class WindowTracker: ObservableObject {
         lastEventTimestamp = now
         activeApp = newApp
         activeTitle = newTitle
+        activeURL = newURL ?? ""
         activeCategory = newCategory
         AppState.shared.session.currentApp = newApp
         AppState.shared.session.currentCategory = newCategory
@@ -270,7 +347,7 @@ class WindowTracker: ObservableObject {
 
     private func updateSessionTime() {
         guard let start = AppState.shared.session.startTime else { return }
-        AppState.shared.session.totalMs = Date().timeIntervalSince(start) * 1000
+        AppState.shared.session.totalMs = Date().timeIntervalSince(start) * 1000 - pausedAccumulatedMs
 
         // Attribute time to the current app's category in real-time.
         // Without this, focusPercent/driftScore stay at 0% until the user
@@ -298,18 +375,33 @@ class WindowTracker: ObservableObject {
     /// from idle the timestamp is reset so idle seconds are not attributed
     /// to any app.
     private func checkIdle() {
+        guard isTracking else { return }
+
         let mouseIdle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .mouseMoved)
         let keyIdle   = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown)
         let clickIdle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .leftMouseDown)
         let minIdle = min(mouseIdle, min(keyIdle, clickIdle))
 
-        if minIdle >= idleThreshold, !isIdle {
-            isIdle = true
-            pause()
-        } else if minIdle < idleThreshold, isIdle {
-            isIdle = false
-            // Reset timestamp so the idle period is not charged to any app.
-            lastEventTimestamp = Date()
+        if minIdle >= idleThreshold {
+            // User went idle — auto-pause only a session that's actively running.
+            // (A manual pause is left untouched so it won't surprise-resume.)
+            if !isPaused {
+                isIdle = true
+                pausedDueToIdle = true
+                pause()
+            }
+        } else {
+            // User is active again.
+            if isPaused, pausedDueToIdle {
+                // Resume the session WE auto-paused. start() banks the paused
+                // span, restarts the work timers, and clears pausedDueToIdle.
+                isIdle = false
+                start()
+            } else if isIdle {
+                isIdle = false
+                // Reset timestamp so the idle period is not charged to any app.
+                lastEventTimestamp = Date()
+            }
         }
     }
 
@@ -422,5 +514,89 @@ class WindowTracker: ObservableObject {
             }
         }
         return nil
+    }
+
+    // MARK: - Browser Tab URL (AppleScript)
+
+    /// Retrieves the active tab URL from a supported browser via AppleScript.
+    ///
+    /// Returns `nil` when the browser is not scriptable, has no windows open,
+    /// or the script fails. Runs synchronously — called from the poll timer
+    /// only when a browser is frontmost.
+    func getActiveTabURL(for app: NSRunningApplication) -> String? {
+        let appName = app.localizedName ?? ""
+        let script: String
+
+        switch true {
+        case appName.contains("Safari") && !appName.contains("Technology Preview"):
+            script = """
+            tell application "Safari"
+                if (count of windows) > 0 then
+                    return URL of current tab of front window
+                end if
+            end tell
+            """
+        case appName.contains("Chrome"):
+            let safe = Self.safeScriptName(appName)
+            script = """
+            tell application "\(safe)"
+                if (count of windows) > 0 then
+                    return URL of active tab of front window
+                end if
+            end tell
+            """
+        case appName.contains("Arc"):
+            script = """
+            tell application "Arc"
+                if (count of windows) > 0 then
+                    return URL of active tab of front window
+                end if
+            end tell
+            """
+        case appName.contains("Brave"):
+            script = """
+            tell application "Brave Browser"
+                if (count of windows) > 0 then
+                    return URL of active tab of front window
+                end if
+            end tell
+            """
+        case appName.contains("Edge"):
+            script = """
+            tell application "Microsoft Edge"
+                if (count of windows) > 0 then
+                    return URL of active tab of front window
+                end if
+            end tell
+            """
+        case appName.contains("Firefox"):
+            // Firefox does not support AppleScript URL retrieval
+            return nil
+        default:
+            return nil
+        }
+
+        guard let appleScript = NSAppleScript(source: script) else { return nil }
+        var error: NSDictionary?
+        let result = appleScript.executeAndReturnError(&error)
+        if error != nil { return nil }
+        return result.stringValue
+    }
+
+    /// Strips characters unsafe for embedding in AppleScript application names.
+    private static func safeScriptName(_ name: String) -> String {
+        String(name.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == " " || $0 == "-" || $0 == "."
+        })
+    }
+
+    /// Extracts the domain component from a full URL string.
+    private func domainFromURL(_ url: String) -> String? {
+        var s = url.lowercased()
+        for prefix in ["https://", "http://", "www."] {
+            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)) }
+        }
+        if let slash = s.firstIndex(of: "/") { s = String(s[..<slash]) }
+        return s.isEmpty ? nil : s
     }
 }

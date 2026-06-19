@@ -6,3 +6,12 @@ dist/
 backend/node_modules/
 backend/dist/
 backend/.env
+
+# Swift build artifacts & built app bundle (regenerate via macos/Drift/build-app.sh)
+.build/
+*.app/
+
+# Local agent/tooling state
+.agents/
+.claude-flow/
+.swarm/

@@ -61,36 +61,59 @@ struct HistoryView: View {
     @State private var showExportError = false
     @State private var showExportSuccess = false
     @State private var exportedFileURL: URL?
+    @State private var appeared = false
     @State private var appearedGroupIDs: Set<String> = []
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: Space.xl) {
+                // MARK: Page header
                 headerSection
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 12)
+                    .animation(.easeOut(duration: 0.28).delay(0 * 0.06), value: appeared)
 
                 if appState.pastSessions.isEmpty {
                     emptySection
                 } else {
-                    filterBar
+                    // MARK: Period tabs
+                    periodTabs
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+                        .animation(.easeOut(duration: 0.28).delay(1 * 0.06), value: appeared)
 
-                    summaryStrip
-                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                    // MARK: Stat cards
+                    statCards
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+                        .animation(.easeOut(duration: 0.28).delay(2 * 0.06), value: appeared)
                         .id(timePeriod)
 
-                    weeklyChart
-                        .transition(.opacity)
+                    // MARK: Bar chart card
+                    barChartCard
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+                        .animation(.easeOut(duration: 0.28).delay(3 * 0.06), value: appeared)
                         .id(timePeriod)
 
-                    secondaryToolbar
+                    // MARK: Search bar
+                    searchBar
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+                        .animation(.easeOut(duration: 0.28).delay(4 * 0.06), value: appeared)
 
+                    // MARK: Session list
                     sessionContent
                 }
             }
             .padding(Space.page)
         }
         .animation(Anim.appear, value: timePeriod)
+        .onAppear {
+            withAnimation { appeared = true }
+        }
         .onChange(of: timePeriod) { _, _ in appearedGroupIDs = [] }
-        .onChange(of: sortOrder) { _, _ in appearedGroupIDs = [] }
+        .onChange(of: sortOrder)  { _, _ in appearedGroupIDs = [] }
         .alert("Export Error", isPresented: $showExportError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -108,19 +131,19 @@ struct HistoryView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Page Header
 
     @ViewBuilder
     private var headerSection: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: Space.xxxs) {
                 Text("History")
-                    .font(TypeScale.title)
+                    .font(.system(size: 32, weight: .bold))
                     .tracking(-0.5)
                     .accessibilityAddTraits(.isHeader)
-                Text("Your past focus sessions")
+                Text("Your past focus sessions — search, filter, and export.")
                     .font(TypeScale.bodySm)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
 
@@ -131,7 +154,7 @@ struct HistoryView: View {
                     exportSessionsCSV()
                 } label: {
                     HStack(spacing: Space.xxs) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "arrow.down.doc")
                             .font(.system(size: 11, weight: .medium))
                         Text("Export CSV")
                             .font(TypeScale.caption)
@@ -145,7 +168,7 @@ struct HistoryView: View {
                             .fill(Color.primary.opacity(0.04))
                             .overlay(
                                 RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                    .strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5)
+                                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
                             )
                     )
                 }
@@ -155,85 +178,163 @@ struct HistoryView: View {
         }
     }
 
-    // MARK: - Filter Bar (period picker)
+    // MARK: - Period Tabs (pill segmented style)
 
     @ViewBuilder
-    private var filterBar: some View {
-        HStack(spacing: Space.xxs) {
+    private var periodTabs: some View {
+        HStack(spacing: 0) {
             ForEach(HistoryTimePeriod.allCases) { period in
                 Button {
                     withAnimation(Anim.tap) { timePeriod = period }
                 } label: {
                     Text(period.rawValue)
-                        .font(.system(
-                            size: 13,
-                            weight: timePeriod == period ? .semibold : .regular
-                        ))
-                        .foregroundStyle(timePeriod == period ? Color.accent : Color.secondary)
-                        .padding(.horizontal, Space.md)
+                        .font(.system(size: 13, weight: timePeriod == period ? .semibold : .medium))
+                        .foregroundStyle(timePeriod == period ? Color.primary : Color.secondary)
+                        .padding(.horizontal, Space.lg)
                         .padding(.vertical, Space.sm)
                         .frame(maxWidth: .infinity)
                         .background(
-                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .fill(timePeriod == period
-                                      ? Color.accent.opacity(0.12)
-                                      : Color.clear)
-                                .animation(Anim.quick, value: timePeriod == period)
+                            Group {
+                                if timePeriod == period {
+                                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                        .fill(Color(.controlBackgroundColor))
+                                        .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+                                }
+                            }
+                            .animation(Anim.quick, value: timePeriod == period)
                         )
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(timePeriod == period ? .isSelected : [])
             }
         }
-        .padding(Space.xxs)
+        .padding(Space.xxxs)
         .background(
             RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(Color.sep.opacity(0.12), lineWidth: 0.5)
-                )
+                .fill(Color.primary.opacity(0.06))
         )
     }
 
-    // MARK: - Summary Strip
+    // MARK: - 4 Stat Cards
 
     @ViewBuilder
-    private var summaryStrip: some View {
-        HStack(spacing: Space.md) {
-            PeriodSummaryStat(
+    private var statCards: some View {
+        HStack(spacing: Space.sm) {
+            HistoryStatCard(
                 value: "\(periodSessions.count)",
-                label: periodCountLabel,
-                icon: "list.bullet.rectangle",
-                color: Color.accent
+                label: periodCountLabel.uppercased(),
+                icon: "calendar"
             )
-            summaryDivider
-            PeriodSummaryStat(
+            HistoryStatCard(
                 value: formatDurationWords(totalPeriodMs),
-                label: "Total Focus Time",
-                icon: "clock.fill",
+                label: "TOTAL FOCUS",
+                icon: "timer.circle",
                 color: Color.productive
             )
-            summaryDivider
-            PeriodSummaryStat(
+            HistoryStatCard(
                 value: "\(avgFocusPercent)%",
-                label: "Avg Focus",
-                icon: "brain",
-                color: Color.streak
+                label: "AVG FOCUS",
+                icon: "bolt",
+                color: Color.caution
             )
-            summaryDivider
-            // Stacked category bar
-            VStack(alignment: .leading, spacing: Space.xxs) {
-                periodStackedBar
-                    .frame(height: Space.sm)
-                Text("Focus breakdown")
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .frame(maxWidth: .infinity)
+            HistoryStatCard(
+                value: avgSessionLabel,
+                label: "AVG SESSION",
+                icon: "chart.line.uptrend.xyaxis",
+                color: Color.accent
+            )
         }
-        .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.md)
+    }
+
+    // MARK: - Last 7 Days Bar Chart Card
+
+    @ViewBuilder
+    private var barChartCard: some View {
+        let days = last7Days
+        let hasData = days.contains { $0.totalMs > 0 }
+
+        VStack(alignment: .leading, spacing: Space.md) {
+            // Card header row
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: Space.xxxs) {
+                    Text("LAST 7 DAYS")
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.tertiary)
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                        Text(hasData ? formatDurationWords(bestDayMs) : "--")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.primary)
+                        Text("· best day \(bestDayShortName)")
+                            .font(TypeScale.bodySm)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                HStack(spacing: Space.xl) {
+                    VStack(alignment: .trailing, spacing: Space.xxxs) {
+                        Text("PEAK HOURS")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .tracking(0.8)
+                            .foregroundStyle(.tertiary)
+                        Text(peakHoursLabel)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+
+                    VStack(alignment: .trailing, spacing: Space.xxxs) {
+                        Text("AVG SESSION")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .tracking(0.8)
+                            .foregroundStyle(.tertiary)
+                        Text(avgSessionLabel)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+
+            // Bar chart
+            GeometryReader { geo in
+                let barCount = days.count
+                let totalSpacing = Space.xs * CGFloat(barCount - 1)
+                let barWidth = (geo.size.width - totalSpacing) / CGFloat(barCount)
+                let chartHeight: CGFloat = 90
+                let maxMs = days.map(\.totalMs).max() ?? 1
+
+                HStack(alignment: .bottom, spacing: Space.xs) {
+                    ForEach(days) { day in
+                        let fraction: CGFloat = maxMs > 0 ? CGFloat(day.totalMs / maxMs) : 0
+                        let barHeight = max(fraction * chartHeight, day.totalMs > 0 ? 4 : 2)
+                        let barColor: Color = day.totalMs > 0
+                            ? interpolateBarColor(fraction: day.focusFraction)
+                            : Color.sep.opacity(0.25)
+
+                        VStack(spacing: Space.xs) {
+                            Spacer(minLength: 0)
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: 3,
+                                bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 3,
+                                style: .continuous
+                            )
+                            .fill(barColor)
+                            .frame(width: barWidth, height: barHeight)
+
+                            Text(dayLabel(for: day.date))
+                                .font(.system(size: 9.5, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .frame(height: chartHeight + 16) // bar height + label height
+            }
+            .frame(height: 106)
+        }
+        .padding(Space.xl)
         .background(
             RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
                 .fill(Color(.controlBackgroundColor))
@@ -245,96 +346,47 @@ struct HistoryView: View {
         .elevate(.xs)
     }
 
-    private var summaryDivider: some View {
-        Rectangle()
-            .fill(Color.border)
-            .frame(width: 0.5, height: 32)
-    }
+    // MARK: - Search Bar
 
     @ViewBuilder
-    private var periodStackedBar: some View {
-        let totalMs = totalPeriodMs
-        let productiveMs = periodSessions.reduce(0.0) { $0 + $1.productiveMs }
-        let distractionMs = periodSessions.reduce(0.0) { $0 + $1.distractionMs }
-        let neutralMs = periodSessions.reduce(0.0) { $0 + $1.neutralMs }
-        let pFrac = totalMs > 0 ? CGFloat(productiveMs / totalMs) : 0
-        let dFrac = totalMs > 0 ? CGFloat(distractionMs / totalMs) : 0
-        let nFrac = max(0, 1 - pFrac - dFrac)
-
-        GeometryReader { geo in
-            let w = geo.size.width
-            HStack(spacing: Space.xxxs) {
-                if pFrac > 0 {
-                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                        .fill(Color.productive)
-                        .frame(width: max(w * pFrac, 2))
-                }
-                if distractionMs > 0 {
-                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                        .fill(Color.distraction)
-                        .frame(width: max(w * dFrac, 2))
-                }
-                if nFrac > 0 {
-                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                        .fill(Color.sep.opacity(0.35))
-                }
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
-    }
-
-    // MARK: - Weekly Chart
-
-    @ViewBuilder
-    private var weeklyChart: some View {
-        if timePeriod == .week || timePeriod == .month || timePeriod == .all {
-            let days = last7Days
-            let hasAnyData = days.contains { $0.totalMs > 0 }
-            if hasAnyData {
-                WeeklyBarChart(days: days)
-            }
-        }
-    }
-
-    // MARK: - Secondary Toolbar
-
-    @ViewBuilder
-    private var secondaryToolbar: some View {
+    private var searchBar: some View {
         HStack(spacing: Space.sm) {
-            // Search field
             HStack(spacing: Space.xs) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
+                    .font(TypeScale.bodySm)
                     .foregroundStyle(.tertiary)
-                TextField("Search apps, dates...", text: $searchText)
-                    .font(TypeScale.bodyMd)
+
+                TextField("Search apps, dates, tasks...", text: $searchText)
                     .textFieldStyle(.plain)
+                    .font(TypeScale.bodyMd)
                     .accessibilityLabel("Search sessions")
+
+                Spacer()
+
                 if !searchText.isEmpty {
                     Button {
                         withAnimation(Anim.quick) { searchText = "" }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
+                            .font(TypeScale.bodySm)
                             .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
                     .transition(.opacity)
                 }
             }
             .padding(.horizontal, Space.md)
-            .padding(.vertical, Space.xs + 1)
+            .padding(.vertical, Space.sm)
             .background(
-                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                    .fill(Color.cardBg)
+                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .fill(Color(.controlBackgroundColor))
                     .overlay(
-                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                            .stroke(Color.sep.opacity(0.15), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .strokeBorder(Color.border, lineWidth: 0.5)
                     )
             )
 
-            // Sort menu
+            // Sort toggle
             Menu {
                 ForEach(HistorySortOrder.allCases) { order in
                     Button {
@@ -348,21 +400,21 @@ struct HistoryView: View {
                 }
             } label: {
                 HStack(spacing: Space.xxs) {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 10, weight: .medium))
                     Text(sortOrder.shortLabel)
                         .font(TypeScale.caption)
                         .fontWeight(.medium)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .medium))
                 }
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, Space.md)
-                .padding(.vertical, Space.xs + 1)
+                .padding(.vertical, Space.sm)
                 .background(
-                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                        .fill(Color.cardBg)
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .fill(Color(.controlBackgroundColor))
                         .overlay(
-                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                .stroke(Color.sep.opacity(0.15), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                .strokeBorder(Color.border, lineWidth: 0.5)
                         )
                 )
             }
@@ -380,9 +432,9 @@ struct HistoryView: View {
         if groupedSessions.isEmpty {
             noResultsState
         } else {
-            LazyVStack(spacing: Space.xl) {
+            LazyVStack(alignment: .leading, spacing: Space.xl) {
                 ForEach(groupedSessions) { group in
-                    DayGroupSection(
+                    DateGroupSection(
                         group: group,
                         appeared: appearedGroupIDs.contains(group.id)
                     )
@@ -400,7 +452,8 @@ struct HistoryView: View {
     private var noResultsState: some View {
         VStack(spacing: Space.md) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 28, weight: .light))
+                .font(TypeScale.h1)
+                .fontWeight(.light)
                 .foregroundStyle(.quaternary)
                 .accessibilityHidden(true)
             Text("No sessions found")
@@ -424,7 +477,7 @@ struct HistoryView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 48)
+        .padding(.vertical, Space.xxxl + Space.lg)
         .accessibilityElement(children: .combine)
     }
 
@@ -445,7 +498,7 @@ struct HistoryView: View {
         case .today: return "Today"
         case .week:  return "This Week"
         case .month: return "This Month"
-        case .all:   return "Sessions"
+        case .all:   return "All Time"
         }
     }
 
@@ -524,6 +577,16 @@ struct HistoryView: View {
         }
     }
 
+    private static let weekdayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEEE"; return f
+    }()
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE MMM d"; return f
+    }()
+    private static let longDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE MMM d, yyyy"; return f
+    }()
+
     private static func dayGroupLabel(
         for date: Date,
         calendar: Calendar,
@@ -533,14 +596,10 @@ struct HistoryView: View {
         if calendar.isDateInYesterday(date) { return "Yesterday" }
         let days = calendar.dateComponents([.day], from: date, to: now).day ?? 0
         if days < 7 {
-            let f = DateFormatter()
-            f.dateFormat = "EEEE"
-            return f.string(from: date)
+            return weekdayFormatter.string(from: date)
         }
         let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
-        let f = DateFormatter()
-        f.dateFormat = sameYear ? "EEE MMM d" : "EEE MMM d, yyyy"
-        return f.string(from: date)
+        return (sameYear ? shortDateFormatter : longDateFormatter).string(from: date)
     }
 
     private func sortedSessions(_ sessions: [PastSession]) -> [PastSession] {
@@ -563,6 +622,30 @@ struct HistoryView: View {
         return periodSessions.map(\.focusPercent).reduce(0, +) / periodSessions.count
     }
 
+    private var avgSessionLabel: String {
+        guard !periodSessions.isEmpty else { return "--" }
+        let avg = periodSessions.reduce(0.0) { $0 + $1.totalMs } / TimeInterval(periodSessions.count)
+        return formatDurationWords(avg)
+    }
+
+    private var peakHoursLabel: String {
+        guard !periodSessions.isEmpty else { return "--" }
+        var hourCounts: [Int: Int] = [:]
+        for session in periodSessions {
+            let hour = Calendar.current.component(.hour, from: session.date)
+            hourCounts[hour, default: 0] += 1
+        }
+        guard let peakHour = hourCounts.max(by: { $0.value < $1.value })?.key else { return "--" }
+        let endHour = (peakHour + 2) % 24
+        func fmt(_ h: Int) -> String {
+            let h24 = h % 24
+            let h12 = h24 % 12 == 0 ? 12 : h24 % 12
+            let suffix = h24 < 12 ? "am" : "pm"
+            return "\(h12)\(suffix)"
+        }
+        return "\(fmt(peakHour))–\(fmt(endHour))"
+    }
+
     // Returns the last 7 calendar days with aggregated session data
     private var last7Days: [DayBarData] {
         let calendar = Calendar.current
@@ -580,6 +663,29 @@ struct HistoryView: View {
             let focusFraction = totalMs > 0 ? CGFloat(productiveMs / totalMs) : 0
             return DayBarData(date: day, totalMs: totalMs, focusFraction: focusFraction)
         }
+    }
+
+    private var bestDayMs: TimeInterval {
+        last7Days.map(\.totalMs).max() ?? 0
+    }
+
+    private var bestDayShortName: String {
+        guard let best = last7Days.max(by: { $0.totalMs < $1.totalMs }), best.totalMs > 0 else {
+            return "--"
+        }
+        return Self.weekdayFormatter.string(from: best.date)
+    }
+
+    private func dayLabel(for date: Date) -> String {
+        Self.weekdayFormatter.string(from: date)
+    }
+
+    private func interpolateBarColor(fraction: CGFloat) -> Color {
+        let t = Double(fraction)
+        let r = 0.937 + t * (0.133 - 0.937)
+        let g = 0.267 + t * (0.773 - 0.267)
+        let b = 0.267 + t * (0.365 - 0.267)
+        return Color(red: r, green: g, blue: b)
     }
 
     private static let searchDateFormatter: DateFormatter = {
@@ -631,6 +737,45 @@ struct HistoryView: View {
     }
 }
 
+// MARK: - History Stat Card
+
+private struct HistoryStatCard: View {
+    let value: String
+    let label: String
+    let icon: String
+    var color: Color = .primary
+
+    var body: some View {
+        HStack(spacing: Space.md) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Space.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(Color(.controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+        )
+        .elevate(.xs)
+    }
+}
+
 // MARK: - Day Bar Data
 
 private struct DayBarData: Identifiable {
@@ -640,191 +785,55 @@ private struct DayBarData: Identifiable {
     let focusFraction: CGFloat
 }
 
-// MARK: - Weekly Bar Chart
+// MARK: - Date Group Section
 
-private struct WeeklyBarChart: View {
-    let days: [DayBarData]
-
-    private static let dayFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "EEE"; return f
-    }()
-
-    private var maxMs: TimeInterval {
-        days.map(\.totalMs).max() ?? 1
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            Text("Last 7 Days")
-                .sectionLabel()
-
-            HStack(alignment: .bottom, spacing: Space.xs) {
-                ForEach(days) { day in
-                    WeeklyBarColumn(
-                        day: day,
-                        maxMs: max(maxMs, 1),
-                        dayLabel: Self.dayFormatter.string(from: day.date)
-                    )
-                }
-            }
-            .frame(height: 96)
-            .padding(.horizontal, Space.xxs)
-        }
-        .padding(Space.lg)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(Color(.controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(Color.border, lineWidth: 0.5)
-                )
-        )
-        .elevate(.xs)
-    }
-}
-
-private struct WeeklyBarColumn: View {
-    let day: DayBarData
-    let maxMs: TimeInterval
-    let dayLabel: String
-
-    private var barFraction: CGFloat {
-        day.totalMs > 0 ? CGFloat(day.totalMs / maxMs) : 0
-    }
-
-    private var barColor: Color {
-        if day.totalMs == 0 { return Color.sep.opacity(0.25) }
-        // Linearly interpolate from distraction (red) at 0% to productive (green) at 100%
-        // distraction: rgb(0.937, 0.267, 0.267)   productive: rgb(0.133, 0.773, 0.365)
-        let t = Double(day.focusFraction)
-        let r = 0.937 + t * (0.133 - 0.937)
-        let g = 0.267 + t * (0.773 - 0.267)
-        let b = 0.267 + t * (0.365 - 0.267)
-        return Color(red: r, green: g, blue: b)
-    }
-
-    var body: some View {
-        VStack(spacing: Space.xs) {
-            // Duration label above bar (only when tracked)
-            if day.totalMs > 0 {
-                Text(formatDurationWords(day.totalMs))
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            } else {
-                Color.clear.frame(height: 14)
-            }
-
-            GeometryReader { geo in
-                VStack {
-                    Spacer(minLength: 0)
-                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                        .fill(barColor)
-                        .frame(height: max(geo.size.height * barFraction, day.totalMs > 0 ? 3 : 2))
-                }
-            }
-
-            // Day label below
-            Text(dayLabel)
-                .font(TypeScale.caption)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(dayLabel): \(day.totalMs > 0 ? formatDurationWords(day.totalMs) : "no data")")
-    }
-}
-
-// MARK: - Period Summary Stat
-
-private struct PeriodSummaryStat: View {
-    let value: String
-    let label: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.xxxs) {
-            HStack(spacing: Space.xxs) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(color.opacity(0.8))
-                    .accessibilityHidden(true)
-                Text(label)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            Text(value)
-                .font(TypeScale.monoSm)
-                .foregroundStyle(.primary)
-                .contentTransition(.numericText())
-                .animation(Anim.count, value: value)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(value)")
-    }
-}
-
-// MARK: - Day Group Section
-
-private struct DayGroupSection: View {
+private struct DateGroupSection: View {
     let group: HistorySessionGroup
     let appeared: Bool
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
 
     private var dayTotalMs: TimeInterval {
         group.sessions.reduce(0) { $0 + $1.totalMs }
     }
 
-    private var dayProductiveMs: TimeInterval {
-        group.sessions.reduce(0) { $0 + $1.productiveMs }
-    }
-
-    private var dayDistractionMs: TimeInterval {
-        group.sessions.reduce(0) { $0 + $1.distractionMs }
-    }
-
-    private var dayNeutralMs: TimeInterval {
-        group.sessions.reduce(0) { $0 + $1.neutralMs }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            // Day header row
-            HStack(alignment: .center, spacing: Space.md) {
-                Text(group.label)
-                    .sectionLabel()
+        VStack(alignment: .leading, spacing: Space.xs) {
+            // Date group header row with hairline feel
+            HStack(spacing: Space.xs) {
+                Text(group.label.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.tertiary)
 
-                // Stacked bar for this day
-                DayStackedBar(
-                    productiveMs: dayProductiveMs,
-                    neutralMs: dayNeutralMs,
-                    distractionMs: dayDistractionMs,
-                    totalMs: dayTotalMs
-                )
-                .frame(maxWidth: 120, minHeight: Space.xs, maxHeight: Space.xs)
+                Text(Self.dateFormatter.string(from: group.date))
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(.quaternary)
 
                 Spacer()
 
                 Text(formatDurationWords(dayTotalMs))
-                    .font(TypeScale.monoXs)
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
             }
+            .padding(.horizontal, Space.xxxs)
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 4)
             .animation(Anim.appear, value: appeared)
 
-            // Session rows
+            // Session rows card
             VStack(spacing: 0) {
                 ForEach(Array(group.sessions.enumerated()), id: \.element.id) { idx, session in
                     VStack(spacing: 0) {
                         if idx > 0 {
                             DriftDivider()
-                                .padding(.leading, Space.lg + Space.md + Space.xs)
+                                .padding(.leading, Space.lg)
                         }
-                        SessionRow(session: session)
+                        HistorySessionRow(session: session)
                     }
                     .opacity(appeared ? 1 : 0)
                     .offset(y: appeared ? 0 : 10)
@@ -847,54 +856,14 @@ private struct DayGroupSection: View {
     }
 }
 
-// MARK: - Day Stacked Bar
+// MARK: - History Session Row
 
-private struct DayStackedBar: View {
-    let productiveMs: TimeInterval
-    let neutralMs: TimeInterval
-    let distractionMs: TimeInterval
-    let totalMs: TimeInterval
-
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let pFrac = totalMs > 0 ? CGFloat(productiveMs / totalMs) : 0
-            let dFrac = totalMs > 0 ? CGFloat(distractionMs / totalMs) : 0
-            let nFrac = max(0, 1 - pFrac - dFrac)
-
-            HStack(spacing: Space.xxxs) {
-                if pFrac > 0 {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color.productive)
-                        .frame(width: max(w * pFrac, 2))
-                }
-                if dFrac > 0 {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color.distraction)
-                        .frame(width: max(w * dFrac, 2))
-                }
-                if nFrac > 0 {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color.sep.opacity(0.35))
-                }
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
-    }
-}
-
-// MARK: - Session Row
-
-private struct SessionRow: View {
+private struct HistorySessionRow: View {
     let session: PastSession
     @State private var isExpanded = false
     @State private var isHovered = false
 
     private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "h:mm a"; return f
-    }()
-
-    private static let endTimeFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "h:mm a"; return f
     }()
 
@@ -904,13 +873,11 @@ private struct SessionRow: View {
 
     private var appBreakdown: String {
         guard !session.topApps.isEmpty else { return "No app data" }
-        return session.topApps.prefix(3).joined(separator: " · ")
+        return session.topApps.prefix(4).joined(separator: " · ")
     }
 
-    private var sessionColor: Color {
-        if session.focusPercent >= 70 { return Color.productive }
-        if session.focusPercent >= 40 { return Color.streak }
-        return Color.distraction
+    private var dotColor: Color {
+        session.focusPercent > 50 ? Color.productive : Color.caution
     }
 
     private var focusPctColor: Color {
@@ -919,37 +886,25 @@ private struct SessionRow: View {
         return Color.distraction
     }
 
-    private var endDate: Date {
-        Date(timeInterval: session.totalMs / 1000, since: session.date)
-    }
-
-    private var timeRangeString: String {
-        let start = Self.timeFormatter.string(from: session.date)
-        let end = Self.endTimeFormatter.string(from: endDate)
-        return "\(start) – \(end)"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Space.md) {
-                // Time column
-                Text(timeRangeString)
-                    .font(TypeScale.monoXs)
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 140, alignment: .trailing)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                // Dot indicator
-                Circle()
-                    .fill(sessionColor)
-                    .frame(width: 6, height: 6)
-                    .shadow(color: sessionColor.opacity(0.5), radius: 3)
+                // Time + dot indicator
+                HStack(spacing: Space.xs) {
+                    Text(Self.timeFormatter.string(from: session.date))
+                        .font(TypeScale.monoXs)
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 56, alignment: .trailing)
+                    Circle()
+                        .fill(dotColor)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: dotColor.opacity(0.5), radius: 3)
+                }
 
                 // Title + app breakdown
                 VStack(alignment: .leading, spacing: Space.xxxs) {
                     Text(sessionTitle)
-                        .font(TypeScale.bodyMd)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text(appBreakdown)
@@ -963,17 +918,17 @@ private struct SessionRow: View {
                 // Duration + focus %
                 VStack(alignment: .trailing, spacing: Space.xxxs) {
                     Text(formatDurationWords(session.totalMs))
-                        .font(TypeScale.monoSm)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
                     Text("\(session.focusPercent)% focus")
                         .font(TypeScale.caption)
                         .foregroundStyle(focusPctColor)
                 }
 
-                // Expand chevron (only if apps available)
+                // Expand chevron
                 if !session.topApps.isEmpty {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(.quaternary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .animation(Anim.tap, value: isExpanded)
@@ -997,7 +952,7 @@ private struct SessionRow: View {
             if isExpanded, !session.topApps.isEmpty {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     DriftDivider()
-                        .padding(.leading, Space.lg + Space.md + Space.xs)
+                        .padding(.leading, Space.md)
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: Space.xs) {
@@ -1013,16 +968,12 @@ private struct SessionRow: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(rowAccessibilityLabel)
-        .accessibilityHint(
-            session.topApps.isEmpty
-                ? ""
-                : "Double-tap to \(isExpanded ? "collapse" : "expand") app details"
+        .accessibilityLabel(
+            "\(Self.timeFormatter.string(from: session.date)), \(session.focusPercent)% focus, \(formatDurationWords(session.totalMs))"
         )
-    }
-
-    private var rowAccessibilityLabel: String {
-        "\(timeRangeString), \(session.focusPercent)% focus, \(formatDurationWords(session.totalMs)), \(session.appCount) apps"
+        .accessibilityHint(
+            session.topApps.isEmpty ? "" : "Double-tap to \(isExpanded ? "collapse" : "expand") app details"
+        )
     }
 }
 

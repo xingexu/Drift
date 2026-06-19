@@ -141,7 +141,20 @@ final class NetworkMonitor: ObservableObject {
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in
-                self?.isConnected = path.status == .satisfied
+                guard let self else { return }
+                let nowConnected = path.status == .satisfied
+                let wasConnected = self.isConnected
+                self.isConnected = nowConnected
+                // Notify observers (e.g. AppDelegate) so the offline queue can
+                // drain the moment connectivity is restored — previously this
+                // notification was observed but never posted, so the queue only
+                // drained on app foreground.
+                if nowConnected != wasConnected {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("NetworkStatusChanged"),
+                        object: nil
+                    )
+                }
             }
         }
         monitor.start(queue: queue)

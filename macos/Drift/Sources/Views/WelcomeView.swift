@@ -8,54 +8,16 @@ struct WelcomeView: View {
     @State private var demoPhase: Int = 0
     @State private var demoAnimationTask: Task<Void, Never>?
     @State private var logoPulse = false
-
-    private let features: [WelcomeFeatureDef] = [
-        WelcomeFeatureDef(
-            icon: "eye.tracking.circle.fill",
-            title: "Smart App Tracking",
-            description: "Detects your active app & window using macOS Accessibility. Zero configuration.",
-            color: Color.accent
-        ),
-        WelcomeFeatureDef(
-            icon: "chart.bar.xaxis.ascending",
-            title: "Real-Time Focus Score",
-            description: "Live focus percentage and drift score. Know instantly when you're losing focus.",
-            color: Color.productive
-        ),
-        WelcomeFeatureDef(
-            icon: "timer.circle.fill",
-            title: "Pomodoro Timer",
-            description: "Customizable focus and break intervals. Desktop notifications when sessions end.",
-            color: Color.streak
-        ),
-        WelcomeFeatureDef(
-            icon: "shield.checkered",
-            title: "Website Blocker",
-            description: "Block distracting sites with password-protected timer. Stay focused effortlessly.",
-            color: Color.purple
-        )
-    ]
-
-    private let steps: [WelcomeStepDef] = [
-        WelcomeStepDef(number: "1", title: "Launch Drift", description: "Lives in your menu bar. Starts tracking the moment you open it.", icon: "power.circle.fill"),
-        WelcomeStepDef(number: "2", title: "Stay Focused", description: "Classifies every app automatically. See your focus score update live.", icon: "bolt.circle.fill"),
-        WelcomeStepDef(number: "3", title: "Review & Improve", description: "Check session history, build streaks, and develop better habits.", icon: "chart.line.uptrend.xyaxis.circle.fill")
-    ]
-
-    private let testimonials: [WelcomeTestimonialDef] = [
-        WelcomeTestimonialDef(quote: "Finally understand where my day goes. The focus score is addicting.", author: "— Marcus T., iOS Developer"),
-        WelcomeTestimonialDef(quote: "Replaced three apps with just Drift. Native, fast, beautiful.", author: "— Priya K., Designer"),
-        WelcomeTestimonialDef(quote: "My streak is at 21 days and I actually ship more code now.", author: "— Lena R., Indie Hacker")
-    ]
+    @State private var avatarPulse = false
 
     var body: some View {
         ZStack {
-            Color("Background")
-                .ignoresSafeArea()
+            // Full-bleed ambient background
+            ambientBackground
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    Color.clear.frame(height: Space.xxxl + Space.lg)
+                    Color.clear.frame(height: Space.xxxl + Space.xl)
 
                     heroSection
                         .padding(.bottom, Space.xxxl * 2 + Space.sm)
@@ -88,7 +50,40 @@ struct WelcomeView: View {
             withAnimation(Anim.breathe.delay(0.6)) {
                 logoPulse = true
             }
+            withAnimation(Anim.breathe.delay(1.2)) {
+                avatarPulse = true
+            }
         }
+    }
+
+    // MARK: - Ambient Background
+
+    @ViewBuilder
+    private var ambientBackground: some View {
+        GeometryReader { geo in
+            ZStack {
+                // System background base
+                Color(.windowBackgroundColor)
+                    .ignoresSafeArea()
+
+                // Top-center accent blob
+                Ellipse()
+                    .fill(Color.accent.opacity(0.15))
+                    .frame(width: geo.size.width * 0.75, height: geo.size.height * 0.45)
+                    .blur(radius: 60)
+                    .offset(x: 0, y: -geo.size.height * 0.12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                // Bottom-left productive blob
+                Ellipse()
+                    .fill(Color.productive.opacity(0.08))
+                    .frame(width: geo.size.width * 0.6, height: geo.size.height * 0.4)
+                    .blur(radius: 60)
+                    .offset(x: -geo.size.width * 0.15, y: geo.size.height * 0.15)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
+        }
+        .ignoresSafeArea()
     }
 
     // MARK: - Hero
@@ -97,48 +92,37 @@ struct WelcomeView: View {
     private var heroSection: some View {
         VStack(spacing: Space.xxxl) {
             // Animated logo with accent glow
-            ZStack {
-                // Glow halo
-                RoundedRectangle(cornerRadius: Radius.lg + 6, style: .continuous)
-                    .fill(Color.accent.opacity(logoPulse ? 0.18 : 0.08))
-                    .frame(width: 80, height: 80)
-                    .blur(radius: 12)
-
-                Image("DriftLogo")
-                    .resizable()
-                    .interpolation(.high)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.lg + 2, style: .continuous))
-                    .frame(width: 56, height: 56)
-                    .shadow(color: Color.accent.opacity(0.4), radius: 20)
-                    .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
-            }
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 10)
-            .animation(Anim.appear, value: appeared)
-            .accessibilityLabel("Drift app icon")
+            logoMark
 
             // Eyebrow + headline + subhead
             VStack(spacing: Space.lg) {
-                DriftTag(text: "Focus tracking for Mac", color: Color.accent)
+                DriftTag(text: "Focus tracker for Mac", color: Color.accent)
                     .opacity(appeared ? 1 : 0)
                     .offset(y: appeared ? 0 : 6)
                     .animation(Anim.appear.delay(0.05), value: appeared)
 
-                Text("Stop losing hours\nto distraction.")
-                    .font(TypeScale.h1)
-                    .multilineTextAlignment(.center)
-                    .tracking(-0.5)
-                    .accessibilityAddTraits(.isHeader)
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 8)
-                    .animation(Anim.appear.delay(0.10), value: appeared)
+                // Split headline: "Your focus," + "amplified."
+                VStack(spacing: 0) {
+                    Text("Your focus,")
+                        .foregroundStyle(Color(.labelColor))
+                    Text("amplified.")
+                        .foregroundStyle(Color.accent)
+                }
+                .font(.system(size: 48, weight: .bold))
+                .multilineTextAlignment(.center)
+                .tracking(-1.0)
+                .accessibilityLabel("Your focus, amplified.")
+                .accessibilityAddTraits(.isHeader)
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 10)
+                .animation(Anim.appear.delay(0.10), value: appeared)
 
-                Text("AI-powered focus tracking that lives in your menu bar.\nUnderstand your habits, reclaim your time, build streaks.")
-                    .font(TypeScale.bodyMd)
+                Text("Know exactly where your attention goes.\nBuild momentum with streaks, block distractions, stay in flow.")
+                    .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
-                    .frame(maxWidth: 420)
+                    .frame(maxWidth: 400)
                     .opacity(appeared ? 1 : 0)
                     .offset(y: appeared ? 0 : 8)
                     .animation(Anim.appear.delay(0.15), value: appeared)
@@ -146,19 +130,132 @@ struct WelcomeView: View {
 
             // CTAs
             VStack(spacing: Space.md) {
-                PrimaryButton("Get Started for Free", icon: "arrow.right.circle.fill", action: onGetStarted)
+                PrimaryButton("Download for Mac", icon: "arrow.down.circle.fill", action: onGetStarted)
                     .keyboardShortcut(.return, modifiers: [])
                     .opacity(appeared ? 1 : 0)
                     .animation(Anim.appear.delay(0.20), value: appeared)
-                    .accessibilityHint("Begins the Drift onboarding experience")
+                    .accessibilityHint("Downloads Drift for macOS")
 
-                GhostButton("Already have an account? Sign in", action: onSignIn)
+                GhostButton("See how it works", action: onSignIn)
                     .opacity(appeared ? 1 : 0)
                     .animation(Anim.appear.delay(0.25), value: appeared)
-                    .accessibilityLabel("Sign in to existing account")
+                    .accessibilityLabel("See how Drift works")
+            }
+
+            // Social proof + feature trio
+            VStack(spacing: Space.lg) {
+                socialProofRow
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 6)
+                    .animation(Anim.appear.delay(0.30), value: appeared)
+
+                featureTrio
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 8)
+                    .animation(Anim.appear.delay(0.35), value: appeared)
             }
         }
         .padding(.horizontal, Space.xxxl + Space.sm)
+    }
+
+    // MARK: - Logo Mark
+
+    @ViewBuilder
+    private var logoMark: some View {
+        ZStack {
+            // Glow halo
+            RoundedRectangle(cornerRadius: Radius.lg + 6, style: .continuous)
+                .fill(Color.accent.opacity(logoPulse ? 0.20 : 0.09))
+                .frame(width: 88, height: 88)
+                .blur(radius: 16)
+
+            Image("DriftLogo")
+                .resizable()
+                .interpolation(.high)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.lg + 2, style: .continuous))
+                .frame(width: 60, height: 60)
+                .shadow(color: Color.accent.opacity(0.45), radius: 22)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+        }
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 12)
+        .animation(Anim.appear, value: appeared)
+        .accessibilityLabel("Drift app icon")
+    }
+
+    // MARK: - Social Proof Row
+
+    @ViewBuilder
+    private var socialProofRow: some View {
+        HStack(spacing: Space.md) {
+            // 4 overlapping avatar circles
+            avatarStack
+
+            Text("2,400+ users already focused")
+                .font(TypeScale.bodySm)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var avatarStack: some View {
+        let avatars: [(initials: String, bg: Color)] = [
+            ("M", Color.accent),
+            ("P", Color.productive),
+            ("L", Color.streak),
+            ("R", Color.distraction)
+        ]
+
+        HStack(spacing: -8) {
+            ForEach(Array(avatars.enumerated()), id: \.offset) { index, avatar in
+                ZStack {
+                    Circle()
+                        .fill(avatar.bg.opacity(0.85))
+                        .frame(width: 28, height: 28)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color(.windowBackgroundColor), lineWidth: 2)
+                        )
+                    Text(avatar.initials)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .zIndex(Double(avatars.count - index))
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    // MARK: - Feature Trio
+
+    @ViewBuilder
+    private var featureTrio: some View {
+        let chips: [(icon: String, label: String)] = [
+            ("brain.head.profile", "Deep Focus"),
+            ("chart.bar.fill",     "Live Stats"),
+            ("shield.fill",        "Site Blocker")
+        ]
+
+        HStack(spacing: Space.sm) {
+            ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                HStack(spacing: Space.xxs + 2) {
+                    Image(systemName: chip.icon)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                    Text(chip.label)
+                        .font(TypeScale.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, Space.sm)
+                .padding(.vertical, Space.xxs + 2)
+                .background {
+                    Capsule()
+                        .fill(Color(.controlBackgroundColor))
+                        .overlay(Capsule().strokeBorder(Color.border, lineWidth: 0.5))
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 
     // MARK: - Live Demo (Animated)
@@ -166,7 +263,6 @@ struct WelcomeView: View {
     @ViewBuilder
     private var liveDemo: some View {
         VStack(spacing: Space.md) {
-            // Section label
             Text("SEE IT IN ACTION")
                 .sectionLabel()
                 .opacity(appeared ? 1 : 0)
@@ -190,7 +286,6 @@ struct WelcomeView: View {
         VStack(spacing: 0) {
             // macOS window chrome
             HStack(spacing: Space.xs) {
-                // Traffic light dots
                 HStack(spacing: Space.xxs + 2) {
                     Circle()
                         .fill(Color(red: 1.0, green: 0.373, blue: 0.341))
@@ -212,7 +307,6 @@ struct WelcomeView: View {
 
                 Spacer()
 
-                // Balance the traffic lights
                 Color.clear
                     .frame(width: 52, height: 12)
             }
@@ -224,16 +318,13 @@ struct WelcomeView: View {
                 .fill(Color.border)
                 .frame(height: 0.5)
 
-            // Window body
             HStack(spacing: 0) {
-                // Mini sidebar
                 demoSidebar
 
                 Rectangle()
                     .fill(Color.border.opacity(0.6))
                     .frame(width: 0.5)
 
-                // Main content area
                 demoMainContent
             }
         }
@@ -290,14 +381,12 @@ struct WelcomeView: View {
                 .fontWeight(.bold)
                 .foregroundStyle(.secondary)
 
-            // Stat pills
             HStack(spacing: Space.sm) {
                 WelcomeMockStat(value: "4h 32m", label: "Tracked", color: Color.accent)
-                WelcomeMockStat(value: "78%", label: "Focus", color: Color.productive)
-                WelcomeMockStat(value: "5", label: "Streak", color: Color.streak)
+                WelcomeMockStat(value: "78%",    label: "Focus",   color: Color.productive)
+                WelcomeMockStat(value: "5",      label: "Streak",  color: Color.streak)
             }
 
-            // Focus bar
             VStack(alignment: .leading, spacing: Space.xxxs + 1) {
                 Text("TODAY'S FOCUS")
                     .sectionLabel()
@@ -319,7 +408,6 @@ struct WelcomeView: View {
                 .clipShape(Capsule())
             }
 
-            // Animated activity rows
             VStack(spacing: Space.xxs) {
                 ForEach(Array(zip(demoApps, [1, 2, 3])), id: \.1) { item, phase in
                     if demoPhase >= phase {
@@ -340,9 +428,9 @@ struct WelcomeView: View {
     }
 
     private let demoApps: [DemoApp] = [
-        DemoApp(name: "Xcode", duration: "2h 15m", isDistraction: false),
-        DemoApp(name: "Safari", duration: "45m", isDistraction: true),
-        DemoApp(name: "Slack", duration: "1h 12m", isDistraction: false)
+        DemoApp(name: "Xcode",  duration: "2h 15m", isDistraction: false),
+        DemoApp(name: "Safari", duration: "45m",    isDistraction: true),
+        DemoApp(name: "Slack",  duration: "1h 12m", isDistraction: false)
     ]
 
     @ViewBuilder
@@ -363,10 +451,36 @@ struct WelcomeView: View {
 
     // MARK: - Features Grid
 
+    private let features: [WelcomeFeatureDef] = [
+        WelcomeFeatureDef(
+            icon: "eye.tracking.circle.fill",
+            title: "Smart App Tracking",
+            description: "Detects your active app & window using macOS Accessibility. Zero configuration.",
+            color: Color.accent
+        ),
+        WelcomeFeatureDef(
+            icon: "chart.bar.xaxis.ascending",
+            title: "Real-Time Focus Score",
+            description: "Live focus percentage and drift score. Know instantly when you're losing focus.",
+            color: Color.productive
+        ),
+        WelcomeFeatureDef(
+            icon: "timer.circle.fill",
+            title: "Pomodoro Timer",
+            description: "Customizable focus and break intervals. Desktop notifications when sessions end.",
+            color: Color.streak
+        ),
+        WelcomeFeatureDef(
+            icon: "shield.checkered",
+            title: "Website Blocker",
+            description: "Block distracting sites with password-protected timer. Stay focused effortlessly.",
+            color: Color.purple
+        )
+    ]
+
     @ViewBuilder
     private var featuresSection: some View {
         VStack(spacing: Space.xxxl) {
-            // Header
             VStack(spacing: Space.sm) {
                 DriftTag(text: "Features", color: Color.accent)
                 Text("Everything you need")
@@ -378,7 +492,6 @@ struct WelcomeView: View {
             }
             .multilineTextAlignment(.center)
 
-            // 2x2 grid
             LazyVGrid(
                 columns: [
                     GridItem(.flexible(), spacing: Space.lg),
@@ -405,6 +518,12 @@ struct WelcomeView: View {
 
     // MARK: - Steps (How it works)
 
+    private let steps: [WelcomeStepDef] = [
+        WelcomeStepDef(number: "1", title: "Launch Drift",    description: "Lives in your menu bar. Starts tracking the moment you open it.",             icon: "power.circle.fill"),
+        WelcomeStepDef(number: "2", title: "Stay Focused",    description: "Classifies every app automatically. See your focus score update live.",        icon: "bolt.circle.fill"),
+        WelcomeStepDef(number: "3", title: "Review & Improve",description: "Check session history, build streaks, and develop better habits.",             icon: "chart.line.uptrend.xyaxis.circle.fill")
+    ]
+
     @ViewBuilder
     private var stepsSection: some View {
         VStack(spacing: Space.xxxl) {
@@ -416,9 +535,7 @@ struct WelcomeView: View {
             }
             .multilineTextAlignment(.center)
 
-            // Horizontal steps with connecting dashed line
             ZStack(alignment: .top) {
-                // Dashed connector (sits behind the circles)
                 GeometryReader { geo in
                     let thirdW = geo.size.width / 3.0
                     let circleRadius: CGFloat = 18
@@ -457,6 +574,12 @@ struct WelcomeView: View {
     }
 
     // MARK: - Testimonials
+
+    private let testimonials: [WelcomeTestimonialDef] = [
+        WelcomeTestimonialDef(quote: "Finally understand where my day goes. The focus score is addicting.", author: "— Marcus T., iOS Developer"),
+        WelcomeTestimonialDef(quote: "Replaced three apps with just Drift. Native, fast, beautiful.",        author: "— Priya K., Designer"),
+        WelcomeTestimonialDef(quote: "My streak is at 21 days and I actually ship more code now.",           author: "— Lena R., Indie Hacker")
+    ]
 
     @ViewBuilder
     private var testimonialsSection: some View {
@@ -552,7 +675,6 @@ private struct WelcomeFeatureCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
-            // 40pt icon badge, centered at top
             HStack {
                 IconBadge(systemName: icon, color: accent, size: 40)
                     .accessibilityHidden(true)
@@ -585,7 +707,6 @@ private struct WelcomeStepCard: View {
 
     var body: some View {
         VStack(spacing: Space.md) {
-            // Accent circle with white number
             ZStack {
                 Circle()
                     .fill(Color.accent)

@@ -47,14 +47,22 @@ class AppState: ObservableObject {
     // MARK: - Preferences
 
     @Published var theme: AppTheme = .system
+    /// Name of the active accent color preset. Persisted to UserDefaults key "accentColorName".
+    @Published var accentColorName: String = "indigo"
+    /// When `true`, views should suppress or minimise decorative animations.
+    @Published var reduceMotion: Bool = false
     @Published var idleTimeout: Int = 300
     @Published var notificationsEnabled = true
     @Published var launchAtLogin = true
+    @Published var density: String = "Spacious"      // "Compact", "Comfortable", "Spacious"
+    @Published var typography: String = "Sora"       // "Sora", "Serif", "Mono"
+    @Published var homeLayout: String = "Hero"       // "Hero", "Bento", "Stack"
 
     // MARK: - UI State
 
     @Published var showSignIn = false
     @Published var hasOnboarded: Bool = false
+    @Published var showCustomizePanel = false
 
     /// Possible root screens used during the launch flow.
     enum AppScreen { case welcome, onboarding, auth, main }
@@ -78,6 +86,8 @@ class AppState: ObservableObject {
     private enum DefaultsKey {
         static let user              = "drift_user"
         static let theme             = "drift_theme"
+        static let accentColorName   = "accentColorName"
+        static let reduceMotion      = "drift_reduce_motion"
         static let blockedSites      = "drift_blocked_sites"
         static let focusBlockAttempts = "drift_focus_block_attempts"
         static let idleTimeout       = "drift_idle_timeout"
@@ -85,6 +95,9 @@ class AppState: ObservableObject {
         static let launchLogin       = "drift_launch_login"
         static let hasOnboarded      = "drift_has_onboarded"
         static let pastSessions      = "drift_past_sessions"
+        static let density           = "drift_density"
+        static let typography        = "drift_typography"
+        static let homeLayout        = "drift_home_layout"
         // Legacy keys used only during the one-time keychain migration.
         static let legacyAccessToken  = "drift_access_token"
         static let legacyRefreshToken = "drift_refresh_token"
@@ -128,6 +141,13 @@ class AppState: ObservableObject {
             theme = decoded
         }
 
+        if let savedAccent = defaults.string(forKey: DefaultsKey.accentColorName),
+           DriftDesign.accents.contains(where: { $0.name == savedAccent }) {
+            accentColorName = savedAccent
+        }
+
+        reduceMotion = defaults.object(forKey: DefaultsKey.reduceMotion) as? Bool ?? false
+
         if let savedSites = defaults.stringArray(forKey: DefaultsKey.blockedSites) {
             blockedSites = savedSites
         }
@@ -139,6 +159,10 @@ class AppState: ObservableObject {
         notificationsEnabled = defaults.object(forKey: DefaultsKey.notifications) as? Bool ?? true
         launchAtLogin        = defaults.object(forKey: DefaultsKey.launchLogin) as? Bool ?? true
         hasOnboarded         = defaults.bool(forKey: DefaultsKey.hasOnboarded)
+
+        if let saved = defaults.string(forKey: DefaultsKey.density) { density = saved }
+        if let saved = defaults.string(forKey: DefaultsKey.typography) { typography = saved }
+        if let saved = defaults.string(forKey: DefaultsKey.homeLayout) { homeLayout = saved }
     }
 
     /// Moves any tokens still sitting in `UserDefaults` into the Keychain.
@@ -196,6 +220,41 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(theme.rawValue, forKey: DefaultsKey.theme)
     }
 
+    /// Updates and persists the selected accent color name.
+    func setAccentColor(_ name: String) {
+        accentColorName = name
+        UserDefaults.standard.set(name, forKey: DefaultsKey.accentColorName)
+    }
+
+    /// Updates and persists the reduce-motion preference.
+    func setReduceMotion(_ enabled: Bool) {
+        reduceMotion = enabled
+        UserDefaults.standard.set(enabled, forKey: DefaultsKey.reduceMotion)
+    }
+
+    /// Updates and persists the layout density preference.
+    func setDensity(_ value: String) {
+        density = value
+        UserDefaults.standard.set(value, forKey: DefaultsKey.density)
+    }
+
+    /// Updates and persists the typography preference.
+    func setTypography(_ value: String) {
+        typography = value
+        UserDefaults.standard.set(value, forKey: DefaultsKey.typography)
+    }
+
+    /// Updates and persists the home layout preference.
+    func setHomeLayout(_ value: String) {
+        homeLayout = value
+        UserDefaults.standard.set(value, forKey: DefaultsKey.homeLayout)
+    }
+
+    /// Resolved `Color` for the currently selected accent preset.
+    var accentColor: Color {
+        DriftDesign.accents.first { $0.name == accentColorName }?.color ?? Color.accent
+    }
+
     /// Marks onboarding as completed.
     func completeOnboarding() {
         hasOnboarded = true
@@ -248,18 +307,14 @@ class AppState: ObservableObject {
     private func computeStats() {
         totalTrackedMs = pastSessions.reduce(0) { $0 + $1.totalMs }
 
-        // Calculate streak: consecutive calendar days with at least one session.
+        // Build a set of day-start dates for O(n) streak calculation.
         let calendar = Calendar.current
+        let sessionDays = Set(pastSessions.map { calendar.startOfDay(for: $0.date) })
         var streak = 0
         var checkDate = calendar.startOfDay(for: Date())
 
-        while true {
-            let hasSession = pastSessions.contains { session in
-                calendar.isDate(session.date, inSameDayAs: checkDate)
-            }
-            guard hasSession else { break }
+        while sessionDays.contains(checkDate) {
             streak += 1
-            // Safe date arithmetic -- break instead of force-unwrapping.
             guard let previous = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
             checkDate = previous
         }

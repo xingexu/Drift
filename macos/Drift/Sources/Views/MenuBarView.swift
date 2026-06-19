@@ -4,6 +4,9 @@ struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var tracker: WindowTracker
 
+    /// Two-step guard so a stray click can't discard the live session.
+    @State private var confirmReset = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -107,18 +110,29 @@ struct MenuBarView: View {
                 .accessibilityLabel(trackingButtonLabel)
                 .accessibilityHint("Toggle session tracking")
 
-                // Reset (only when tracking)
+                // Reset (only when tracking) — two-step confirm to avoid
+                // accidentally discarding the active session.
                 if tracker.isTracking {
                     MenuBarButton(
-                        title: "Reset Session",
-                        icon: "arrow.counterclockwise",
-                        color: .secondary,
+                        title: confirmReset ? "Tap again to confirm" : "Reset Session",
+                        icon: confirmReset ? "exclamationmark.triangle.fill" : "arrow.counterclockwise",
+                        color: confirmReset ? .distraction : .secondary,
                         shortcutHint: nil
                     ) {
-                        tracker.resetSession()
+                        if confirmReset {
+                            tracker.resetSession()
+                            confirmReset = false
+                        } else {
+                            withAnimation(Anim.quick) { confirmReset = true }
+                            // Auto-revert if the user doesn't confirm.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                withAnimation(Anim.quick) { confirmReset = false }
+                            }
+                        }
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
-                    .accessibilityLabel("Reset tracking session")
+                    .accessibilityLabel(confirmReset ? "Confirm reset session" : "Reset tracking session")
+                    .accessibilityHint(confirmReset ? "Discards the current session" : "")
                 }
             }
             .padding(.bottom, Space.sm)

@@ -1,179 +1,250 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Session View
 
 struct SessionView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var tracker: WindowTracker
-    @State private var contentAppeared = false
+    @State private var appeared = false
+    @State private var showExportSuccess = false
+    @State private var showExportError = false
+    @State private var exportError: String?
+    @State private var exportedFileURL: URL?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: Space.xxl) {
-                sessionHeader
-                currentAppBar
-                    .opacity(contentAppeared ? 1 : 0)
-                    .offset(y: contentAppeared ? 0 : 10)
-                clockRing
-                    .opacity(contentAppeared ? 1 : 0)
-                    .scaleEffect(contentAppeared ? 1 : 0.92)
-                controlStrip
-                metricsPanel
-                    .opacity(contentAppeared ? 1 : 0)
-                    .offset(y: contentAppeared ? 0 : 12)
-                appTimeline
-                    .opacity(contentAppeared ? 1 : 0)
-                    .offset(y: contentAppeared ? 0 : 16)
+            VStack(alignment: .leading, spacing: Space.xxl) {
+
+                // MARK: Page Header
+                pageHeader
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 8)
+                    .animation(.easeOut(duration: 0.28).delay(0.0), value: appeared)
+
+                // MARK: Main Body
+                HStack(alignment: .top, spacing: Space.lg) {
+
+                    // LEFT: ring + status + controls
+                    leftCard
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+                        .animation(.easeOut(duration: 0.28).delay(0.06), value: appeared)
+
+                    // RIGHT: stat tiles column
+                    rightColumn
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+                        .animation(.easeOut(duration: 0.28).delay(0.12), value: appeared)
+                }
+
+                // MARK: App Breakdown
+                appBreakdownCard
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 16)
+                    .animation(.easeOut(duration: 0.28).delay(0.18), value: appeared)
             }
             .padding(Space.page)
         }
         .task {
-            guard !contentAppeared else { return }
-            try? await Task.sleep(for: .milliseconds(80))
+            guard !appeared else { return }
+            try? await Task.sleep(for: .milliseconds(60))
             withAnimation(Anim.appear) {
-                contentAppeared = true
+                appeared = true
             }
+        }
+        .alert("Export Error", isPresented: $showExportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "Could not export session data.")
+        }
+        .alert("Export Successful", isPresented: $showExportSuccess) {
+            if let url = exportedFileURL {
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                }
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Session data has been exported as CSV.")
         }
     }
 
-    // MARK: - Header
+    // MARK: - Page Header
 
-    @ViewBuilder
-    private var sessionHeader: some View {
-        HStack {
+    private var pageHeader: some View {
+        HStack(alignment: .top, spacing: Space.md) {
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text("Session")
-                    .font(TypeScale.title)
-                    .tracking(-0.5)
-                    .accessibilityAddTraits(.isHeader)
-                Text("Track your focus in real-time")
-                    .font(TypeScale.body)
+                    .font(TypeScale.h1)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+
+                Text("A live view of what you're doing right now. Start a session to begin tracking productive time.")
+                    .font(TypeScale.bodyMd)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+
             Spacer()
-            StatusBadge(
-                label: statusLabel,
-                color: statusColor,
-                pulsing: tracker.isTracking && !tracker.isPaused
-            )
-            .accessibilityLabel("Session status: \(statusLabel)")
+
+            HStack(spacing: Space.xs) {
+                GhostButton("Reset", icon: "arrow.counterclockwise") {
+                    tracker.resetSession()
+                }
+                .disabled(!tracker.isTracking)
+                .opacity(tracker.isTracking ? 1 : 0.45)
+
+                GhostButton("Export", icon: "square.and.arrow.up") {
+                    exportCurrentSession()
+                }
+            }
         }
     }
 
-    // MARK: - Current App Bar
+    // MARK: - Left Card
 
-    @ViewBuilder
-    private var currentAppBar: some View {
-        let appName = tracker.activeApp
-        let category = appState.session.currentCategory
-        let isFocused = category.label == "Productive"
+    private var leftCard: some View {
+        VStack(spacing: Space.xl) {
 
-        HStack(spacing: Space.md) {
-            // Category glow dot
-            ZStack {
-                Circle()
-                    .fill(category.color.opacity(0.25))
-                    .frame(width: 20, height: 20)
-                    .blur(radius: 4)
-                Circle()
-                    .fill(category.color)
-                    .frame(width: 7, height: 7)
-            }
-            .frame(width: 20, height: 20)
+            // 1. Status pill
+            statusPill
 
-            VStack(alignment: .leading, spacing: Space.xxxs) {
-                Text("Currently tracking")
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.tertiary)
-                Text(appName.isEmpty ? "Waiting for activity..." : appName)
-                    .font(TypeScale.bodyMd)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
+            // 2. Ring chart
+            ringChart
 
-            Spacer()
-
-            DriftTag(text: category.label, color: category.color)
+            // 3. Controls
+            controlStrip
         }
-        .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.md)
+        .padding(Space.xl)
+        .frame(maxWidth: .infinity)
         .background {
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay {
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(
-                            isFocused
-                                ? Color.productive.opacity(0.35)
-                                : Color.border,
-                            lineWidth: isFocused ? 1 : 0.5
-                        )
+                    RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
                 }
-                .shadow(
-                    color: isFocused ? Color.productive.opacity(0.12) : .clear,
-                    radius: 10,
-                    y: 2
-                )
         }
-        .hoverLift()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Current app: \(appName.isEmpty ? "None" : appName), \(category.label)")
+        .elevate(.md)
     }
 
-    // MARK: - Clock Ring
+    // MARK: Status Pill
 
-    @ViewBuilder
-    private var clockRing: some View {
-        ZStack {
-            // Track
-            Circle()
-                .stroke(Color.sep.opacity(0.12), lineWidth: 8)
-                .frame(width: 240, height: 240)
+    private var statusPill: some View {
+        HStack(spacing: Space.xs) {
+            StatusDot(status: trackerStatus)
+            Text(pillLabel)
+                .font(TypeScale.bodyMd)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.sm)
+        .background {
+            Capsule()
+                .fill(Color.primary.opacity(0.06))
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
+        }
+        .animation(Anim.quick, value: pillLabel)
+    }
 
-            // Glow layer behind progress
-            SessionProgressRing(
-                progress: CGFloat(appState.session.focusPercent) / 100.0,
-                ringSize: 240,
-                strokeWidth: 8
+    private var pillLabel: String {
+        if tracker.isTracking && !tracker.isPaused {
+            return "Tracking \u{00B7} Session in progress"
+        }
+        return "Stopped \u{00B7} Waiting for activity"
+    }
+
+    // MARK: Ring Chart
+
+    private var ringChart: some View {
+        let productiveFraction = CGFloat(appState.session.focusPercent) / 100.0
+
+        return ZStack {
+            // Track (full 270 arc, dimmed distraction color)
+            ProductivityArcTrack(fraction: 1.0, color: Color.distraction.opacity(0.18))
+
+            // Soft glow blur layer beneath fill
+            ProductivityArcFill(
+                fraction: max(productiveFraction, 0.01),
+                gradient: AngularGradient(
+                    colors: [Color.productive.opacity(0.35), Color.productive.opacity(0.20)],
+                    center: .center,
+                    startAngle: .degrees(-225),
+                    endAngle: .degrees(225)
+                )
+            )
+            .blur(radius: 8)
+
+            // Productive fill
+            ProductivityArcFill(
+                fraction: productiveFraction,
+                gradient: AngularGradient(
+                    colors: [Color.productive.opacity(0.75), Color.productive],
+                    center: .center,
+                    startAngle: .degrees(-225),
+                    endAngle: .degrees(225)
+                )
             )
 
-            // Center content
-            VStack(spacing: Space.xs) {
+            // Center label stack
+            VStack(spacing: Space.xxs) {
                 Text(formatDuration(appState.session.totalMs))
-                    .font(TypeScale.monoLg)
-                    .tracking(-1)
+                    .font(TypeScale.display)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.primary)
                     .contentTransition(.numericText())
-                    .accessibilityLabel("Session duration: \(formatDurationWords(appState.session.totalMs))")
+                    .animation(Anim.count, value: appState.session.totalMs)
 
-                Text(statusLabel)
-                    .font(TypeScale.caption)
-                    .fontWeight(.medium)
+                Text(tracker.isTracking && !tracker.isPaused ? "ELAPSED" : "READY")
+                    .font(TypeScale.tiny)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .tracking(0.6)
+                    .tracking(1.2)
+                    .animation(Anim.quick, value: tracker.isTracking)
+
+                HStack(spacing: Space.xxs) {
+                    Circle()
+                        .fill(Color.productive)
+                        .frame(width: Space.xs, height: Space.xs)
+                    Text("\(appState.session.focusPercent)% productive")
+                        .font(TypeScale.caption)
+                        .foregroundStyle(.tertiary)
+                        .contentTransition(.numericText())
+                        .animation(Anim.count, value: appState.session.focusPercent)
+                }
+                .padding(.top, Space.xxxs)
             }
         }
-        .padding(.vertical, Space.md)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Focus ring at \(appState.session.focusPercent) percent. Duration: \(formatDurationWords(appState.session.totalMs))")
+        .frame(width: 200, height: 160)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Productivity ring: \(appState.session.focusPercent) percent productive, \(appState.session.driftScore) percent drift.")
     }
 
-    // MARK: - Control Strip
+    // MARK: Control Strip
 
-    @ViewBuilder
     private var controlStrip: some View {
         HStack(spacing: Space.md) {
-            // Reset
-            SecondaryButton("Reset", icon: "arrow.counterclockwise") {
+            // Reset (ghost secondary)
+            Button {
                 tracker.resetSession()
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(tracker.isTracking ? Color(.labelColor) : Color(.tertiaryLabelColor))
+                    .frame(width: 36, height: 36)
+                    .background {
+                        Circle()
+                            .fill(Color.primary.opacity(0.06))
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
+                    }
             }
+            .buttonStyle(.plain)
             .disabled(!tracker.isTracking)
-            .opacity(tracker.isTracking ? 1 : 0.4)
-            .accessibilityLabel("Reset Session")
-            .accessibilityHint("Saves and resets the current tracking session")
+            .accessibilityLabel("Reset session")
 
-            // Main action — custom button to support contentTransition on icon
+            // Play / Pause — big blue circle
             SessionActionButton(
                 icon: actionButtonIcon,
                 label: actionButtonLabel,
@@ -181,102 +252,195 @@ struct SessionView: View {
                 action: toggleTracking
             )
 
-            // Focus Mode
-            SessionFocusButton(
-                isActive: appState.focusModeActive,
-                action: {
-                    withAnimation(Anim.page) {
-                        appState.focusModeActive.toggle()
-                    }
+            // Stop — square icon ghost button
+            Button {
+                if tracker.isTracking {
+                    tracker.resetSession()
                 }
-            )
+            } label: {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(tracker.isTracking ? Color(.labelColor) : Color(.tertiaryLabelColor))
+                    .frame(width: 36, height: 36)
+                    .background {
+                        Circle()
+                            .fill(Color.primary.opacity(0.06))
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
+                    }
+            }
+            .buttonStyle(.plain)
+            .disabled(!tracker.isTracking)
+            .accessibilityLabel("Stop session")
         }
     }
 
-    // MARK: - Metrics Panel
+    // MARK: - Right Column (fixed ~280pt)
 
-    @ViewBuilder
-    private var metricsPanel: some View {
-        HStack(spacing: Space.sm) {
-            MetricPair(
-                value: "\(appState.session.focusPercent)%",
-                label: "Focus",
-                valueFont: TypeScale.monoMd,
-                color: Color.productive,
-                alignment: .center
+    private var rightColumn: some View {
+        VStack(spacing: Space.sm) {
+
+            // Active app tile
+            activeAppTile
+
+            // Metric tiles
+            metricTile(
+                icon: "timer",
+                iconColor: Color.accent,
+                value: formatDurationWords(appState.session.totalMs),
+                label: "TOTAL TIME"
             )
-            .frame(maxWidth: .infinity)
-            .insetCard(padding: Space.md, radius: Radius.md)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Focus \(appState.session.focusPercent) percent")
 
-            MetricPair(
-                value: "\(appState.session.driftScore)%",
-                label: "Drift",
-                valueFont: TypeScale.monoMd,
-                color: Color.distraction,
-                alignment: .center
+            metricTile(
+                icon: "bolt.fill",
+                iconColor: Color.productive,
+                value: formatDurationWords(appState.session.productiveMs),
+                label: "PRODUCTIVE"
             )
-            .frame(maxWidth: .infinity)
-            .insetCard(padding: Space.md, radius: Radius.md)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Drift \(appState.session.driftScore) percent")
 
-            MetricPair(
+            metricTile(
+                icon: "arrow.trianglehead.2.clockwise.rotate.90",
+                iconColor: Color.streak,
                 value: "\(appState.session.uniqueApps)",
-                label: "Switches",
-                valueFont: TypeScale.monoMd,
-                color: Color.streak,
-                alignment: .center
+                label: "APP SWITCHES"
             )
-            .frame(maxWidth: .infinity)
-            .insetCard(padding: Space.md, radius: Radius.md)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("App switches \(appState.session.uniqueApps)")
+
+            metricTile(
+                icon: "exclamationmark.triangle.fill",
+                iconColor: Color.distraction,
+                value: formatDurationWords(appState.session.distractionMs),
+                label: "DISTRACTION"
+            )
         }
-        .hoverLift()
+        .frame(width: 280)
     }
 
-    // MARK: - App Timeline
+    // MARK: Active App Tile
 
-    @ViewBuilder
-    private var appTimeline: some View {
-        VStack(alignment: .leading, spacing: Space.md) {
-            Text("App Timeline")
-                .sectionLabel()
-                .accessibilityAddTraits(.isHeader)
+    private var activeAppTile: some View {
+        let appName = tracker.activeApp
+        let category = appState.session.currentCategory
+        let isActive = tracker.isTracking && !tracker.isPaused && !appName.isEmpty
 
-            if appState.session.events.isEmpty {
+        return HStack(spacing: Space.sm) {
+            // Round icon badge with first letter
+            ZStack {
+                Circle()
+                    .fill((isActive ? category.color : Color(.tertiaryLabelColor)).opacity(0.15))
+                    .frame(width: 34, height: 34)
+                Text(isActive ? String(appName.prefix(1)).uppercased() : "—")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isActive ? category.color : Color(.tertiaryLabelColor))
+            }
+
+            VStack(alignment: .leading, spacing: Space.xxxs) {
+                Text(isActive ? appName : "No active app")
+                    .font(TypeScale.bodyMd)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .contentTransition(.identity)
+                    .animation(Anim.quick, value: appName)
+
+                Text(isActive ? "Active" : "Idle")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            DriftTag(
+                text: isActive ? category.label : "Neutral",
+                color: isActive ? category.color : Color(.tertiaryLabelColor)
+            )
+            .animation(Anim.quick, value: category.label)
+        }
+        .padding(Space.md)
+        .background {
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(
+                            isActive && category.label == "Productive"
+                                ? Color.productive.opacity(0.30)
+                                : Color.primary.opacity(0.07),
+                            lineWidth: isActive && category.label == "Productive" ? 1 : 0.5
+                        )
+                }
+        }
+        .elevate(.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(isActive ? "Active app: \(appName), \(category.label)" : "No active app, Idle")
+    }
+
+    // MARK: Metric Tile Builder
+
+    private func metricTile(icon: String, iconColor: Color, value: String, label: String) -> some View {
+        StatTile(icon: icon, iconColor: iconColor, value: value, label: label)
+    }
+
+    // MARK: - App Breakdown Card
+
+    private var appBreakdownCard: some View {
+        let breakdown = buildAppBreakdown()
+
+        return VStack(alignment: .leading, spacing: Space.md) {
+            HStack {
+                Text("App Breakdown")
+                    .sectionLabel()
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text("\(breakdown.count) apps")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(.quaternary)
+            }
+
+            if breakdown.isEmpty {
                 SessionEmptyTimeline()
             } else {
-                SessionTimelineBar(events: appState.session.events)
+                let maxMs = breakdown.first?.durationMs ?? 1
+                VStack(spacing: Space.xs) {
+                    ForEach(Array(breakdown.enumerated()), id: \.element.name) { idx, item in
+                        AppBreakdownRow(
+                            item: item,
+                            maxMs: maxMs
+                        )
+                        .staggerAppear(index: idx, appeared: appeared, baseDelay: 0.04)
 
-                HStack(spacing: Space.lg) {
-                    LegendDot(label: "Productive", color: Color.productive)
-                    LegendDot(label: "Neutral", color: .secondary)
-                    LegendDot(label: "Distraction", color: Color.distraction)
+                        if idx < breakdown.count - 1 {
+                            DriftDivider(opacity: 0.6)
+                        }
+                    }
                 }
-                .font(TypeScale.caption)
-                .foregroundStyle(.tertiary)
             }
         }
-        .driftCard()
+        .padding(Space.xl)
+        .background {
+            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+                }
+        }
+        .elevate(.md)
     }
 
     // MARK: - Computed Properties
+
+    private var trackerStatus: StatusDot.Status {
+        if tracker.isIdle { return .idle }
+        if tracker.isPaused { return .paused }
+        if tracker.isTracking { return .tracking }
+        return .idle
+    }
 
     private var statusLabel: String {
         if tracker.isIdle { return "Idle" }
         if tracker.isPaused { return "Paused" }
         if tracker.isTracking { return "Tracking" }
         return "Stopped"
-    }
-
-    private var statusColor: Color {
-        if tracker.isIdle { return Color.streak }
-        if tracker.isPaused { return Color.streak }
-        if tracker.isTracking { return Color.productive }
-        return .secondary
     }
 
     private var actionButtonIcon: String {
@@ -307,50 +471,276 @@ struct SessionView: View {
             }
         }
     }
-}
 
-// MARK: - Session Progress Ring
+    // MARK: - App Breakdown Builder
 
-private struct SessionProgressRing: View {
-    let progress: CGFloat
-    var ringSize: CGFloat = 240
-    var strokeWidth: CGFloat = 8
+    fileprivate struct AppBreakdownItem {
+        let name: String
+        let category: AppCategory
+        let durationMs: TimeInterval
+        let eventCount: Int
+    }
 
-    var body: some View {
-        ZStack {
-            // Soft glow shadow ring underneath
-            Circle()
-                .trim(from: 0, to: max(progress, 0))
-                .stroke(
-                    Color.accent.opacity(0.3),
-                    style: StrokeStyle(lineWidth: strokeWidth + 6, lineCap: .round)
+    private func buildAppBreakdown() -> [AppBreakdownItem] {
+        var durationMap: [String: TimeInterval] = [:]
+        var categoryMap: [String: AppCategory] = [:]
+        var countMap: [String: Int] = [:]
+
+        for event in appState.session.events {
+            durationMap[event.owner, default: 0] += event.durationMs
+            countMap[event.owner, default: 0] += 1
+            // Last-write wins for category (most recent)
+            categoryMap[event.owner] = event.category
+        }
+
+        return durationMap
+            .map { name, ms in
+                AppBreakdownItem(
+                    name: name,
+                    category: categoryMap[name] ?? .neutral,
+                    durationMs: ms,
+                    eventCount: countMap[name] ?? 0
                 )
-                .frame(width: ringSize, height: ringSize)
-                .rotationEffect(.degrees(-90))
-                .blur(radius: 6)
-                .animation(Anim.appear, value: progress)
+            }
+            .sorted { $0.durationMs > $1.durationMs }
+            .prefix(8)
+            .map { $0 }
+    }
 
-            // Main progress arc
-            Circle()
-                .trim(from: 0, to: max(progress, 0))
-                .stroke(
-                    AngularGradient(
-                        colors: [Color.accent.opacity(0.7), Color.accent],
-                        center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
-                    ),
-                    style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
-                )
-                .frame(width: ringSize, height: ringSize)
-                .rotationEffect(.degrees(-90))
-                .shadow(color: Color.accent.opacity(0.3), radius: 10)
-                .animation(Anim.appear, value: progress)
+    // MARK: - Export
+
+    private func exportCurrentSession() {
+        let session = appState.session
+        guard session.totalMs > 0 else {
+            exportError = "No session data to export. Start tracking first."
+            showExportError = true
+            return
+        }
+
+        let dateFmt = DateFormatter(); dateFmt.dateFormat = "yyyy-MM-dd"
+        let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm:ss"
+        let now = session.startTime ?? Date()
+
+        // Build app-level rows from breakdown items
+        let breakdown = buildAppBreakdown()
+        var csv  = "Date,Start Time,Duration (min),Focus %,Drift %,Apps Used\n"
+        csv += "\(dateFmt.string(from: now)),"
+            + "\(timeFmt.string(from: now)),"
+            + "\(Int(session.totalMs / 60_000)),"
+            + "\(session.focusPercent),"
+            + "\(session.driftScore),"
+            + "\(session.uniqueApps)\n"
+        csv += "\nApp,Category,Duration (min),Events\n"
+        for item in breakdown {
+            let appName = item.name
+                .replacingOccurrences(of: "\"", with: "\"\"")
+            csv += "\"\(appName)\","
+                + "\(item.category.label),"
+                + "\(Int(item.durationMs / 60_000)),"
+                + "\(item.eventCount)\n"
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType.commaSeparatedText]
+        panel.nameFieldStringValue = "drift-session-\(dateFmt.string(from: now)).csv"
+        panel.title = "Export Session"
+        panel.message = "Choose where to save this session's data."
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try csv.write(to: url, atomically: true, encoding: .utf8)
+                exportedFileURL = url
+                showExportSuccess = true
+            } catch {
+                exportError = "Failed to write file: \(error.localizedDescription)"
+                showExportError = true
+            }
         }
     }
 }
 
-// MARK: - Session Action Button (Start / Pause / Resume)
+// MARK: - Stat Tile (right column metric cards)
+
+private struct StatTile: View {
+    let icon: String
+    let iconColor: Color
+    let value: String
+    let label: String
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: Space.sm) {
+            IconBadge(systemName: icon, color: iconColor, size: 32)
+
+            VStack(alignment: .leading, spacing: Space.xxxs) {
+                Text(value)
+                    .font(TypeScale.monoMd)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .contentTransition(.numericText())
+                    .animation(Anim.count, value: value)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                Text(label)
+                    .font(TypeScale.tiny)
+                    .foregroundStyle(.tertiary)
+                    .tracking(0.8)
+            }
+
+            Spacer()
+        }
+        .padding(Space.md)
+        .background {
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(
+                            isHovered ? iconColor.opacity(0.22) : Color.primary.opacity(0.07),
+                            lineWidth: 0.5
+                        )
+                }
+        }
+        .elevate(isHovered ? .md : .sm)
+        .scaleEffect(isHovered ? 1.012 : 1.0)
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+// MARK: - Productivity Arc Shapes (270° sweep)
+
+/// The track or fill arc — 270° sweep starting from bottom-left (135°).
+private struct ProductivityArcTrack: View {
+    let fraction: CGFloat
+    let color: Color
+    private let startAngle: Angle = .degrees(135)
+    private let sweepDegrees: Double = 270
+
+    var body: some View {
+        Arc(fraction: fraction, startAngle: startAngle, sweepDegrees: sweepDegrees)
+            .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+            .frame(width: 180, height: 180)
+    }
+}
+
+private struct ProductivityArcFill<G: ShapeStyle>: View {
+    let fraction: CGFloat
+    let gradient: G
+    private let startAngle: Angle = .degrees(135)
+    private let sweepDegrees: Double = 270
+
+    var body: some View {
+        Arc(fraction: fraction, startAngle: startAngle, sweepDegrees: sweepDegrees)
+            .stroke(gradient, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+            .frame(width: 180, height: 180)
+            .animation(Anim.appear, value: fraction)
+    }
+}
+
+private struct Arc: Shape {
+    var fraction: CGFloat
+    let startAngle: Angle
+    let sweepDegrees: Double
+
+    var animatableData: CGFloat {
+        get { fraction }
+        set { fraction = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let endDegrees = sweepDegrees * Double(max(0, min(1, fraction)))
+        var p = Path()
+        p.addArc(
+            center: CGPoint(x: rect.midX, y: rect.midY),
+            radius: min(rect.width, rect.height) / 2,
+            startAngle: startAngle,
+            endAngle: startAngle + .degrees(endDegrees),
+            clockwise: false
+        )
+        return p
+    }
+}
+
+// MARK: - App Breakdown Row
+
+private struct AppBreakdownRow: View {
+    let item: SessionView.AppBreakdownItem
+    let maxMs: TimeInterval
+
+    @State private var isHovered = false
+
+    private var avatarLetter: String {
+        String(item.name.prefix(1)).uppercased()
+    }
+
+    private var timeFraction: CGFloat {
+        guard maxMs > 0 else { return 0 }
+        return CGFloat(item.durationMs / maxMs)
+    }
+
+    var body: some View {
+        HStack(spacing: Space.md) {
+            // First-letter avatar badge
+            ZStack {
+                Circle()
+                    .fill(item.category.color.opacity(0.15))
+                    .frame(width: 26, height: 26)
+                Text(avatarLetter)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(item.category.color)
+            }
+
+            // App name + category tag
+            VStack(alignment: .leading, spacing: Space.xxxs) {
+                HStack(spacing: Space.xs) {
+                    Text(item.name)
+                        .font(TypeScale.bodyMd)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    DriftTag(text: item.category.label, color: item.category.color)
+                }
+                // Relative time bar (thin capsule)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.primary.opacity(0.07))
+                        Capsule()
+                            .fill(item.category.color.opacity(0.55))
+                            .frame(width: max(4, geo.size.width * timeFraction))
+                    }
+                }
+                .frame(height: 3)
+                .animation(Anim.appear, value: timeFraction)
+            }
+
+            Spacer(minLength: Space.xs)
+
+            // Duration on the right
+            Text(formatDurationWords(item.durationMs))
+                .font(TypeScale.monoXs)
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
+        }
+        .padding(.vertical, Space.xxs)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.04) : .clear)
+        )
+        .animation(Anim.hover, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name), \(item.category.label), \(formatDurationWords(item.durationMs))")
+    }
+}
+
+// MARK: - Session Action Button (Start / Pause / Resume — big blue circle)
 
 private struct SessionActionButton: View {
     let icon: String
@@ -362,81 +752,28 @@ private struct SessionActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: Space.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .contentTransition(.symbolEffect(.replace))
-                Text(label)
-                    .font(TypeScale.heading)
-            }
-            .padding(.horizontal, Space.lg)
-            .padding(.vertical, Space.sm + 1)
-            .background {
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            ZStack {
+                Circle()
                     .fill(isHovered ? Color.accent.opacity(0.88) : Color.accent)
-                    .elevate(isHovered ? .sm : .xs)
+                    .frame(width: 52, height: 52)
+                    .shadow(
+                        color: Color.accent.opacity(isHovered ? 0.45 : 0.30),
+                        radius: isHovered ? 12 : 8,
+                        y: 3
+                    )
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .foregroundStyle(.white)
             .animation(Anim.hover, value: isHovered)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .scaleEffect(isHovered ? 1.06 : 1.0)
+        .animation(Anim.hover, value: isHovered)
         .accessibilityLabel(label)
         .accessibilityHint(accessibilityHint)
-    }
-}
-
-// MARK: - Session Focus Mode Button
-
-private struct SessionFocusButton: View {
-    let isActive: Bool
-    let action: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Space.xs) {
-                Image(systemName: isActive ? "shield.fill" : "shield")
-                    .font(.system(size: 13, weight: .medium))
-                    .contentTransition(.symbolEffect(.replace))
-                if isActive {
-                    Text("Focus On")
-                        .font(TypeScale.bodyMd)
-                        .fontWeight(.medium)
-                }
-            }
-            .padding(.horizontal, Space.md)
-            .padding(.vertical, Space.xs + 1)
-            .background {
-                if isActive {
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .fill(Color.accent.opacity(0.12))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .strokeBorder(Color.accent.opacity(0.25), lineWidth: 0.75)
-                        }
-                } else {
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .fill(isHovered ? Color(.controlColor) : Color(.controlBackgroundColor))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .strokeBorder(Color.border, lineWidth: 0.75)
-                        }
-                }
-            }
-            .foregroundStyle(
-                isActive
-                    ? Color.accent
-                    : (isHovered ? Color.accent : Color(.labelColor))
-            )
-            .animation(Anim.hover, value: isHovered)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .accessibilityLabel(isActive ? "Focus Mode On" : "Focus Mode Off")
-        .accessibilityHint("Toggles distraction blocking")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 
@@ -446,11 +783,13 @@ private struct SessionEmptyTimeline: View {
     var body: some View {
         VStack(spacing: Space.sm) {
             Image(systemName: "waveform.path")
-                .font(.system(size: 20, weight: .light))
+                .font(TypeScale.h2)
+                .fontWeight(.light)
                 .foregroundStyle(.quaternary)
             Text("Activity will appear here during tracking.")
                 .font(TypeScale.body)
                 .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.vertical, Space.xl)
@@ -459,71 +798,3 @@ private struct SessionEmptyTimeline: View {
     }
 }
 
-// MARK: - Session Timeline Bar
-
-private struct SessionTimelineBar: View {
-    let events: [AppEvent]
-
-    var body: some View {
-        let segments = Array(events.suffix(40))
-
-        GeometryReader { geo in
-            HStack(spacing: 2) {
-                let segmentCount = max(segments.count, 1)
-                let spacing = CGFloat(segmentCount - 1) * 2
-                let segmentWidth = max(4, (geo.size.width - spacing) / CGFloat(segmentCount))
-
-                ForEach(segments) { event in
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(event.category.color)
-                        .frame(width: segmentWidth)
-                }
-            }
-        }
-        .frame(height: 8)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-        .animation(Anim.quick, value: events.count)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("App timeline showing \(events.count) tracked activities")
-    }
-}
-
-// MARK: - Helper Views
-
-struct MetricItem: View {
-    let label: String
-    let value: String
-    let color: Color
-    let icon: String
-
-    var body: some View {
-        VStack(spacing: Space.xs) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(color.opacity(0.6))
-            Text(value)
-                .font(.system(size: 22, weight: .bold, design: .monospaced))
-                .foregroundStyle(color)
-                .contentTransition(.numericText())
-            Text(label)
-                .sectionLabel()
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-struct LegendDot: View {
-    let label: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: Space.xxs) {
-            Circle()
-                .fill(color)
-                .frame(width: Space.xs, height: Space.xs)
-            Text(label)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label) category")
-    }
-}
