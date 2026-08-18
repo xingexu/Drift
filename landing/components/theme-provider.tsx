@@ -14,14 +14,13 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
     const saved = localStorage.getItem("drift_landing_theme") as Theme | null;
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.setAttribute("data-theme", saved);
-    }
+    const initialTheme = saved ?? "dark";
+    setTheme(initialTheme);
+    document.documentElement.setAttribute("data-theme", initialTheme);
   }, []);
 
   const toggleTheme = () => {
