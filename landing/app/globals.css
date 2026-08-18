@@ -86,9 +86,9 @@ body {
   width: clamp(270px, 22.5vw, 470px);
   height: clamp(52px, 6.4vh, 76px);
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
   align-items: center;
-  gap: clamp(8px, 1vw, 18px);
+  gap: clamp(6px, .5vw, 10px);
   color: #fff0a5;
   background: #13092c;
   border: 3px solid #f1ad47;
@@ -97,7 +97,7 @@ body {
     4px 4px 0 #6f313b;
   font-size: clamp(9px, .7vw, 14px);
   line-height: 1.35;
-  text-align: left;
+  text-align: center;
   text-decoration: none;
   white-space: nowrap;
   padding: 0 clamp(14px, 1.25vw, 24px);
@@ -105,7 +105,15 @@ body {
 }
 
 .scene-download span {
+  grid-column: 2;
   min-width: 0;
+}
+
+.scene-download::after {
+  grid-column: 3;
+  width: 32px;
+  height: 1px;
+  content: "";
 }
 
 .scene-download:hover,
@@ -131,6 +139,7 @@ body {
 }
 
 .platform-mark {
+  grid-column: 1;
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -270,9 +279,10 @@ body {
   .scene-download {
     width: min(320px, calc(100vw - 32px));
     height: 54px;
-    grid-template-columns: 40px 1fr;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: 6px;
     font-size: 10px;
-    padding-inline: 18px;
+    padding-inline: 12px;
   }
 
   .scene-footer {
