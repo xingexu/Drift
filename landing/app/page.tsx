@@ -6,6 +6,7 @@ const SCENE_WIDTH = 3072;
 const SCENE_HEIGHT = 2048;
 const SOURCE_IMAGE = "/art/drift-original-scene-2x.png";
 const SCENE_DROP = 118;
+const RELEASES_URL = "https://github.com/xingexu/Drift/releases";
 
 type PixelContext = CanvasRenderingContext2D;
 
@@ -32,6 +33,45 @@ const ruffles = [
   { x: 2260, y: 1846, delay: 3.6 },
   { x: 2760, y: 1900, delay: 0.9 },
 ];
+
+const pixelMarks = {
+  linkedin: [
+    "000000000000000",
+    "001100000000000",
+    "001100000000000",
+    "000000000000000",
+    "001100011110000",
+    "001100110011000",
+    "001100110011000",
+    "001100110011000",
+    "001100110011000",
+    "001100110011000",
+    "001100110011000",
+    "001100110011000",
+    "000000000000000",
+    "000000000000000",
+    "000000000000000",
+  ],
+  mail: [
+    "000000000000000",
+    "001111111111100",
+    "001000000000100",
+    "001100000001100",
+    "001110000011100",
+    "001011000110100",
+    "001001101100100",
+    "001000111000100",
+    "001000010000100",
+    "001000000000100",
+    "001000000000100",
+    "001111111111100",
+    "000000000000000",
+    "000000000000000",
+    "000000000000000",
+  ],
+} as const;
+
+type PixelMark = keyof typeof pixelMarks;
 
 const pixelStars = Array.from({ length: 170 }, (_, index) => {
   const seed = (index + 3) * 9301 + 49297;
@@ -148,6 +188,11 @@ function patchOriginalTitle(ctx: PixelContext, image: HTMLImageElement) {
   ctx.globalAlpha = 1;
 }
 
+function patchOriginalButtons(ctx: PixelContext, image: HTMLImageElement) {
+  ctx.drawImage(image, 80, 980, 700, 200, 840, 980, 700, 200);
+  ctx.drawImage(image, 2290, 980, 700, 200, 1530, 980, 700, 200);
+}
+
 function patchOriginalMoon(ctx: PixelContext, image: HTMLImageElement) {
   ctx.drawImage(image, 2040, 240, 620, 500, 2520, 170, 620, 500);
   ctx.globalAlpha = 0.34;
@@ -182,24 +227,6 @@ function drawSmallMoon(ctx: PixelContext) {
   for (const [cellX, cellY, cellW, cellH, color] of cells) {
     pixel(ctx, x + Number(cellX) * 12, y + Number(cellY) * 12, Number(cellW) * 12, Number(cellH) * 12, String(color));
   }
-}
-
-function drawTitle(ctx: PixelContext) {
-  ctx.save();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = '166px "Press Start 2P", monospace';
-  ctx.globalAlpha = 0.74;
-  ctx.fillStyle = "#4b2544";
-  ctx.fillText("DRIFT", 1558, 850);
-  ctx.fillStyle = "#8f4d30";
-  ctx.fillText("DRIFT", 1548, 834);
-  ctx.fillStyle = "#b56c35";
-  ctx.fillText("DRIFT", 1540, 818);
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = "#fff0a5";
-  ctx.fillText("DRIFT", 1532, 800);
-  ctx.restore();
 }
 
 function drawCactusSpikes(ctx: PixelContext) {
@@ -268,9 +295,9 @@ function drawImpactPixels(ctx: PixelContext, x: number, y: number, facing: 1 | -
   pixel(ctx, x + direction * (230 + pop), y + 8, 6, 6, "#d9984d");
 }
 
-function drawLizard(ctx: PixelContext, elapsed: number) {
-  const left = 842;
-  const right = 1218;
+function drawLizard(ctx: PixelContext, elapsed: number, narrowScene: boolean) {
+  const left = narrowScene ? 1480 : 842;
+  const right = narrowScene ? 1850 : 1218;
   const walk = 29;
   const bump = 2.8;
   const cycle = walk * 2 + bump * 2;
@@ -317,7 +344,7 @@ function drawLizard(ctx: PixelContext, elapsed: number) {
   ctx.restore();
 }
 
-function drawSceneEffects(ctx: PixelContext, elapsed: number) {
+function drawSceneEffects(ctx: PixelContext, elapsed: number, narrowScene: boolean) {
   drawTinyStars(ctx, elapsed);
 
   for (const burst of starbursts) {
@@ -337,7 +364,35 @@ function drawSceneEffects(ctx: PixelContext, elapsed: number) {
     drawSandRuffle(ctx, ruffle.x, ruffle.y, phase);
   }
 
-  drawLizard(ctx, elapsed);
+  drawLizard(ctx, elapsed, narrowScene);
+}
+
+function PixelLogo({ mark }: { mark: PixelMark }) {
+  return (
+    <span className={`pixel-logo pixel-logo--${mark}`} aria-hidden="true">
+      {pixelMarks[mark].flatMap((row, rowIndex) =>
+        Array.from(row).map((cell, columnIndex) => (
+          <span
+            key={`${rowIndex}-${columnIndex}`}
+            className={cell === "1" ? "pixel-logo__dot is-on" : "pixel-logo__dot"}
+          />
+        )),
+      )}
+    </span>
+  );
+}
+
+function GitHubLogo() {
+  return (
+    <img
+      alt=""
+      aria-hidden="true"
+      className="pixel-github-logo"
+      height="18"
+      src="/icons/github-mark-pixel.png"
+      width="18"
+    />
+  );
 }
 
 export default function Home() {
@@ -360,7 +415,7 @@ export default function Home() {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const setSceneHeight = () => {
-      const height = window.visualViewport?.height ?? window.innerHeight;
+      const height = Math.max(window.innerHeight, window.visualViewport?.height ?? 0);
       document.documentElement.style.setProperty("--scene-height", `${height}px`);
     };
 
@@ -395,8 +450,8 @@ export default function Home() {
       patchOriginalMoon(ctx, image);
       drawSmallMoon(ctx);
       patchOriginalTitle(ctx, image);
-      drawSceneEffects(ctx, reducedMotion ? 0 : time / 1000);
-      drawTitle(ctx);
+      patchOriginalButtons(ctx, image);
+      drawSceneEffects(ctx, reducedMotion ? 0 : time / 1000, rect.width / rect.height < 0.8);
       ctx.restore();
 
       if (!reducedMotion) {
@@ -433,21 +488,49 @@ export default function Home() {
       <main className="scene" aria-labelledby="drift-title">
         <canvas ref={canvasRef} className="scene-canvas" aria-hidden="true" />
 
-        <h1 className="sr-only" id="drift-title">
-          DRIFT
-        </h1>
+        <section className="scene-ui" aria-label="Drift downloads">
+          <h1 className="scene-title" id="drift-title">
+            DRIFT
+          </h1>
 
-        <a
-          aria-label="Download Drift for macOS"
-          className="download-hotspot download-hotspot-mac"
-          href="/downloads/drift-macos.dmg"
-        />
+          <div className="download-actions">
+            <a
+              aria-label="Download Drift for macOS"
+              className="scene-download"
+              href={RELEASES_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                className="platform-mark platform-mark--apple"
+                height="72"
+                src="/icons/apple-mark-pixel.png"
+                width="60"
+              />
+              <span>DOWNLOAD FOR MACOS</span>
+            </a>
 
-        <a
-          aria-label="Download Drift for Windows"
-          className="download-hotspot download-hotspot-windows"
-          href="/downloads/drift-windows.exe"
-        />
+            <a
+              aria-label="Download Drift for Windows"
+              className="scene-download"
+              href={RELEASES_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                className="platform-mark platform-mark--windows"
+                height="68"
+                src="/icons/windows-mark-pixel.png"
+                width="68"
+              />
+              <span>DOWNLOAD FOR WINDOWS</span>
+            </a>
+          </div>
+        </section>
       </main>
 
       <footer className="scene-footer" aria-label="Copyright">
@@ -460,9 +543,7 @@ export default function Home() {
             rel="noreferrer"
             target="_blank"
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.58 2 12.24c0 4.52 2.86 8.35 6.84 9.7.5.1.68-.22.68-.5v-1.75c-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.1-1.5-1.1-1.5-.9-.63.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.9.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05A9.33 9.33 0 0 1 12 6.93c.85 0 1.7.12 2.5.34 1.9-1.33 2.74-1.05 2.74-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.95.68 1.92v2.85c0 .28.18.6.69.5A10.14 10.14 0 0 0 22 12.24C22 6.58 17.52 2 12 2Z" />
-            </svg>
+            <GitHubLogo />
           </a>
           <a
             aria-label="LinkedIn"
@@ -471,18 +552,14 @@ export default function Home() {
             rel="noreferrer"
             target="_blank"
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M4.2 8.8h3.2V20H4.2V8.8Zm1.6-5A1.85 1.85 0 1 1 5.8 7.5a1.85 1.85 0 0 1 0-3.7ZM9.8 8.8H13v1.55h.05c.45-.85 1.55-1.85 3.2-1.85 3.35 0 3.95 2.2 3.95 5.05V20H17v-5.75c0-1.35-.05-3.1-1.9-3.1-1.9 0-2.2 1.45-2.2 3V20H9.8V8.8Z" />
-            </svg>
+            <PixelLogo mark="linkedin" />
           </a>
           <a
             aria-label="Email"
             className="scene-footer__icon scene-footer__icon--mail"
             href="mailto:xingexu1107@gmail.com"
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M3 5h18v14H3V5Zm2.2 2v1.4l6.8 4.45 6.8-4.45V7H5.2Zm13.6 10V10.8L12 15.25 5.2 10.8V17h13.6Z" />
-            </svg>
+            <PixelLogo mark="mail" />
           </a>
         </span>
       </footer>
