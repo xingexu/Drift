@@ -4,7 +4,6 @@ import SwiftUI
 
 struct OnboardingView: View {
     let onComplete: () -> Void
-    let onSignIn: () -> Void
 
     @State private var currentStep = 0
     @State private var appeared = false
@@ -19,7 +18,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color("Background")
+            DriftAmbientBackground(accent: Color.accent, reduceMotion: false)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -59,11 +58,11 @@ struct OnboardingView: View {
                 let isActive = index == currentStep
                 let isPast = index < currentStep
                 ZStack {
-                    Circle()
+                    Rectangle()
                         .fill(isActive ? Color.accent : (isPast ? Color.accent.opacity(0.4) : Color.primary.opacity(0.08)))
                         .frame(width: isActive ? 8 : 6, height: isActive ? 8 : 6)
                     if isActive {
-                        Circle()
+                        Rectangle()
                             .stroke(Color.accent.opacity(0.25), lineWidth: 2)
                             .frame(width: 14, height: 14)
                             .matchedGeometryEffect(id: "activeDotRing", in: progressNamespace)
@@ -81,22 +80,19 @@ struct OnboardingView: View {
     private var progressCapsule: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule()
+                Rectangle()
                     .fill(Color.primary.opacity(0.06))
                     .frame(height: 3)
 
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accent.opacity(0.7), Color.accent],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                Rectangle()
+                    .fill(Color.accent)
                     .frame(
                         width: geo.size.width * CGFloat(currentStep + 1) / CGFloat(steps.count),
                         height: 3
                     )
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(Color.white.opacity(0.28)).frame(height: 1)
+                    }
                     .animation(Anim.page, value: currentStep)
             }
         }
@@ -132,12 +128,10 @@ struct OnboardingView: View {
             )
             case 4: OnboardingReadyStep(
                 onComplete: onComplete,
-                onSignIn: onSignIn,
                 onBack: goBack
             )
             default: OnboardingReadyStep(
                 onComplete: onComplete,
-                onSignIn: onSignIn,
                 onBack: goBack
             )
             }
@@ -203,10 +197,10 @@ private struct StepCard<Content: View>: View {
         VStack(spacing: Space.xxxl) {
             // Icon badge
             ZStack {
-                Circle()
+                Rectangle()
                     .fill(iconColor.opacity(0.10))
                     .frame(width: 80, height: 80)
-                Circle()
+                Rectangle()
                     .stroke(iconColor.opacity(iconPulsing ? 0.0 : 0.18), lineWidth: 1)
                     .frame(width: 80, height: 80)
                     .scaleEffect(iconPulsing ? 1.25 : 1.0)
@@ -216,7 +210,7 @@ private struct StepCard<Content: View>: View {
                     .font(.system(size: 34, weight: .light))
                     .foregroundStyle(iconColor)
             }
-            .shadow(color: iconColor.opacity(0.22), radius: 20, x: 0, y: 6)
+            .shadow(color: iconColor.opacity(0.32), radius: 0, x: 6, y: 6)
             .onAppear { iconPulsing = true }
             .accessibilityHidden(true)
 
@@ -287,17 +281,16 @@ private struct OnboardingWelcomeStep: View {
         VStack(spacing: Space.xxxl) {
             // App icon with glow
             ZStack {
-                Circle()
+                Rectangle()
                     .fill(Color.accent.opacity(0.12))
                     .frame(width: 110, height: 110)
-                    .blur(radius: 18)
                 Image("DriftLogo")
                     .resizable()
-                    .interpolation(.high)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.lg + 6, style: .continuous))
+                    .interpolation(.none)
+                    .clipShape(Rectangle())
                     .frame(width: 88, height: 88)
-                    .shadow(color: Color.accent.opacity(0.25), radius: 20, y: 6)
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                    .overlay(Rectangle().strokeBorder(Color.accent, lineWidth: 2))
+                    .shadow(color: Color.driftShadow, radius: 0, x: 7, y: 7)
             }
             .scaleEffect(appeared ? 1 : 0.85)
             .opacity(appeared ? 1 : 0)
@@ -326,13 +319,13 @@ private struct OnboardingWelcomeStep: View {
                 OnboardingBadge(icon: "eye.tracking.circle", text: "Auto Tracking", color: Color.accent)
                 OnboardingBadge(icon: "timer", text: "Pomodoro", color: Color.productive)
                 OnboardingBadge(icon: "shield.fill", text: "Focus Blocker", color: Color.streak)
-                OnboardingBadge(icon: "chart.bar.fill", text: "Analytics", color: .purple)
+                OnboardingBadge(icon: "link", text: "Web Context", color: .purple)
             }
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 10)
             .animation(Anim.appear.delay(0.25), value: appeared)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Features: Auto Tracking, Pomodoro, Focus Blocker, Analytics")
+            .accessibilityLabel("Features: Auto Tracking, Pomodoro, Focus Blocker, Web Context")
 
             // Navigation
             VStack(spacing: Space.sm) {
@@ -486,13 +479,13 @@ private struct OnboardingPermissionsStep: View {
                 Spacer()
                 // Toggle visualization
                 ZStack {
-                    Capsule()
+                    Rectangle()
                         .fill(permissionGranted ? Color.productive : Color.primary.opacity(0.10))
                         .frame(width: 38, height: 22)
-                    Circle()
+                    Rectangle()
                         .fill(.white)
                         .frame(width: 18, height: 18)
-                        .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
+                        .shadow(color: .black.opacity(0.22), radius: 0, x: 1, y: 1)
                         .offset(x: permissionGranted ? 8 : -8)
                         .animation(Anim.tap, value: permissionGranted)
                 }
@@ -580,9 +573,9 @@ private struct OnboardingTrackingStep: View {
         VStack(spacing: 0) {
             // Mock window chrome
             HStack(spacing: Space.xs) {
-                Circle().fill(Color.red.opacity(0.75)).frame(width: 8, height: 8)
-                Circle().fill(Color.orange.opacity(0.75)).frame(width: 8, height: 8)
-                Circle().fill(Color.green.opacity(0.75)).frame(width: 8, height: 8)
+                Rectangle().fill(Color.red.opacity(0.75)).frame(width: 8, height: 8)
+                Rectangle().fill(Color.orange.opacity(0.75)).frame(width: 8, height: 8)
+                Rectangle().fill(Color.green.opacity(0.75)).frame(width: 8, height: 8)
                 Spacer()
                 HStack(spacing: Space.xxs) {
                     StatusDot(status: trackingDemoPhase > 0 ? .tracking : .idle)
@@ -616,7 +609,7 @@ private struct OnboardingTrackingStep: View {
                 ForEach(0..<min(trackingDemoPhase, demoApps.count), id: \.self) { i in
                     let app = demoApps[i]
                     HStack(spacing: Space.md) {
-                        Circle()
+                        Rectangle()
                             .fill(app.color)
                             .frame(width: 6, height: 6)
 
@@ -710,20 +703,15 @@ private struct OnboardingFocusModeStep: View {
 
     private var focusTimerRing: some View {
         ZStack {
-            Circle()
+            Rectangle()
                 .stroke(Color.sep.opacity(0.25), lineWidth: 6)
                 .frame(width: 130, height: 130)
 
-            Circle()
+            Rectangle()
                 .trim(from: 0, to: focusTimerValue)
                 .stroke(
-                    AngularGradient(
-                        colors: [Color.streak.opacity(0.5), Color.streak],
-                        center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
-                    ),
-                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                    Color.streak,
+                    style: StrokeStyle(lineWidth: 6, lineCap: .butt)
                 )
                 .frame(width: 130, height: 130)
                 .rotationEffect(.degrees(-90))
@@ -783,7 +771,6 @@ private struct OnboardingFocusModeStep: View {
 
 private struct OnboardingReadyStep: View {
     let onComplete: () -> Void
-    let onSignIn: () -> Void
     let onBack: () -> Void
 
     @State private var checkScale: CGFloat = 0
@@ -794,24 +781,24 @@ private struct OnboardingReadyStep: View {
         VStack(spacing: Space.xxxl) {
             // Celebration icon with glow
             ZStack {
-                Circle()
+                Rectangle()
                     .fill(Color.productive.opacity(0.08))
                     .frame(width: 120, height: 120)
                     .scaleEffect(glowPulsing ? 1.12 : 1.0)
                     .opacity(glowPulsing ? 0.6 : 1.0)
                     .animation(Anim.breathe, value: glowPulsing)
 
-                Circle()
+                Rectangle()
                     .fill(Color.productive.opacity(0.12))
                     .frame(width: 90, height: 90)
 
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: "checkmark.square.fill")
                     .font(.system(size: 52, weight: .regular))
                     .foregroundStyle(Color.productive)
                     .scaleEffect(checkScale)
                     .animation(Anim.appear.delay(0.15), value: checkScale)
             }
-            .shadow(color: Color.productive.opacity(0.25), radius: 24, y: 8)
+            .shadow(color: Color.productive.opacity(0.28), radius: 0, x: 6, y: 6)
             .accessibilityHidden(true)
             .onAppear {
                 checkScale = 1
@@ -838,40 +825,19 @@ private struct OnboardingReadyStep: View {
             // Quick preview stats card
             quickPreviewCard
 
-            // CTA buttons
-            VStack(spacing: Space.sm) {
-                // Back
-                HStack(spacing: Space.md) {
-                    SecondaryButton("Back", icon: "chevron.left") {
-                        onBack()
-                    }
-                    .keyboardShortcut(.leftArrow, modifiers: [])
-
-                    PrimaryButton("Start Tracking", icon: "play.fill", color: Color.productive, isFullWidth: true) {
-                        withAnimation(Anim.page) {
-                            onComplete()
-                        }
-                    }
-                    .keyboardShortcut(.return, modifiers: [])
-                    .accessibilityLabel("Start your first focus session")
+            HStack(spacing: Space.md) {
+                SecondaryButton("Back", icon: "chevron.left") {
+                    onBack()
                 }
+                .keyboardShortcut(.leftArrow, modifiers: [])
 
-                Button(action: {
+                PrimaryButton("Start Tracking", icon: "play.fill", color: Color.productive, isFullWidth: true) {
                     withAnimation(Anim.page) {
-                        onSignIn()
+                        onComplete()
                     }
-                }) {
-                    HStack(spacing: Space.xxs) {
-                        Text("Have an account?")
-                            .foregroundStyle(.tertiary)
-                        Text("Sign in to sync")
-                            .foregroundStyle(Color.accent)
-                            .fontWeight(.medium)
-                    }
-                    .font(TypeScale.bodyMd)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Sign in to sync your data across devices")
+                .keyboardShortcut(.return, modifiers: [])
+                .accessibilityLabel("Start your first focus session")
             }
         }
         .padding(.horizontal, Space.xxxl)
@@ -999,9 +965,9 @@ private struct OnboardingBadge: View {
         .padding(.horizontal, Space.md)
         .padding(.vertical, Space.xs + 1)
         .background(
-            Capsule()
+            Rectangle()
                 .fill(color.opacity(0.08))
-                .overlay(Capsule().stroke(color.opacity(0.14), lineWidth: 0.75))
+                .overlay(Rectangle().stroke(color.opacity(0.14), lineWidth: 0.75))
         )
         .accessibilityElement(children: .combine)
     }
@@ -1043,7 +1009,7 @@ private struct CategoryLegend: View {
     var body: some View {
         VStack(spacing: Space.xs) {
             HStack(spacing: Space.xxs + 1) {
-                Circle().fill(color).frame(width: 6, height: 6)
+                Rectangle().fill(color).frame(width: 6, height: 6)
                 Text(label)
                     .font(TypeScale.caption)
                     .fontWeight(.semibold)
@@ -1076,9 +1042,9 @@ private struct FeaturePill: View {
         .padding(.horizontal, Space.md)
         .padding(.vertical, Space.sm)
         .background(
-            Capsule()
+            Rectangle()
                 .fill(Color.accent.opacity(0.06))
-                .overlay(Capsule().stroke(Color.accent.opacity(0.10), lineWidth: 0.75))
+                .overlay(Rectangle().stroke(Color.accent.opacity(0.10), lineWidth: 0.75))
         )
         .accessibilityElement(children: .combine)
     }

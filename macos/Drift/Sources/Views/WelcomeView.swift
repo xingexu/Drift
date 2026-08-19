@@ -2,7 +2,6 @@ import SwiftUI
 
 struct WelcomeView: View {
     let onGetStarted: () -> Void
-    let onSignIn: () -> Void
 
     @State private var appeared = false
     @State private var demoPhase: Int = 0
@@ -20,21 +19,9 @@ struct WelcomeView: View {
                     Color.clear.frame(height: Space.xxxl + Space.xl)
 
                     heroSection
-                        .padding(.bottom, Space.xxxl * 2 + Space.sm)
+                        .padding(.bottom, Space.xxxl + Space.sm)
 
                     liveDemo
-                        .padding(.bottom, Space.xxxl * 2 + Space.sm)
-
-                    featuresSection
-                        .padding(.bottom, Space.xxxl * 2 + Space.sm)
-
-                    stepsSection
-                        .padding(.bottom, Space.xxxl + Space.xl)
-
-                    testimonialsSection
-                        .padding(.bottom, Space.xxxl * 2 + Space.sm)
-
-                    bottomCTA
                         .padding(.bottom, Space.xxxl + Space.lg)
                 }
                 .frame(maxWidth: .infinity)
@@ -60,29 +47,7 @@ struct WelcomeView: View {
 
     @ViewBuilder
     private var ambientBackground: some View {
-        GeometryReader { geo in
-            ZStack {
-                // System background base
-                Color(.windowBackgroundColor)
-                    .ignoresSafeArea()
-
-                // Top-center accent blob
-                Ellipse()
-                    .fill(Color.accent.opacity(0.15))
-                    .frame(width: geo.size.width * 0.75, height: geo.size.height * 0.45)
-                    .blur(radius: 60)
-                    .offset(x: 0, y: -geo.size.height * 0.12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                // Bottom-left productive blob
-                Ellipse()
-                    .fill(Color.productive.opacity(0.08))
-                    .frame(width: geo.size.width * 0.6, height: geo.size.height * 0.4)
-                    .blur(radius: 60)
-                    .offset(x: -geo.size.width * 0.15, y: geo.size.height * 0.15)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            }
-        }
+        DriftAmbientBackground(accent: Color.accent, reduceMotion: false)
         .ignoresSafeArea()
     }
 
@@ -104,20 +69,19 @@ struct WelcomeView: View {
                 // Split headline: "Your focus," + "amplified."
                 VStack(spacing: 0) {
                     Text("Your focus,")
-                        .foregroundStyle(Color(.labelColor))
+                        .foregroundStyle(Color.driftText)
                     Text("amplified.")
                         .foregroundStyle(Color.accent)
                 }
-                .font(.system(size: 48, weight: .bold))
+                .font(TypeScale.display)
                 .multilineTextAlignment(.center)
-                .tracking(-1.0)
                 .accessibilityLabel("Your focus, amplified.")
                 .accessibilityAddTraits(.isHeader)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 10)
                 .animation(Anim.appear.delay(0.10), value: appeared)
 
-                Text("Know exactly where your attention goes.\nBuild momentum with streaks, block distractions, stay in flow.")
+                Text("Track attention, protect focus time, and review the day without extra ceremony.")
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -128,32 +92,16 @@ struct WelcomeView: View {
                     .animation(Anim.appear.delay(0.15), value: appeared)
             }
 
-            // CTAs
-            VStack(spacing: Space.md) {
-                PrimaryButton("Download for Mac", icon: "arrow.down.circle.fill", action: onGetStarted)
-                    .keyboardShortcut(.return, modifiers: [])
-                    .opacity(appeared ? 1 : 0)
-                    .animation(Anim.appear.delay(0.20), value: appeared)
-                    .accessibilityHint("Downloads Drift for macOS")
+            PrimaryButton("Start Setup", icon: "arrow.right", action: onGetStarted)
+                .keyboardShortcut(.return, modifiers: [])
+                .opacity(appeared ? 1 : 0)
+                .animation(Anim.appear.delay(0.20), value: appeared)
+                .accessibilityHint("Open the Drift setup guide")
 
-                GhostButton("See how it works", action: onSignIn)
-                    .opacity(appeared ? 1 : 0)
-                    .animation(Anim.appear.delay(0.25), value: appeared)
-                    .accessibilityLabel("See how Drift works")
-            }
-
-            // Social proof + feature trio
-            VStack(spacing: Space.lg) {
-                socialProofRow
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 6)
-                    .animation(Anim.appear.delay(0.30), value: appeared)
-
-                featureTrio
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 8)
-                    .animation(Anim.appear.delay(0.35), value: appeared)
-            }
+            featureTrio
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 8)
+                .animation(Anim.appear.delay(0.35), value: appeared)
         }
         .padding(.horizontal, Space.xxxl + Space.sm)
     }
@@ -163,67 +111,23 @@ struct WelcomeView: View {
     @ViewBuilder
     private var logoMark: some View {
         ZStack {
-            // Glow halo
-            RoundedRectangle(cornerRadius: Radius.lg + 6, style: .continuous)
+            Rectangle()
                 .fill(Color.accent.opacity(logoPulse ? 0.20 : 0.09))
-                .frame(width: 88, height: 88)
-                .blur(radius: 16)
+                .frame(width: 72, height: 72)
+                .offset(x: logoPulse ? 7 : 4, y: logoPulse ? 7 : 4)
 
             Image("DriftLogo")
                 .resizable()
-                .interpolation(.high)
-                .clipShape(RoundedRectangle(cornerRadius: Radius.lg + 2, style: .continuous))
+                .interpolation(.none)
+                .clipShape(Rectangle())
                 .frame(width: 60, height: 60)
-                .shadow(color: Color.accent.opacity(0.45), radius: 22)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .overlay(Rectangle().strokeBorder(Color.primary.opacity(0.55), lineWidth: 2))
+                .shadow(color: .black.opacity(0.25), radius: 0, x: 6, y: 6)
         }
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 12)
         .animation(Anim.appear, value: appeared)
         .accessibilityLabel("Drift app icon")
-    }
-
-    // MARK: - Social Proof Row
-
-    @ViewBuilder
-    private var socialProofRow: some View {
-        HStack(spacing: Space.md) {
-            // 4 overlapping avatar circles
-            avatarStack
-
-            Text("2,400+ users already focused")
-                .font(TypeScale.bodySm)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private var avatarStack: some View {
-        let avatars: [(initials: String, bg: Color)] = [
-            ("M", Color.accent),
-            ("P", Color.productive),
-            ("L", Color.streak),
-            ("R", Color.distraction)
-        ]
-
-        HStack(spacing: -8) {
-            ForEach(Array(avatars.enumerated()), id: \.offset) { index, avatar in
-                ZStack {
-                    Circle()
-                        .fill(avatar.bg.opacity(0.85))
-                        .frame(width: 28, height: 28)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(Color(.windowBackgroundColor), lineWidth: 2)
-                        )
-                    Text(avatar.initials)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .zIndex(Double(avatars.count - index))
-            }
-        }
-        .accessibilityHidden(true)
     }
 
     // MARK: - Feature Trio
@@ -249,9 +153,9 @@ struct WelcomeView: View {
                 .padding(.horizontal, Space.sm)
                 .padding(.vertical, Space.xxs + 2)
                 .background {
-                    Capsule()
-                        .fill(Color(.controlBackgroundColor))
-                        .overlay(Capsule().strokeBorder(Color.border, lineWidth: 0.5))
+                    Rectangle()
+                        .fill(Color.driftPanel)
+                        .overlay(Rectangle().strokeBorder(Color.border, lineWidth: 1))
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -287,13 +191,13 @@ struct WelcomeView: View {
             // macOS window chrome
             HStack(spacing: Space.xs) {
                 HStack(spacing: Space.xxs + 2) {
-                    Circle()
+                    Rectangle()
                         .fill(Color(red: 1.0, green: 0.373, blue: 0.341))
                         .frame(width: 12, height: 12)
-                    Circle()
+                    Rectangle()
                         .fill(Color(red: 0.996, green: 0.741, blue: 0.180))
                         .frame(width: 12, height: 12)
-                    Circle()
+                    Rectangle()
                         .fill(Color(red: 0.157, green: 0.784, blue: 0.251))
                         .frame(width: 12, height: 12)
                 }
@@ -312,7 +216,7 @@ struct WelcomeView: View {
             }
             .padding(.horizontal, Space.lg)
             .padding(.vertical, Space.sm + 2)
-            .background(.ultraThinMaterial)
+            .background(Color.driftPanel)
 
             Rectangle()
                 .fill(Color.border)
@@ -329,15 +233,15 @@ struct WelcomeView: View {
             }
         }
         .background {
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(.ultraThinMaterial)
+            Rectangle()
+                .fill(Color.driftPanel)
                 .overlay {
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                    Rectangle()
                         .inset(by: 1)
-                        .strokeBorder(Color.border, lineWidth: 2)
+                        .strokeBorder(Color.driftBorder, lineWidth: 2)
                 }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .clipShape(Rectangle())
         .elevate(.md)
     }
 
@@ -357,7 +261,7 @@ struct WelcomeView: View {
             ForEach(["Home", "Session", "Focus", "History"], id: \.self) { label in
                 let isActive = label == "Home"
                 HStack(spacing: Space.xxs + 1) {
-                    Circle()
+                    Rectangle()
                         .fill(isActive ? Color.accent.opacity(0.8) : Color.clear)
                         .frame(width: 4, height: 4)
                     Text(label)
@@ -405,7 +309,7 @@ struct WelcomeView: View {
                     .animation(Anim.count, value: demoPhase)
                 }
                 .frame(height: 5)
-                .clipShape(Capsule())
+                .clipShape(Rectangle())
             }
 
             VStack(spacing: Space.xxs) {
@@ -436,7 +340,7 @@ struct WelcomeView: View {
     @ViewBuilder
     private func demoAppRow(name: String, duration: String, isDistraction: Bool) -> some View {
         HStack(spacing: Space.xs) {
-            Circle()
+            Rectangle()
                 .fill(isDistraction ? Color.distraction : Color.productive)
                 .frame(width: 4, height: 4)
             Text(name)
@@ -573,32 +477,6 @@ struct WelcomeView: View {
         .animation(Anim.appear.delay(0.20), value: appeared)
     }
 
-    // MARK: - Testimonials
-
-    private let testimonials: [WelcomeTestimonialDef] = [
-        WelcomeTestimonialDef(quote: "Finally understand where my day goes. The focus score is addicting.", author: "— Marcus T., iOS Developer"),
-        WelcomeTestimonialDef(quote: "Replaced three apps with just Drift. Native, fast, beautiful.",        author: "— Priya K., Designer"),
-        WelcomeTestimonialDef(quote: "My streak is at 21 days and I actually ship more code now.",           author: "— Lena R., Indie Hacker")
-    ]
-
-    @ViewBuilder
-    private var testimonialsSection: some View {
-        VStack(spacing: Space.xl) {
-            DriftTag(text: "Loved by makers", color: Color.accent)
-
-            HStack(alignment: .top, spacing: Space.lg) {
-                ForEach(Array(testimonials.enumerated()), id: \.offset) { index, testimonial in
-                    WelcomeTestimonialCard(quote: testimonial.quote, author: testimonial.author)
-                        .staggerAppear(index: index, appeared: appeared, yOffset: 8, baseDelay: 0.07)
-                }
-            }
-        }
-        .frame(maxWidth: 640)
-        .padding(.horizontal, Space.xxxl + Space.sm)
-        .opacity(appeared ? 1 : 0)
-        .animation(Anim.appear.delay(0.20), value: appeared)
-    }
-
     // MARK: - Bottom CTA
 
     @ViewBuilder
@@ -609,12 +487,12 @@ struct WelcomeView: View {
                 .tracking(-0.4)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("Join thousands of makers who reclaimed their attention.")
+            Text("Build a personal focus baseline from real activity on this Mac.")
                 .font(TypeScale.bodyMd)
                 .foregroundStyle(.secondary)
 
-            PrimaryButton("Get Started — It's Free", icon: "bolt.fill", isFullWidth: true, action: onGetStarted)
-                .accessibilityLabel("Get started for free")
+            PrimaryButton("Start Locally", icon: "bolt.fill", isFullWidth: true, action: onGetStarted)
+                .accessibilityLabel("Start Drift locally")
 
             Text("No account required  \u{2022}  Works offline  \u{2022}  Native macOS")
                 .font(TypeScale.caption)
@@ -660,11 +538,6 @@ private struct WelcomeStepDef {
     let icon: String
 }
 
-private struct WelcomeTestimonialDef {
-    let quote: String
-    let author: String
-}
-
 // MARK: - Feature Card
 
 private struct WelcomeFeatureCard: View {
@@ -708,7 +581,7 @@ private struct WelcomeStepCard: View {
     var body: some View {
         VStack(spacing: Space.md) {
             ZStack {
-                Circle()
+                Rectangle()
                     .fill(Color.accent)
                     .frame(width: 36, height: 36)
                 Text(number)
@@ -736,36 +609,6 @@ private struct WelcomeStepCard: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .driftCard()
-        .hoverLift()
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Testimonial Card
-
-private struct WelcomeTestimonialCard: View {
-    let quote: String
-    let author: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.md) {
-            Image(systemName: "quote.opening")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.accent.opacity(0.5))
-                .accessibilityHidden(true)
-
-            Text(quote)
-                .font(TypeScale.bodyMd)
-                .foregroundStyle(.primary)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(author)
-                .font(TypeScale.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .driftCard()
         .hoverLift()
         .accessibilityElement(children: .combine)

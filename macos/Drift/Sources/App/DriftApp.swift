@@ -10,6 +10,10 @@ struct DriftApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        PixelFont.register()
+    }
+
     var body: some Scene {
         WindowGroup("Drift") {
             ContentView()
@@ -18,7 +22,9 @@ struct DriftApp: App {
                 .environmentObject(focusBlocker)
                 .environmentObject(networkMonitor)
                 .frame(minWidth: 860, minHeight: 560)
-                .background(Color("Background"))
+                .background(Color.driftBackground)
+                .font(TypeScale.bodyMd)
+                .foregroundStyle(Color.driftText)
                 .tint(appState.accentColor)
                 .onAppear {
                     configureMainWindow()
@@ -34,16 +40,12 @@ struct DriftApp: App {
             CommandGroup(replacing: .newItem) {}
 
             CommandMenu("Go") {
-                Button("Home")     { AppState.shared.currentTab = .home }
+                Button("Tracking") { AppState.shared.currentTab = .tracking }
                     .keyboardShortcut("1", modifiers: .command)
-                Button("Session")  { AppState.shared.currentTab = .session }
+                Button("Focus + Blocking") { AppState.shared.currentTab = .focus }
                     .keyboardShortcut("2", modifiers: .command)
-                Button("Focus")    { AppState.shared.currentTab = .focus }
-                    .keyboardShortcut("3", modifiers: .command)
-                Button("History")  { AppState.shared.currentTab = .history }
-                    .keyboardShortcut("4", modifiers: .command)
                 Button("Settings") { AppState.shared.currentTab = .settings }
-                    .keyboardShortcut("5", modifiers: .command)
+                    .keyboardShortcut("3", modifiers: .command)
             }
 
             CommandMenu("Tracking") {
@@ -68,6 +70,8 @@ struct DriftApp: App {
             MenuBarView()
                 .environmentObject(appState)
                 .environmentObject(tracker)
+                .font(TypeScale.bodyMd)
+                .foregroundStyle(Color.driftText)
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -78,6 +82,9 @@ struct DriftApp: App {
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(tracker)
+                .font(TypeScale.bodyMd)
+                .foregroundStyle(Color.driftText)
+                .background(Color.driftBackground)
         }
     }
 
@@ -123,8 +130,8 @@ struct DriftApp: App {
         guard url.scheme == "drift" else { return }
 
         switch url.host {
-        case "session":
-            appState.currentTab = .session
+        case "tracking", "session":
+            appState.currentTab = .tracking
         case "settings":
             appState.currentTab = .settings
         case "focus":

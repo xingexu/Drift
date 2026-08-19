@@ -6,8 +6,14 @@ cd "$SCRIPT_DIR"
 
 APP_NAME="Drift"
 BUILD_DIR=".build/release"
-APP_BUNDLE="$SCRIPT_DIR/$APP_NAME.app"
+APP_BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/drift-app.XXXXXX")"
+APP_BUNDLE="$APP_BUILD_DIR/$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
+
+cleanup() {
+    rm -rf "$APP_BUILD_DIR"
+}
+trap cleanup EXIT
 
 echo "Building $APP_NAME..."
 swift build -c release 2>&1
@@ -22,7 +28,7 @@ cp "$BUILD_DIR/$APP_NAME" "$CONTENTS/MacOS/$APP_NAME"
 
 # Copy resources (compiled asset catalog etc.)
 if [ -d "$BUILD_DIR/Drift_Drift.bundle" ]; then
-    cp -R "$BUILD_DIR/Drift_Drift.bundle/" "$CONTENTS/Resources/"
+    cp -R "$BUILD_DIR/Drift_Drift.bundle" "$CONTENTS/Resources/"
 fi
 
 # Compile asset catalog

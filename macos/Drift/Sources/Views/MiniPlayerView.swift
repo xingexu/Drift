@@ -13,11 +13,10 @@ struct MiniPlayerView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             // --- Card background ---
-            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                .fill(.ultraThinMaterial)
+            Rectangle()
+                .fill(Color.driftPanel)
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                        .strokeBorder(Color.accent.opacity(0.2), lineWidth: 1)
+                    Rectangle().strokeBorder(Color.accent.opacity(0.72), lineWidth: 2)
                 )
 
             // --- Content row ---
@@ -25,12 +24,12 @@ struct MiniPlayerView: View {
                 // Progress ring with timer centred
                 ZStack {
                     // Track
-                    Circle()
+                    Rectangle()
                         .stroke(Color.accent.opacity(0.15), lineWidth: ringStroke)
                         .frame(width: ringSize, height: ringSize)
 
                     // Progress arc
-                    Circle()
+                    Rectangle()
                         .trim(from: 0, to: viewModel.progress)
                         .stroke(
                             viewModel.ringColor,
@@ -76,7 +75,7 @@ struct MiniPlayerView: View {
                         .foregroundStyle(Color.secondary)
                         .frame(width: 18, height: 18)
                         .background(
-                            Circle()
+                            Rectangle()
                                 .fill(Color.primary.opacity(0.07))
                         )
                 }
@@ -88,7 +87,7 @@ struct MiniPlayerView: View {
 
             // --- Bottom progress bar (thin accent capsule) ---
             GeometryReader { geo in
-                Capsule()
+                Rectangle()
                     .fill(viewModel.ringColor)
                     .frame(
                         width: geo.size.width * viewModel.progress,
