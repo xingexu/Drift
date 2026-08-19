@@ -1,5 +1,5 @@
 import SwiftUI
-import UserNotifications
+@preconcurrency import UserNotifications
 import ApplicationServices
 import Combine
 
@@ -11,24 +11,6 @@ struct StudyView: View {
 
     @State private var showMiniPlayer = false
     private let miniPlayerPanel = MiniPlayerPanel()
-
-    // MARK: - Week focus time computed from past sessions
-
-    private var weekFocusTime: String {
-        let calendar = Calendar.current
-        let now = Date()
-        guard let weekStart = calendar.date(byAdding: .day, value: -7, to: now) else {
-            return "0m"
-        }
-        let totalMs = AppState.shared.pastSessions
-            .filter { $0.date >= weekStart }
-            .reduce(0.0) { $0 + $1.totalMs }
-        let totalSec = Int(totalMs / 1000)
-        let hours = totalSec / 3600
-        let minutes = (totalSec % 3600) / 60
-        if hours > 0 { return "\(hours)h \(minutes)m" }
-        return "\(minutes)m"
-    }
 
     // MARK: - Body
 
@@ -53,42 +35,23 @@ struct StudyView: View {
                     }
 
                     // Page header
-                    HStack {
+                    HStack(alignment: .top, spacing: Space.md) {
+                        Image(systemName: "scope")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Color.accent)
+                            .padding(.top, 2)
                         VStack(alignment: .leading, spacing: Space.xs) {
-                            Text("Focus")
-                                .font(.system(size: 32, weight: .bold))
-                                .tracking(-0.5)
-                            Text("Deep work, distraction-free. Pick a duration, name your task, and start a pomodoro.")
-                                .font(TypeScale.body)
-                                .foregroundStyle(.secondary)
+                            Text("FOCUS + BLOCKING")
+                                .font(TypeScale.h1)
+                            Text("Set one task, start the timer, block distractions.")
+                                .font(TypeScale.bodyMd)
+                                .foregroundStyle(Color.driftMuted)
                         }
                         Spacer()
                     }
 
                     // Main card — two column
                     mainCard
-
-                    // Stats row — 3 tiles
-                    HStack(spacing: Space.sm) {
-                        FocusStatTile(
-                            icon: "bolt.fill",
-                            color: Color.productive,
-                            value: weekFocusTime,
-                            label: "FOCUS TIME THIS WEEK"
-                        )
-                        FocusStatTile(
-                            icon: "flame.fill",
-                            color: Color.streak,
-                            value: "\(AppState.shared.currentStreak)",
-                            label: "DAY STREAK"
-                        )
-                        FocusStatTile(
-                            icon: "checkmark.circle.fill",
-                            color: Color.accent,
-                            value: "\(AppState.shared.pastSessions.count)",
-                            label: "SESSIONS COMPLETED"
-                        )
-                    }
 
                     // Site blocker (idle) or active blocker badge (focus)
                     if viewModel.mode == .idle {
@@ -138,26 +101,15 @@ struct StudyView: View {
 
     @ViewBuilder
     private var mainCard: some View {
-        HStack(alignment: .center, spacing: 0) {
-
-            // LEFT: Ring timer
+        HStack(alignment: .top, spacing: 12) {
             ringTimerPanel
+                .frame(minWidth: 300, maxWidth: 360, minHeight: 353)
+                .pixelPanel()
 
-            Divider()
-                .frame(maxHeight: 280)
-
-            // RIGHT: Controls
             controlsPanel
+                .frame(maxWidth: .infinity, minHeight: 353, alignment: .leading)
+                .pixelPanel()
         }
-        .background(
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(Color(.controlBackgroundColor))
-                .shadow(color: .black.opacity(0.06), radius: 20, y: 6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
-                )
-        )
         .alert("End Focus Session?", isPresented: $viewModel.showStopConfirmation) {
             Button("Keep Going", role: .cancel) {}
             Button("End Session", role: .destructive) { viewModel.stopStudy() }
@@ -170,74 +122,50 @@ struct StudyView: View {
 
     @ViewBuilder
     private var ringTimerPanel: some View {
-        let ringSize: CGFloat = 220
-        let trackWidth: CGFloat = 10
-
-        // fraction: 0 when idle, progress when running
-        let fraction: CGFloat = {
-            switch viewModel.mode {
-            case .idle:  return 0
-            case .focus: return CGFloat(viewModel.timeRemaining) / CGFloat(viewModel.focusDuration * 60)
-            case .rest:  return CGFloat(viewModel.timeRemaining) / CGFloat(viewModel.breakDuration * 60)
-            }
-        }()
-
-        let strokeColor: Color = viewModel.completionRingFlash ? Color.productive : viewModel.ringColor
-
         ZStack {
-            // Track
-            Circle()
-                .stroke(Color.primary.opacity(0.08), lineWidth: trackWidth)
-                .frame(width: ringSize, height: ringSize)
+            Rectangle()
+                .stroke(Color.accentDeep, lineWidth: 4)
+                .overlay {
+                    Rectangle()
+                        .stroke(Color.streak, lineWidth: 2)
+                        .padding(7)
+                }
+                .shadow(color: Color.accentDeep.opacity(0.25), radius: 0, x: 5, y: 5)
 
-            // Progress arc (trim from top, clockwise)
-            if viewModel.mode != .idle || viewModel.completionRingFlash {
-                let trimTo: CGFloat = viewModel.completionRingFlash ? 1.0 : min(fraction, 1.0)
-                Circle()
-                    .trim(from: 0, to: trimTo)
-                    .stroke(
-                        AngularGradient(
-                            colors: [strokeColor.opacity(0.6), strokeColor],
-                            center: .center,
-                            startAngle: .degrees(-90),
-                            endAngle: .degrees(270)
-                        ),
-                        style: StrokeStyle(lineWidth: trackWidth, lineCap: .round)
-                    )
-                    .frame(width: ringSize, height: ringSize)
-                    .rotationEffect(.degrees(-90))
-                    .shadow(color: strokeColor.opacity(0.40), radius: 14)
-                    .animation(
-                        viewModel.completionRingFlash
-                            ? .spring(response: 0.55, dampingFraction: 0.72)
-                            : .linear(duration: 0.8),
-                        value: trimTo
-                    )
-                    .animation(Anim.appear, value: viewModel.completionRingFlash)
-            }
-
-            // Center text
-            VStack(spacing: Space.xs) {
+            VStack(spacing: 12) {
+                Image(systemName: "hourglass")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(Color.streak)
+                    .padding(.bottom, 18)
                 Text(formatCountdown(viewModel.timeRemaining))
-                    .font(.system(size: 72, weight: .bold, design: .monospaced))
-                    .tracking(-2)
+                    .font(.system(size: 68, weight: .semibold, design: .rounded))
                     .contentTransition(.numericText())
                     .animation(Anim.count, value: viewModel.timeRemaining)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
 
                 Text(viewModel.modeLabelDisplay)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium, design: .default))
                     .foregroundStyle(viewModel.mode == .idle
                         ? Color.secondary.opacity(0.5)
                         : viewModel.ringColor.opacity(0.85))
                     .tracking(2.5)
                     .textCase(.uppercase)
                     .animation(Anim.quick, value: viewModel.mode)
+
+                HStack(spacing: 5) {
+                    ForEach(0..<10, id: \.self) { index in
+                        Rectangle()
+                            .fill(index < 8 ? Color.productive : Color.clear)
+                            .overlay(Rectangle().strokeBorder(Color.border.opacity(0.6), lineWidth: 1))
+                            .frame(width: 13, height: 9)
+                    }
+                }
+                .padding(.top, 28)
             }
         }
-        .frame(minWidth: 300)
-        .padding(Space.xxl)
+        .frame(maxWidth: .infinity, minHeight: 280)
+        .padding(35)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(viewModel.modeLabel) timer. \(viewModel.timeRemaining / 60) minutes and \(viewModel.timeRemaining % 60) seconds remaining")
     }
@@ -262,7 +190,7 @@ struct StudyView: View {
                         .font(TypeScale.tiny)
                         .foregroundStyle(.tertiary)
                         .tracking(1.0)
-                    ForEach([15, 25, 30, 45, 60], id: \.self) { mins in
+                    ForEach([25, 45, 60], id: \.self) { mins in
                         DurationChip(
                             label: "\(mins)m",
                             isSelected: viewModel.focusDuration == mins,
@@ -281,7 +209,7 @@ struct StudyView: View {
                         .font(TypeScale.tiny)
                         .foregroundStyle(.tertiary)
                         .tracking(1.0)
-                    ForEach([3, 5, 10, 15], id: \.self) { mins in
+                    ForEach([5, 10, 15], id: \.self) { mins in
                         DurationChip(
                             label: "\(mins)m",
                             isSelected: viewModel.breakDuration == mins,
@@ -311,10 +239,11 @@ struct StudyView: View {
                     Button {
                         viewModel.togglePlayPause()
                     } label: {
-                        Circle()
+                        Rectangle()
                             .fill(Color.accent)
-                            .frame(width: 52, height: 52)
-                            .shadow(color: Color.accent.opacity(0.40), radius: 12, y: 3)
+                            .frame(width: 76, height: 76)
+                            .overlay(Rectangle().strokeBorder(Color.driftText.opacity(0.45), lineWidth: 2))
+                            .shadow(color: Color.driftShadow, radius: 0, x: 6, y: 6)
                             .overlay(
                                 Image(systemName: "play.fill")
                                     .font(.system(size: 20, weight: .semibold))
@@ -326,14 +255,9 @@ struct StudyView: View {
                     .keyboardShortcut(.defaultAction)
                     .accessibilityLabel("Start focus session")
 
-                    HStack(spacing: 4) {
-                        Text("Press")
-                            .foregroundStyle(.secondary)
-                        KeyBadge(key: "Space")
-                        Text("or click to start")
-                            .foregroundStyle(.secondary)
-                    }
-                    .font(.system(size: 12))
+                    Text("Space starts the session")
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Color.driftMuted)
                 }
             } else {
                 // Active: stop + skip
@@ -342,9 +266,9 @@ struct StudyView: View {
                     Button {
                         viewModel.showStopConfirmation = true
                     } label: {
-                        Circle()
+                        Rectangle()
                             .fill(Color.primary.opacity(0.06))
-                            .overlay(Circle().strokeBorder(Color.sep.opacity(0.15), lineWidth: 0.5))
+                            .overlay(Rectangle().strokeBorder(Color.sep.opacity(0.28), lineWidth: 1))
                             .frame(width: 48, height: 48)
                             .overlay(
                                 Image(systemName: "stop.fill")
@@ -359,12 +283,12 @@ struct StudyView: View {
                     Button {
                         viewModel.skipPhase()
                     } label: {
-                        Circle()
+                        Rectangle()
                             .fill(viewModel.mode == .focus ? Color.productive : Color.accent)
                             .frame(width: 64, height: 64)
                             .shadow(
                                 color: (viewModel.mode == .focus ? Color.productive : Color.accent).opacity(0.38),
-                                radius: 14, y: 4
+                                radius: 0, x: 6, y: 6
                             )
                             .overlay(
                                 Image(systemName: "forward.fill")
@@ -390,7 +314,7 @@ struct StudyView: View {
                 DriftTag(text: "\(blocker.blockedSites.count) sites blocked", color: Color.distraction)
                 Spacer()
                 HStack(spacing: Space.xxs) {
-                    Circle()
+                    Rectangle()
                         .fill(Color.distraction)
                         .frame(width: Space.xs, height: Space.xs)
                     Text("Blocking Active")
@@ -410,8 +334,8 @@ struct StudyView: View {
                             .padding(.horizontal, Space.xs)
                             .padding(.vertical, Space.xxxs)
                             .background(
-                                Capsule().fill(Color.primary.opacity(0.06))
-                                    .overlay(Capsule().strokeBorder(Color.sep.opacity(0.12), lineWidth: 0.5))
+                                Rectangle().fill(Color.primary.opacity(0.06))
+                                    .overlay(Rectangle().strokeBorder(Color.sep.opacity(0.12), lineWidth: 0.5))
                             )
                             .lineLimit(1)
                     }
@@ -447,21 +371,18 @@ private struct DurationChip: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .font(TypeScale.bodySm)
                 .foregroundStyle(isSelected ? Color.accent : Color.secondary)
-                .padding(.horizontal, Space.sm)
-                .padding(.vertical, Space.xxs)
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.sm)
                 .background(
-                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                    Rectangle()
                         .fill(isSelected
                               ? Color.accent.opacity(0.14)
                               : Color.primary.opacity(0.05))
                         .overlay(
-                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                .strokeBorder(
-                                    isSelected ? Color.accent.opacity(0.30) : Color.sep.opacity(0.10),
-                                    lineWidth: 0.5
-                                )
+                            Rectangle()
+                                .strokeBorder(isSelected ? Color.accent : Color.driftBorder.opacity(0.36), lineWidth: 2)
                         )
                 )
         }
@@ -492,59 +413,17 @@ private struct TaskInputField: View {
         }
         .padding(Space.md)
         .background(
-            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            Rectangle()
                 .fill(Color(.quaternaryLabelColor).opacity(0.10))
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    Rectangle()
                         .strokeBorder(
-                            isFocused ? Color.accent.opacity(0.25) : Color.sep.opacity(0.12),
-                            lineWidth: isFocused ? 1 : 0.5
+                            isFocused ? Color.accent.opacity(0.65) : Color.driftBorder.opacity(0.42),
+                            lineWidth: isFocused ? 2 : 1
                         )
                 )
         )
         .animation(Anim.quick, value: isFocused)
-    }
-}
-
-// MARK: - Focus Stat Tile
-
-private struct FocusStatTile: View {
-    let icon: String
-    let color: Color
-    let value: String
-    let label: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            HStack(spacing: Space.xs) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(color)
-                Spacer()
-            }
-            Text(value)
-                .font(TypeScale.monoMd)
-                .foregroundStyle(Color.primary)
-                .contentTransition(.numericText())
-                .animation(Anim.count, value: value)
-            Text(label)
-                .font(TypeScale.tiny)
-                .foregroundStyle(.tertiary)
-                .tracking(0.5)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Space.md)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(Color(.controlBackgroundColor))
-                .shadow(color: .black.opacity(0.05), radius: 10, y: 3)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(Color.sep.opacity(0.10), lineWidth: 0.5)
-                )
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(value)")
     }
 }
 
@@ -774,29 +653,14 @@ private struct AmbientBackground: View {
 
     var body: some View {
         ZStack {
-            Color("Background")
-
-            // Primary radial — always present, strongest during focus
-            RadialGradient(
-                colors: [
-                    primaryColor.opacity(primaryOpacity),
-                    .clear
-                ],
-                center: .top,
-                startRadius: 0,
-                endRadius: 380
-            )
-            .ignoresSafeArea()
-            .animation(Anim.appear, value: mode)
+            DriftAmbientBackground(accent: primaryColor, reduceMotion: false)
+                .ignoresSafeArea()
+                .animation(Anim.appear, value: mode)
 
             // Secondary ambient — bottom-right drift tint when distraction is high
             if driftFraction > 0.25 {
-                RadialGradient(
-                    colors: [Color.distraction.opacity(0.03 * min(driftFraction * 4, 1)), .clear],
-                    center: .bottomTrailing,
-                    startRadius: 0,
-                    endRadius: 300
-                )
+                Rectangle()
+                    .fill(Color.distraction.opacity(0.025 * min(driftFraction * 4, 1)))
                 .ignoresSafeArea()
                 .animation(Anim.appear, value: driftFraction > 0.25)
             }
@@ -832,8 +696,8 @@ private struct CompletionOverlay: View {
         .padding(Space.xxxl)
         .background(
             RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                .fill(Color(.controlBackgroundColor).opacity(0.95))
-                .shadow(color: Color.productive.opacity(0.18), radius: 28, y: 8)
+                .fill(Color.driftPanel.opacity(0.95))
+                .shadow(color: Color.productive.opacity(0.28), radius: 0, x: 6, y: 6)
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                         .strokeBorder(Color.productive.opacity(0.20), lineWidth: 0.5)
@@ -853,7 +717,7 @@ private struct BlockedBanner: View {
         if isVisible, let site {
             HStack(spacing: Space.md) {
                 ZStack {
-                    Circle()
+                    Rectangle()
                         .fill(Color.distraction.opacity(0.2))
                         .frame(width: 28, height: 28)
                     Image(systemName: "shield.fill")
@@ -880,7 +744,7 @@ private struct BlockedBanner: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.tertiary)
                         .padding(Space.xs)
-                        .background(Circle().fill(Color.primary.opacity(0.07)))
+                        .background(Rectangle().fill(Color.primary.opacity(0.07)))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss")
@@ -888,13 +752,12 @@ private struct BlockedBanner: View {
             .padding(.horizontal, Space.md)
             .padding(.vertical, Space.sm)
             .background(
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                Rectangle()
+                    .fill(Color.driftPanel)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(Color.distraction.opacity(0.22), lineWidth: 0.5)
+                        Rectangle().strokeBorder(Color.distraction.opacity(0.42), lineWidth: 1)
                     )
-                    .shadow(color: Color.distraction.opacity(0.10), radius: 10, y: 3)
+                    .shadow(color: Color.driftShadow, radius: 0, x: 4, y: 4)
             )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(site) was blocked")
@@ -928,20 +791,20 @@ private struct FocusBlockerSection: View {
         }
         .padding(Space.xl)
         .background {
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(.ultraThinMaterial)
+            Rectangle()
+                .fill(Color.driftPanel)
                 .overlay {
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                    Rectangle()
                         .strokeBorder(
                             blocker.isBlocking
-                                ? Color.distraction.opacity(0.18)
-                                : Color.primary.opacity(0.07),
-                            lineWidth: 0.5
+                                ? Color.distraction.opacity(0.42)
+                                : Color.driftBorder,
+                            lineWidth: 2
                         )
                 }
                 .shadow(
-                    color: blocker.isBlocking ? Color.distraction.opacity(0.08) : .black.opacity(0.06),
-                    radius: 16, y: 4
+                    color: blocker.isBlocking ? Color.distraction.opacity(0.22) : Color.driftShadow,
+                    radius: 0, x: 7, y: 7
                 )
         }
         .onAppear { startTick() }
@@ -956,7 +819,7 @@ private struct FocusBlockerSection: View {
     private var blockerHeader: some View {
         HStack(alignment: .center, spacing: Space.md) {
             ZStack {
-                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                Rectangle()
                     .fill(
                         blocker.isBlocking
                             ? Color.distraction.opacity(0.14)
@@ -970,8 +833,8 @@ private struct FocusBlockerSection: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Site Blocker")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color(.labelColor))
+                    .font(TypeScale.h2)
+                    .foregroundStyle(Color.driftText)
                 Text(blocker.isBlocking
                      ? "Protecting \(blocker.blockedSites.count) domains"
                      : "Block distracting sites")
@@ -992,8 +855,8 @@ private struct FocusBlockerSection: View {
                 .padding(.horizontal, Space.sm)
                 .padding(.vertical, Space.xxs + 1)
                 .background(
-                    Capsule().fill(Color.distraction.opacity(0.10))
-                        .overlay(Capsule().strokeBorder(Color.distraction.opacity(0.18), lineWidth: 0.5))
+                    Rectangle().fill(Color.distraction.opacity(0.10))
+                        .overlay(Rectangle().strokeBorder(Color.distraction.opacity(0.18), lineWidth: 0.5))
                 )
                 .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
@@ -1026,7 +889,7 @@ private struct FocusBlockerSection: View {
                             .lineLimit(1)
                             .padding(.horizontal, Space.xs)
                             .padding(.vertical, Space.xxxs)
-                            .background(Capsule().fill(Color.primary.opacity(0.06)))
+                            .background(Rectangle().fill(Color.primary.opacity(0.06)))
                     }
                 }
                 .padding(.horizontal, Space.md)
@@ -1108,11 +971,11 @@ private struct FocusBlockerSection: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.md)
                     .background(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        Rectangle()
                             .fill(Color.accent.opacity(0.10))
                             .overlay(
-                                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                    .strokeBorder(Color.accent.opacity(0.20), lineWidth: 0.5)
+                                Rectangle()
+                                    .strokeBorder(Color.accent.opacity(0.55), lineWidth: 2)
                             )
                     )
                     .foregroundStyle(Color.accent)
@@ -1308,30 +1171,19 @@ private struct BlockerCountdown: View {
     var body: some View {
         HStack(spacing: Space.xl) {
             ZStack {
-                Circle()
+                Rectangle()
                     .stroke(Color.distraction.opacity(0.15), lineWidth: 10)
                     .frame(width: 96, height: 96)
-                    .blur(radius: 4)
 
-                Circle()
-                    .stroke(
-                        AngularGradient(
-                            colors: [Color.distraction.opacity(0.08), Color.distraction.opacity(0.14), Color.distraction.opacity(0.08)],
-                            center: .center
-                        ),
-                        lineWidth: 6
-                    )
+                Rectangle()
+                    .stroke(Color.distraction.opacity(0.18), lineWidth: 6)
                     .frame(width: 96, height: 96)
 
-                Circle()
+                Rectangle()
                     .trim(from: 0, to: min(blocker.progress, 1.0))
                     .stroke(
-                        LinearGradient(
-                            colors: [Color.distraction.opacity(0.7), Color.distraction],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        Color.distraction,
+                        style: StrokeStyle(lineWidth: 6, lineCap: .butt)
                     )
                     .frame(width: 96, height: 96)
                     .rotationEffect(.degrees(-90))
@@ -1533,7 +1385,7 @@ private struct BlockedSitesList: View {
                                 .fontWeight(.semibold)
                                 .padding(.horizontal, Space.md)
                                 .padding(.vertical, Space.xxs)
-                                .background(Capsule().fill(Color.accent))
+                                .background(Rectangle().fill(Color.accent))
                                 .foregroundStyle(.white)
                         }
                         .driftButton()
@@ -1623,7 +1475,7 @@ struct BlockedSiteChip: View {
                     .foregroundStyle(removeHovered ? Color.distraction : Color.secondary.opacity(0.5))
                     .frame(width: 16, height: 16)
                     .background(
-                        Circle().fill(
+                        Rectangle().fill(
                             removeHovered
                                 ? Color.distraction.opacity(0.10)
                                 : Color.primary.opacity(0.04)

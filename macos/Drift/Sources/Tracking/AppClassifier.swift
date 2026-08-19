@@ -255,11 +255,9 @@ struct AppClassifier {
     /// Known distraction web domains.
     private static let distractionDomains: Set<String> = [
         // Video
-        "youtube.com", "netflix.com", "twitch.tv", "hulu.com",
+        "netflix.com", "twitch.tv", "hulu.com",
         "disneyplus.com", "primevideo.com", "crunchyroll.com",
         // Social
-        "reddit.com", "twitter.com", "x.com",
-        "instagram.com", "facebook.com", "tiktok.com",
         "threads.net", "bsky.app", "mastodon.social",
         // Entertainment
         "9gag.com", "buzzfeed.com", "imgur.com", "giphy.com",
@@ -269,6 +267,32 @@ struct AppClassifier {
         "amazon.com", "ebay.com", "aliexpress.com", "etsy.com",
         // Gaming
         "store.steampowered.com", "twitch.tv",
+    ]
+
+    /// Domains where the page title/query matters more than the domain.
+    private static let contextDependentDomains: Set<String> = [
+        "youtube.com", "youtu.be",
+        "reddit.com",
+        "twitter.com", "x.com",
+        "instagram.com", "facebook.com", "tiktok.com",
+    ]
+
+    private static let educationalSignals: [String] = [
+        "tutorial", "lecture", "lesson", "course", "study", "learn",
+        "explained", "walkthrough", "documentary", "research", "paper",
+        "university", "mit ", "stanford", "harvard", "khan academy",
+        "crash course", "programming", "coding", "swift", "python",
+        "javascript", "typescript", "math", "calculus", "physics",
+        "chemistry", "biology", "history", "economics", "design",
+        "engineering", "conference", "keynote", "interview",
+    ]
+
+    private static let distractionSignals: [String] = [
+        "shorts", "meme", "memes", "prank", "reaction", "drama", "gossip",
+        "celebrity", "vlog", "haul", "challenge", "compilation", "fails",
+        "music video", "official video", "trailer", "highlights", "gameplay",
+        "stream", "fortnite", "minecraft", "valorant", "league of legends",
+        "tiktok", "funny", "comedy", "shopping",
     ]
 
     /// Classifies a URL or bare domain into a productivity category.
@@ -301,6 +325,43 @@ struct AppClassifier {
         return .neutral
     }
 
+    /// Classifies web activity using both the domain and page context.
+    ///
+    /// Context-dependent sites such as YouTube are not blanket-labelled as
+    /// distractions. Their page title, URL path, and query decide whether the
+    /// activity looks educational/productive, distracting, or neutral.
+    static func classifyWebContext(urlString: String?, title: String, fallback: AppCategory = .neutral) -> AppCategory {
+        let context = [
+            title,
+            urlString ?? ""
+        ]
+        .joined(separator: " ")
+        .lowercased()
+        .replacingOccurrences(of: "%20", with: " ")
+        .replacingOccurrences(of: "+", with: " ")
+
+        let hasEducationalSignal = educationalSignals.contains { context.contains($0) }
+        let hasDistractionSignal = distractionSignals.contains { context.contains($0) }
+
+        if let urlString,
+           let host = extractHost(from: urlString)?.lowercased().replacingOccurrences(of: "www.", with: ""),
+           isContextDependentDomain(host) {
+            if hasEducationalSignal && !hasDistractionSignal { return .productive }
+            if hasDistractionSignal && !hasEducationalSignal { return .distraction }
+            return .neutral
+        }
+
+        if hasEducationalSignal && !hasDistractionSignal { return .productive }
+        if hasDistractionSignal && !hasEducationalSignal { return .distraction }
+
+        if let urlString {
+            let domainCategory = classifyDomain(urlString)
+            if domainCategory != .neutral { return domainCategory }
+        }
+
+        return fallback
+    }
+
     // MARK: - Helpers
 
     /// Extracts the host component from a URL string or bare domain.
@@ -315,5 +376,10 @@ struct AppClassifier {
             return trimmed
         }
         return nil
+    }
+
+    private static func isContextDependentDomain(_ domain: String) -> Bool {
+        if contextDependentDomains.contains(domain) { return true }
+        return contextDependentDomains.contains { domain.hasSuffix("." + $0) }
     }
 }

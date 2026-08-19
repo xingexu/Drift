@@ -1,10 +1,35 @@
 import SwiftUI
+import AppKit
+import CoreText
+
+private func driftAdaptiveColor(light: NSColor, dark: NSColor) -> Color {
+    Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+    })
+}
+
+enum PixelFont {
+    static let postScriptName = "PressStart2P-Regular"
+
+    static func register() {
+        let url = Bundle.module.url(
+            forResource: "PressStart2P",
+            withExtension: "ttf",
+            subdirectory: "Fonts"
+        ) ?? Bundle.module.url(forResource: "PressStart2P", withExtension: "ttf")
+
+        guard let url else { return }
+        CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    }
+
+    static func font(_ size: CGFloat) -> Font {
+        .custom(postScriptName, size: size)
+    }
+}
 
 // MARK: - Drift Design System v2
 // One source of truth for every visual decision in the app.
-// Inspired by: Linear, Raycast, Apple HIG, Cluely, Stripe design.
-// Rules: NO magic numbers in views. NO inline colors. NO custom shadows.
-// Everything — color, spacing, type, animation, elevation — lives here.
+// Pixel-informed visual language shared by every app surface.
 
 // MARK: - Accent Color Palette
 
@@ -16,14 +41,14 @@ struct AccentOption {
 
 /// Namespace for design-system constants that aren't view modifiers.
 enum DriftDesign {
-    /// The six built-in accent color presets. Blue (Drift brand) is the default.
+    /// Existing keys stay stable for saved preferences; colors map to the desert palette.
     static let accents: [AccentOption] = [
-        AccentOption(name: "indigo",  color: Color(red: 0.616, green: 0.765, blue: 0.992)),  // #9DC3FD — Drift brand blue
-        AccentOption(name: "violet",  color: Color(red: 0.612, green: 0.388, blue: 0.957)),
-        AccentOption(name: "rose",    color: Color(red: 0.957, green: 0.267, blue: 0.455)),
-        AccentOption(name: "emerald", color: Color(red: 0.133, green: 0.773, blue: 0.502)),
-        AccentOption(name: "amber",   color: Color(red: 0.984, green: 0.671, blue: 0.137)),
-        AccentOption(name: "sky",     color: Color(red: 0.125, green: 0.706, blue: 0.929)),
+        AccentOption(name: "indigo",  color: Color.accent),
+        AccentOption(name: "violet",  color: Color(red: 0.72, green: 0.35, blue: 0.52)),
+        AccentOption(name: "rose",    color: Color(red: 0.82, green: 0.29, blue: 0.28)),
+        AccentOption(name: "emerald", color: Color(red: 0.42, green: 0.56, blue: 0.22)),
+        AccentOption(name: "amber",   color: Color(red: 0.91, green: 0.53, blue: 0.18)),
+        AccentOption(name: "sky",     color: Color(red: 0.25, green: 0.59, blue: 0.66)),
     ]
 }
 
@@ -31,32 +56,117 @@ enum DriftDesign {
 
 extension Color {
     // Brand
-    /// Primary accent — Drift brand light blue
-    static let accent      = Color(red: 0.616, green: 0.765, blue: 0.992)   // #9DC3FD (Drift brand blue)
-    /// Accent pressed/hover state — slightly deeper
-    static let accentDeep  = Color(red: 0.447, green: 0.616, blue: 0.882)   // #729DE1
+    static let accent = driftAdaptiveColor(
+        light: NSColor(red: 0.910, green: 0.475, blue: 0.349, alpha: 1), // #e87959
+        dark: NSColor(red: 1.000, green: 0.404, blue: 0.310, alpha: 1)   // #ff674f
+    )
+    static let accentDeep = driftAdaptiveColor(
+        light: NSColor(red: 0.835, green: 0.467, blue: 0.349, alpha: 1), // #d57759
+        dark: NSColor(red: 0.812, green: 0.380, blue: 0.286, alpha: 1)   // #cf6149
+    )
+
+    static let driftBackground = driftAdaptiveColor(
+        light: NSColor(red: 0.984, green: 0.973, blue: 0.949, alpha: 1), // #fbf8f2
+        dark: NSColor(red: 0.067, green: 0.075, blue: 0.149, alpha: 1)   // #111326
+    )
+    static let driftPanel = driftAdaptiveColor(
+        light: NSColor(red: 1.000, green: 0.992, blue: 0.976, alpha: 0.97), // rgba #fffdf9
+        dark: NSColor(red: 0.122, green: 0.102, blue: 0.212, alpha: 0.97)   // rgba #1f1a36
+    )
+    static let driftPanelRaised = driftAdaptiveColor(
+        light: NSColor(red: 0.984, green: 0.973, blue: 0.949, alpha: 0.98), // #fdf8f2
+        dark: NSColor(red: 0.145, green: 0.114, blue: 0.239, alpha: 0.97)   // #251d3d
+    )
+    static let driftPanelInset = driftAdaptiveColor(
+        light: NSColor(red: 1.000, green: 0.988, blue: 0.969, alpha: 0.92),
+        dark: NSColor(red: 0.094, green: 0.078, blue: 0.169, alpha: 0.72)
+    )
+    static let driftBorder = driftAdaptiveColor(
+        light: NSColor(red: 0.851, green: 0.631, blue: 0.467, alpha: 0.58),
+        dark: NSColor(red: 0.855, green: 0.471, blue: 0.306, alpha: 0.55)
+    )
+    static let driftShadow = driftAdaptiveColor(
+        light: NSColor(red: 0.780, green: 0.572, blue: 0.408, alpha: 0.07),
+        dark: NSColor(red: 0.482, green: 0.224, blue: 0.259, alpha: 0.13)
+    )
+    static let driftText = driftAdaptiveColor(
+        light: NSColor(red: 0.161, green: 0.153, blue: 0.176, alpha: 1), // #29272d
+        dark: NSColor(red: 0.961, green: 0.945, blue: 0.922, alpha: 1)   // #f5f1eb
+    )
+    static let driftMuted = driftAdaptiveColor(
+        light: NSColor(red: 0.404, green: 0.380, blue: 0.416, alpha: 1), // #67616a
+        dark: NSColor(red: 0.737, green: 0.710, blue: 0.776, alpha: 1)   // #bcb5c6
+    )
 
     // Semantic states
-    /// Focused / productive — vivid green
-    static let productive  = Color(red: 0.133, green: 0.773, blue: 0.365)   // #22C55E
-    /// Drifting / distraction — clear red
-    static let distraction = Color(red: 0.937, green: 0.267, blue: 0.267)   // #EF4444
-    /// Streak / energy — warm amber
-    static let streak      = Color(red: 0.984, green: 0.671, blue: 0.137)   // #FBAB23
-    /// Warning / caution — orange
-    static let caution     = Color(red: 0.980, green: 0.506, blue: 0.157)   // #FA8128
+    static let productive  = Color(red: 0.392, green: 0.702, blue: 0.420) // #64b36b
+    static let distraction = Color(red: 1.000, green: 0.404, blue: 0.310)
+    static let streak      = Color(red: 0.945, green: 0.706, blue: 0.353) // #f1b45a
+    static let caution     = Color(red: 0.875, green: 0.510, blue: 0.396)
 
     // Surfaces (adaptive — use in all color scheme contexts)
     /// Subtle card background — system control bg
-    static let cardBg      = Color(.controlBackgroundColor)
+    static let cardBg      = Color.driftPanel
     /// Hover/selected row background
-    static let rowHover    = Color(.controlColor)
+    static let rowHover    = Color.driftPanelRaised
 
     // Borders & separators
     /// Standard border — 15% opaque
-    static let border      = Color(.separatorColor).opacity(0.5)
+    static let border      = Color.driftBorder
     /// Strong border — sidebar dividers
-    static let sep         = Color(.separatorColor)
+    static let sep         = Color.driftBorder
+}
+
+// MARK: - Pixel Brand Mark
+
+struct PixelDLogo: View {
+    var size: CGFloat = 32
+    var background: Color = .accent
+    var foreground: Color = Color(red: 1.00, green: 0.94, blue: 0.65)
+    var shadow: Color = .driftShadow
+
+    private static let rows: [[Int]] = [
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 0, 0, 1, 1],
+        [1, 1, 0, 0, 1, 1],
+        [1, 1, 0, 0, 1, 1],
+        [1, 1, 0, 0, 1, 1],
+        [1, 1, 0, 1, 1, 0],
+        [1, 1, 1, 1, 0, 0],
+    ]
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(shadow)
+                .frame(width: size, height: size)
+                .offset(x: max(3, size * 0.10), y: max(3, size * 0.10))
+
+            Rectangle()
+                .fill(background)
+                .frame(width: size, height: size)
+                .overlay(Rectangle().strokeBorder(Color(red: 1.00, green: 0.94, blue: 0.65).opacity(0.78), lineWidth: max(1, size * 0.04)))
+
+            VStack(spacing: 0) {
+                ForEach(0..<Self.rows.count, id: \.self) { row in
+                    HStack(spacing: 0) {
+                        ForEach(0..<Self.rows[row].count, id: \.self) { column in
+                            Rectangle()
+                                .fill(Self.rows[row][column] == 1 ? foreground : Color.clear)
+                                .frame(width: pixel, height: pixel)
+                        }
+                    }
+                }
+            }
+            .frame(width: pixel * 6, height: pixel * 8)
+        }
+        .frame(width: size + max(3, size * 0.10), height: size + max(3, size * 0.10))
+    }
+
+    private var pixel: CGFloat {
+        floor(size / 12)
+    }
 }
 
 // MARK: - Elevation (shadow presets)
@@ -71,10 +181,10 @@ enum Elevation {
         // Static members on Shadow itself so `.sm` resolves as `Elevation.Shadow.sm`
         // when used in .elevate(.sm) context
         static let none = Elevation.Shadow(color: .clear,               radius: 0,  x: 0, y: 0)
-        static let xs   = Elevation.Shadow(color: .black.opacity(0.04), radius: 4,  x: 0, y: 1)
-        static let sm   = Elevation.Shadow(color: .black.opacity(0.06), radius: 8,  x: 0, y: 2)
-        static let md   = Elevation.Shadow(color: .black.opacity(0.10), radius: 16, x: 0, y: 4)
-        static let lg   = Elevation.Shadow(color: .black.opacity(0.18), radius: 28, x: 0, y: 8)
+        static let xs   = Elevation.Shadow(color: .black.opacity(0.05), radius: 0, x: 2, y: 2)
+        static let sm   = Elevation.Shadow(color: .black.opacity(0.07), radius: 0, x: 3, y: 3)
+        static let md   = Elevation.Shadow(color: .black.opacity(0.11), radius: 0, x: 5, y: 5)
+        static let lg   = Elevation.Shadow(color: .black.opacity(0.18), radius: 0, x: 8, y: 8)
     }
 
     // Convenience aliases on Elevation itself for Elevation.sm usage
@@ -110,40 +220,32 @@ enum Space {
 // MARK: - Corner Radius
 
 enum Radius {
-    static let xs:   CGFloat =  4
-    static let sm:   CGFloat =  6
-    static let md:   CGFloat = 10
-    static let lg:   CGFloat = 14
-    static let xl:   CGFloat = 20
-    static let pill: CGFloat = 100
+    static let xs:   CGFloat = 3
+    static let sm:   CGFloat = 4
+    static let md:   CGFloat = 5
+    static let lg:   CGFloat = 5
+    static let xl:   CGFloat = 6
+    static let pill: CGFloat = 999
 }
 
 // MARK: - Typography Scale
 
 enum TypeScale {
-    // Display — hero number (session timer)
-    static let display: Font = .system(size: 48, weight: .bold,     design: .monospaced)
-    // Large title — welcome screen headline
-    static let h1:      Font = .system(size: 28, weight: .bold)
-    // Section title
-    static let h2:      Font = .system(size: 22, weight: .bold)
-    // Card headline
-    static let heading: Font = .system(size: 15, weight: .semibold)
-    // Body — standard readable text
-    static let bodyMd:  Font = .system(size: 13)
-    // Body small — metadata, timestamps
-    static let bodySm:  Font = .system(size: 12)
-    // Caption — secondary labels
-    static let caption: Font = .system(size: 11)
-    // Tiny label — badges, overlines
-    static let tiny:    Font = .system(size:  9.5, weight: .medium)
+    static let display: Font = .system(size: 48, weight: .semibold, design: .default)
+    static let h1:      Font = .system(size: 28, weight: .semibold, design: .default)
+    static let h2:      Font = .system(size: 17, weight: .semibold, design: .default)
+    static let heading: Font = .system(size: 15, weight: .medium, design: .default)
+    static let bodyMd:  Font = .system(size: 13.5, weight: .regular, design: .default)
+    static let bodySm:  Font = .system(size: 12.5, weight: .regular, design: .default)
+    static let caption: Font = .system(size: 11.5, weight: .regular, design: .default)
+    static let tiny:    Font = .system(size: 10.5, weight: .medium, design: .default)
     // Monospaced — timer, durations
-    static let monoLg:  Font = .system(size: 28,  weight: .bold,    design: .monospaced)
-    static let monoMd:  Font = .system(size: 15,  weight: .semibold, design: .monospaced)
-    static let monoSm:  Font = .system(size: 13,  weight: .medium,   design: .monospaced)
-    static let monoXs:  Font = .system(size: 11,  weight: .regular,  design: .monospaced)
+    static let monoLg:  Font = .system(size: 28, weight: .semibold, design: .monospaced)
+    static let monoMd:  Font = .system(size: 17, weight: .semibold, design: .monospaced)
+    static let monoSm:  Font = .system(size: 13, weight: .medium, design: .monospaced)
+    static let monoXs:  Font = .system(size: 11.5, weight: .regular, design: .monospaced)
     // Section overline labels
-    static let label:   Font = .system(size: 11,  weight: .semibold)
+    static let label:   Font = .system(size: 12, weight: .semibold, design: .default)
     // Legacy aliases
     static let hero     = h1
     static let title    = h2
@@ -179,9 +281,9 @@ struct SectionLabel: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(TypeScale.label)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Color.driftMuted)
             .textCase(.uppercase)
-            .tracking(0.8)
+            .tracking(1.5)
     }
 }
 
@@ -201,11 +303,11 @@ struct DriftCard: ViewModifier {
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color(.controlBackgroundColor))
+                    .fill(Color.driftPanel)
                     .elevate(.sm)
                     .overlay {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(Color.border, lineWidth: 0.5)
+                            .strokeBorder(Color.driftBorder, lineWidth: 1)
                     }
             }
     }
@@ -227,10 +329,10 @@ struct InsetCard: ViewModifier {
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color(.windowBackgroundColor).opacity(0.6))
+                    .fill(Color.driftPanelInset)
                     .overlay {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(Color.border, lineWidth: 0.5)
+                            .strokeBorder(Color.driftBorder.opacity(0.72), lineWidth: 1)
                     }
             }
     }
@@ -253,11 +355,12 @@ struct AccentCard: ViewModifier {
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(color.opacity(0.08))
+                    .fill(color.opacity(0.10))
                     .overlay {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(color.opacity(0.18), lineWidth: 0.5)
+                            .strokeBorder(color.opacity(0.42), lineWidth: 1)
                     }
+                    .shadow(color: Color.driftShadow, radius: 0, x: 3, y: 3)
             }
     }
 }
@@ -277,11 +380,12 @@ struct HoverLift: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(isHovered ? scale : 1.0)
+            .offset(x: isHovered ? -2 : 0, y: isHovered ? -2 : 0)
             .shadow(
-                color: .black.opacity(isHovered ? 0.09 : 0.04),
-                radius: isHovered ? shadowRadius : 6,
-                y: isHovered ? 4 : 2
+                color: .black.opacity(isHovered ? 0.16 : 0.07),
+                radius: 0,
+                x: isHovered ? 5 : 3,
+                y: isHovered ? 5 : 3
             )
             .animation(Anim.hover, value: isHovered)
             .onHover { isHovered = $0 }
@@ -325,11 +429,11 @@ struct PulseModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .topTrailing) {
-            Circle()
+            Rectangle()
                 .fill(color)
                 .frame(width: 7, height: 7)
                 .overlay(
-                    Circle()
+                    Rectangle()
                         .stroke(color.opacity(0.5), lineWidth: 1.5)
                         .scaleEffect(pulsing ? 2.0 : 1.0)
                         .opacity(pulsing ? 0 : 0.8)
@@ -354,8 +458,8 @@ struct DriftButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .opacity(configuration.isPressed ? 0.82 : 1.0)
+            .offset(x: configuration.isPressed ? 3 : 0, y: configuration.isPressed ? 3 : 0)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
             .animation(Anim.tap, value: configuration.isPressed)
     }
 }
@@ -393,19 +497,21 @@ struct PrimaryButton: View {
                 }
                 Text(title)
                     .font(TypeScale.heading)
+                    .textCase(.uppercase)
             }
             .padding(.horizontal, Space.lg)
             .padding(.vertical, Space.sm + 1)
             .frame(maxWidth: isFullWidth ? .infinity : nil)
             .background {
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(isHovered ? color.opacity(0.88) : color)
-                    .elevate(isHovered ? .sm : .xs)
+                    .fill(isHovered ? Color.driftPanelRaised : Color.driftPanel)
+                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(color, lineWidth: 1.5))
+                    .shadow(color: Color.driftShadow, radius: 0, x: isHovered ? 4 : 3, y: isHovered ? 4 : 3)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.driftText)
             .animation(Anim.hover, value: isHovered)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DriftButtonStyle(variant: .primary))
         .onHover { isHovered = $0 }
     }
 }
@@ -433,21 +539,22 @@ struct SecondaryButton: View {
                 }
                 Text(title)
                     .font(TypeScale.bodyMd)
+                    .textCase(.uppercase)
             }
             .padding(.horizontal, Space.md)
             .padding(.vertical, Space.xs + 1)
             .background {
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(isHovered ? Color(.controlColor) : Color(.controlBackgroundColor))
+                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                    .fill(isHovered ? Color.driftPanelRaised : Color.driftPanel)
                     .overlay {
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(Color.border, lineWidth: 0.75)
+                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Color.driftBorder, lineWidth: 1)
                     }
+                    .shadow(color: Color.driftShadow.opacity(0.55), radius: 0, x: isHovered ? 3 : 2, y: isHovered ? 3 : 2)
             }
-            .foregroundStyle(isHovered ? Color.accent : Color(.labelColor))
+            .foregroundStyle(isHovered ? Color.accent : Color.driftText)
             .animation(Anim.hover, value: isHovered)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DriftButtonStyle(variant: .secondary))
         .onHover { isHovered = $0 }
     }
 }
@@ -477,17 +584,18 @@ struct GhostButton: View {
                 }
                 Text(title)
                     .font(TypeScale.bodySm)
+                    .textCase(.uppercase)
             }
             .padding(.horizontal, Space.sm)
             .padding(.vertical, Space.xxs + 1)
             .background(
-                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                    .fill(isHovered ? color.opacity(0.10) : .clear)
+                Rectangle()
+                    .fill(isHovered ? color.opacity(0.14) : .clear)
             )
-            .foregroundStyle(isHovered ? color : Color(.secondaryLabelColor))
+            .foregroundStyle(isHovered ? color : Color.driftMuted)
             .animation(Anim.hover, value: isHovered)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DriftButtonStyle(variant: .ghost))
         .onHover { isHovered = $0 }
     }
 }
@@ -500,9 +608,10 @@ struct IconBadge: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(color.opacity(0.12))
-                .frame(width: size, height: size)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(color.opacity(0.12))
+                    .frame(width: size, height: size)
+                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(color.opacity(0.42), lineWidth: 1))
             Image(systemName: systemName)
                 .font(.system(size: size * 0.44, weight: .semibold))
                 .foregroundStyle(color)
@@ -521,11 +630,10 @@ struct KeyBadge: View {
             .padding(.horizontal, Space.xs)
             .padding(.vertical, Space.xxxs + 1)
             .background {
-                RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                    .fill(Color(.controlColor))
+                Rectangle()
+                    .fill(Color.driftPanelInset)
                     .overlay {
-                        RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-                            .strokeBorder(Color.border, lineWidth: 0.5)
+                        Rectangle().strokeBorder(Color.driftBorder, lineWidth: 1)
                     }
             }
     }
@@ -548,14 +656,14 @@ struct StatusDot: View {
     var body: some View {
         ZStack {
             if status == .tracking {
-                Circle()
+                Rectangle()
                     .fill(dotColor.opacity(0.35))
                     .scaleEffect(pulsing ? 2.2 : 1.0)
                     .opacity(pulsing ? 0 : 0.6)
                     .animation(Anim.breathe, value: pulsing)
                     .onAppear { pulsing = true }
             }
-            Circle()
+            Rectangle()
                 .fill(dotColor)
                 .frame(width: 7, height: 7)
         }
@@ -596,19 +704,18 @@ struct FocusBar: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     // Track
-                    RoundedRectangle(cornerRadius: Radius.pill)
+                    Rectangle()
                         .fill(Color.distraction.opacity(0.22))
 
                     // Fill
-                    RoundedRectangle(cornerRadius: Radius.pill)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.productive.opacity(0.85), Color.productive],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                    Rectangle()
+                        .fill(Color.productive)
                         .frame(width: geo.size.width * max(0, min(1, focusFraction)))
+                        .overlay(alignment: .top) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.24))
+                                .frame(height: max(1, height / 3))
+                        }
                 }
             }
             .frame(height: height)
@@ -620,7 +727,7 @@ struct FocusBar: View {
                             .font(TypeScale.caption)
                             .foregroundStyle(Color.productive)
                     } icon: {
-                        Circle().fill(Color.productive).frame(width: 5, height: 5)
+                        Rectangle().fill(Color.productive).frame(width: 5, height: 5)
                     }
                     Spacer()
                     Label {
@@ -628,7 +735,7 @@ struct FocusBar: View {
                             .font(TypeScale.caption)
                             .foregroundStyle(Color.distraction)
                     } icon: {
-                        Circle().fill(Color.distraction).frame(width: 5, height: 5)
+                        Rectangle().fill(Color.distraction).frame(width: 5, height: 5)
                     }
                 }
             }
@@ -679,9 +786,9 @@ struct DriftTag: View {
             .padding(.horizontal, Space.xs)
             .padding(.vertical, Space.xxxs)
             .background {
-                Capsule()
+                Rectangle()
                     .fill(color.opacity(0.12))
-                    .overlay(Capsule().strokeBorder(color.opacity(0.25), lineWidth: 0.5))
+                    .overlay(Rectangle().strokeBorder(color.opacity(0.62), lineWidth: 1))
             }
     }
 }
@@ -707,13 +814,12 @@ struct DriftGlassCard: ViewModifier {
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.driftPanel)
                     .overlay {
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                        RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.driftBorder, lineWidth: 1)
                     }
-                    .shadow(color: accentColor.opacity(0.14), radius: 22, y: 8)
-                    .shadow(color: .black.opacity(0.07), radius: 8, y: 2)
+                    .shadow(color: accentColor.opacity(0.18), radius: 0, x: 3, y: 3)
+                    .shadow(color: Color.driftShadow, radius: 0, x: 3, y: 3)
             }
     }
 }
@@ -721,6 +827,37 @@ struct DriftGlassCard: ViewModifier {
 extension View {
     func driftGlassCard(accent: Color = .clear, padding: CGFloat = Space.xl, radius: CGFloat = Radius.lg) -> some View {
         modifier(DriftGlassCard(accentColor: accent, padding: padding, radius: radius))
+    }
+}
+
+// MARK: - Pixel Panel
+
+struct PixelPanel: ViewModifier {
+    var padding: CGFloat = 0
+    var border: Color = .driftBorder
+    var fill: Color = .driftPanel
+    var shadow: Bool = true
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background {
+                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                    .fill(fill)
+                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(border, lineWidth: 1))
+                    .shadow(color: shadow ? Color.driftShadow : .clear, radius: 0, x: 4, y: 4)
+            }
+    }
+}
+
+extension View {
+    func pixelPanel(
+        padding: CGFloat = 0,
+        border: Color = .driftBorder,
+        fill: Color = .driftPanel,
+        shadow: Bool = true
+    ) -> some View {
+        modifier(PixelPanel(padding: padding, border: border, fill: fill, shadow: shadow))
     }
 }
 
@@ -751,18 +888,15 @@ struct AmbientGlow: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                RadialGradient(
-                    colors: [color.opacity(opacity), .clear],
-                    center: .topLeading,
-                    startRadius: 0,
-                    endRadius: geo.size.width * 0.9
-                )
-                RadialGradient(
-                    colors: [color.opacity(opacity * 0.5), .clear],
-                    center: .bottomTrailing,
-                    startRadius: 0,
-                    endRadius: geo.size.width * 0.6
-                )
+                color.opacity(opacity * 0.16)
+                Rectangle()
+                    .fill(color.opacity(opacity))
+                    .frame(width: geo.size.width * 0.28, height: geo.size.height * 0.18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                Rectangle()
+                    .fill(color.opacity(opacity * 0.48))
+                    .frame(width: geo.size.width * 0.18, height: geo.size.height * 0.14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
             .ignoresSafeArea()
         }

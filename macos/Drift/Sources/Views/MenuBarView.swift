@@ -13,8 +13,8 @@ struct MenuBarView: View {
             HStack(spacing: Space.sm) {
                 Image("DriftLogo")
                     .resizable()
-                    .interpolation(.high)
-                    .clipShape(RoundedRectangle(cornerRadius: Space.xxs))
+                    .interpolation(.none)
+                    .clipShape(Rectangle())
                     .frame(width: 18, height: 18)
                 Text("Drift")
                     .font(TypeScale.body)
@@ -45,7 +45,7 @@ struct MenuBarView: View {
 
                     // Current app with category dot
                     HStack(spacing: Space.xs) {
-                        Circle()
+                        Rectangle()
                             .fill(appState.session.currentCategory.color)
                             .frame(width: Space.xs, height: Space.xs)
                         Text(tracker.activeApp.isEmpty ? "No active app" : tracker.activeApp)
@@ -86,8 +86,9 @@ struct MenuBarView: View {
                     )
                 }
                 .padding(.vertical, Space.sm)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: Radius.sm))
+                .background(Color.driftPanelInset)
+                .overlay(Rectangle().strokeBorder(Color.driftBorder.opacity(0.6), lineWidth: 1))
+                .clipShape(Rectangle())
                 .padding(.bottom, Space.md)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Session statistics")
@@ -253,7 +254,7 @@ private struct MenuBarButton: View {
                         .padding(.horizontal, Space.xxs)
                         .padding(.vertical, 1)
                         .background(
-                            RoundedRectangle(cornerRadius: 3)
+                            Rectangle()
                                 .fill(Color.primary.opacity(0.04))
                         )
                 }

@@ -103,6 +103,7 @@ class WindowTracker: ObservableObject {
         installWorkspaceObserver()
         startTimers()
         startIdleTimer()
+        pollActiveWindow()
     }
 
     /// Pauses tracking without resetting the session. The idle checker keeps
@@ -183,13 +184,16 @@ class WindowTracker: ObservableObject {
             resolvedURL = getActiveTabURL(for: app)
         }
 
-        let domainForClassification = resolvedURL.flatMap { domainFromURL($0) }
+        let webContextForClassification = resolvedURL
             ?? (isBrowser ? extractURL(from: title, appName: appName) : nil)
 
         var category = AppClassifier.classify(appName: appName, bundleId: bundleId)
-        if let domain = domainForClassification {
-            let domainCategory = AppClassifier.classifyDomain(domain)
-            if domainCategory != .neutral { category = domainCategory }
+        if isBrowser {
+            category = AppClassifier.classifyWebContext(
+                urlString: webContextForClassification,
+                title: title,
+                fallback: category
+            )
         }
 
         recordAppSwitch(
@@ -270,13 +274,16 @@ class WindowTracker: ObservableObject {
             }
         }
 
-        let domainForClassification = resolvedURL.flatMap { domainFromURL($0) }
+        let webContextForClassification = resolvedURL
             ?? (isBrowser ? extractURL(from: title, appName: appName) : nil)
 
         var category = AppClassifier.classify(appName: appName, bundleId: bundleId)
-        if let domain = domainForClassification {
-            let domainCategory = AppClassifier.classifyDomain(domain)
-            if domainCategory != .neutral { category = domainCategory }
+        if isBrowser {
+            category = AppClassifier.classifyWebContext(
+                urlString: webContextForClassification,
+                title: title,
+                fallback: category
+            )
         }
 
         // Always update the displayed state.
@@ -590,13 +597,4 @@ class WindowTracker: ObservableObject {
         })
     }
 
-    /// Extracts the domain component from a full URL string.
-    private func domainFromURL(_ url: String) -> String? {
-        var s = url.lowercased()
-        for prefix in ["https://", "http://", "www."] {
-            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)) }
-        }
-        if let slash = s.firstIndex(of: "/") { s = String(s[..<slash]) }
-        return s.isEmpty ? nil : s
-    }
 }

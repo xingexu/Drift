@@ -12,7 +12,7 @@ let package = Package(
             name: "Drift",
             path: "Sources",
             resources: [
-                .process("../Assets.xcassets")
+                .copy("Resources/Fonts")
             ]
         )
     ]

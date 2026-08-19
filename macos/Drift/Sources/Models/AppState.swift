@@ -26,7 +26,7 @@ class AppState: ObservableObject {
 
     // MARK: - Navigation
 
-    @Published var currentTab: Tab = .home
+    @Published var currentTab: Tab = .tracking
 
     // MARK: - Session
 
@@ -55,17 +55,13 @@ class AppState: ObservableObject {
     @Published var notificationsEnabled = true
     @Published var launchAtLogin = true
     @Published var density: String = "Spacious"      // "Compact", "Comfortable", "Spacious"
-    @Published var typography: String = "Sora"       // "Sora", "Serif", "Mono"
-    @Published var homeLayout: String = "Hero"       // "Hero", "Bento", "Stack"
 
     // MARK: - UI State
 
-    @Published var showSignIn = false
     @Published var hasOnboarded: Bool = false
-    @Published var showCustomizePanel = false
 
     /// Possible root screens used during the launch flow.
-    enum AppScreen { case welcome, onboarding, auth, main }
+    enum AppScreen { case welcome, onboarding, main }
 
     // MARK: - Stats
 
@@ -96,8 +92,6 @@ class AppState: ObservableObject {
         static let hasOnboarded      = "drift_has_onboarded"
         static let pastSessions      = "drift_past_sessions"
         static let density           = "drift_density"
-        static let typography        = "drift_typography"
-        static let homeLayout        = "drift_home_layout"
         // Legacy keys used only during the one-time keychain migration.
         static let legacyAccessToken  = "drift_access_token"
         static let legacyRefreshToken = "drift_refresh_token"
@@ -161,8 +155,6 @@ class AppState: ObservableObject {
         hasOnboarded         = defaults.bool(forKey: DefaultsKey.hasOnboarded)
 
         if let saved = defaults.string(forKey: DefaultsKey.density) { density = saved }
-        if let saved = defaults.string(forKey: DefaultsKey.typography) { typography = saved }
-        if let saved = defaults.string(forKey: DefaultsKey.homeLayout) { homeLayout = saved }
     }
 
     /// Moves any tokens still sitting in `UserDefaults` into the Keychain.
@@ -238,18 +230,6 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(value, forKey: DefaultsKey.density)
     }
 
-    /// Updates and persists the typography preference.
-    func setTypography(_ value: String) {
-        typography = value
-        UserDefaults.standard.set(value, forKey: DefaultsKey.typography)
-    }
-
-    /// Updates and persists the home layout preference.
-    func setHomeLayout(_ value: String) {
-        homeLayout = value
-        UserDefaults.standard.set(value, forKey: DefaultsKey.homeLayout)
-    }
-
     /// Resolved `Color` for the currently selected accent preset.
     var accentColor: Color {
         DriftDesign.accents.first { $0.name == accentColorName }?.color ?? Color.accent
@@ -277,7 +257,8 @@ class AppState: ObservableObject {
             focusPercent: session.focusPercent,
             driftScore: session.driftScore,
             appCount: session.uniqueApps,
-            topApps: session.topApps
+            topApps: session.topApps,
+            events: session.events
         )
 
         pastSessions.insert(past, at: 0)
@@ -354,20 +335,16 @@ struct User: Codable, Identifiable {
 
 /// Main sidebar navigation tabs.
 enum Tab: String, CaseIterable, Identifiable {
-    case home     = "Home"
-    case session  = "Session"
-    case focus    = "Focus"
-    case history  = "History"
+    case tracking = "Tracking"
+    case focus    = "Focus + Blocking"
     case settings = "Settings"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .home:     return "house"
-        case .session:  return "chart.bar.fill"
-        case .focus:    return "timer"
-        case .history:  return "clock.arrow.circlepath"
+        case .tracking: return "dot.radiowaves.left.and.right"
+        case .focus:    return "shield.lefthalf.filled"
         case .settings: return "gearshape"
         }
     }
@@ -440,6 +417,43 @@ struct SessionData {
             .map(\.key)
     }
 
+    var contextSwitchCount: Int {
+        max(events.count - 1, 0)
+    }
+
+    var longestProductiveStreakMs: TimeInterval {
+        var longest: TimeInterval = 0
+        var current: TimeInterval = 0
+
+        for event in events.sorted(by: { $0.timestamp < $1.timestamp }) {
+            if event.category == .productive {
+                current += event.durationMs
+                longest = max(longest, current)
+            } else {
+                current = 0
+            }
+        }
+
+        return longest
+    }
+
+    var efficiencyScore: Int {
+        guard totalMs > 0 else { return 0 }
+
+        let productiveShare = min(max(productiveMs / totalMs, 0), 1)
+        let distractionShare = min(max(distractionMs / totalMs, 0), 1)
+        let sessionHours = max(totalMs / 3_600_000, 1.0 / 60.0)
+        let switchesPerHour = Double(contextSwitchCount) / sessionHours
+        let continuity = max(0, 1 - min(switchesPerHour / 40, 1))
+        let deepWork = min(longestProductiveStreakMs / 2_700_000, 1)
+        let score = productiveShare * 0.45
+            + (1 - distractionShare) * 0.25
+            + continuity * 0.20
+            + deepWork * 0.10
+
+        return Int((score * 100).rounded())
+    }
+
     /// Resets all fields to their initial values.
     mutating func reset() {
         self = SessionData()
@@ -449,8 +463,8 @@ struct SessionData {
 // MARK: - AppEvent
 
 /// A single app-usage event recorded during a tracking session.
-struct AppEvent: Identifiable {
-    let id = UUID()
+struct AppEvent: Identifiable, Codable {
+    let id: UUID
     let owner: String
     let title: String
     let isBrowser: Bool
@@ -458,6 +472,26 @@ struct AppEvent: Identifiable {
     let category: AppCategory
     let timestamp: Date
     var durationMs: TimeInterval
+
+    init(
+        id: UUID = UUID(),
+        owner: String,
+        title: String,
+        isBrowser: Bool,
+        url: String?,
+        category: AppCategory,
+        timestamp: Date,
+        durationMs: TimeInterval
+    ) {
+        self.id = id
+        self.owner = owner
+        self.title = title
+        self.isBrowser = isBrowser
+        self.url = url
+        self.category = category
+        self.timestamp = timestamp
+        self.durationMs = durationMs
+    }
 }
 
 // MARK: - PastSession
@@ -474,6 +508,7 @@ struct PastSession: Identifiable, Codable {
     let driftScore: Int
     let appCount: Int
     let topApps: [String]
+    let events: [AppEvent]?
 
     init(
         date: Date,
@@ -484,7 +519,8 @@ struct PastSession: Identifiable, Codable {
         focusPercent: Int,
         driftScore: Int,
         appCount: Int,
-        topApps: [String] = []
+        topApps: [String] = [],
+        events: [AppEvent]? = nil
     ) {
         self.id = UUID()
         self.date = date
@@ -496,6 +532,14 @@ struct PastSession: Identifiable, Codable {
         self.driftScore = driftScore
         self.appCount = appCount
         self.topApps = topApps
+        self.events = events
+    }
+
+    var efficiencyScore: Int {
+        guard totalMs > 0 else { return 0 }
+        let productiveShare = min(max(productiveMs / totalMs, 0), 1)
+        let distractionShare = min(max(distractionMs / totalMs, 0), 1)
+        return Int(((productiveShare * 0.65 + (1 - distractionShare) * 0.35) * 100).rounded())
     }
 }
 

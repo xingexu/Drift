@@ -81,10 +81,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         switch url.host {
         case "auth":
             handleAuthCallback(url)
-        case "session":
+        case "tracking", "session":
             Self.openMainWindow()
             Task { @MainActor in
-                AppState.shared.currentTab = .session
+                AppState.shared.currentTab = .tracking
             }
         case "settings":
             Self.openMainWindow()
