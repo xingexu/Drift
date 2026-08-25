@@ -8,8 +8,8 @@ private struct DriftSidebarWorld: View {
     var body: some View {
         ZStack {
             Color.driftPanel
-            DriftAmbientBackground(accent: accent, reduceMotion: false)
-                .opacity(colorScheme == .dark ? 0.72 : 0.66)
+            DriftAmbientBackground(accent: accent, reduceMotion: false, showLizard: false)
+                .opacity(colorScheme == .dark ? 0.52 : 0.46)
         }
         .accessibilityHidden(true)
     }
@@ -203,8 +203,13 @@ struct MainAppView: View {
                 Color.driftBackground
                 DriftAmbientBackground(
                     accent: appState.accentColor,
-                    reduceMotion: appState.reduceMotion
+                    reduceMotion: appState.reduceMotion,
+                    showLizard: true
                 )
+                .opacity(0.82)
+
+                Rectangle()
+                    .fill(Color.driftBackground.opacity(0.12))
             }
         }
         .animation(.easeOut(duration: 0.22), value: appState.currentTab)
@@ -323,13 +328,11 @@ struct TopbarView: View {
 
             Spacer()
 
-            Rectangle()
-                .fill(tracker.isTracking ? Color.productive : Color.productive.opacity(0.80))
-                .frame(width: 8, height: 8)
+            StatusDot(status: tracker.isTracking ? .tracking : .idle)
             Text(tracker.isTracking ? "Tracking" : "Offline")
                 .font(TypeScale.caption)
                 .foregroundStyle(Color.driftText)
-            Text("Last sync: 2h ago")
+            Text(tracker.isTracking ? "Local capture" : "Local mode")
                 .font(TypeScale.caption)
                 .foregroundStyle(Color.driftMuted)
         }
@@ -369,7 +372,7 @@ private struct SidebarView: View {
             Spacer(minLength: 0)
             localOnlySection
         }
-        .frame(width: 228)
+        .frame(width: 232)
         .background {
             DriftSidebarWorld(accent: appState.accentColor)
         }
@@ -378,17 +381,17 @@ private struct SidebarView: View {
     // MARK: - Header
 
     private var sidebarHeader: some View {
-        HStack(spacing: Space.sm) {
-            PixelDLogo(size: 39, background: appState.accentColor)
+        HStack(spacing: Space.md) {
+            PixelDLogo(size: 42, background: appState.accentColor)
 
             Text("Drift")
-                .font(.system(size: 21, weight: .semibold, design: .default))
+                .font(.system(size: 22, weight: .semibold, design: .default))
                 .foregroundStyle(Color.driftText)
 
             Spacer()
         }
-        .padding(.horizontal, 10)
-        .frame(height: 39)
+        .padding(.horizontal, 16)
+        .frame(height: 42)
         .padding(.top, 22)
         .padding(.bottom, 32)
     }
@@ -401,11 +404,11 @@ private struct SidebarView: View {
                 .font(TypeScale.tiny)
                 .tracking(1.6)
                 .foregroundStyle(Color.driftMuted.opacity(0.75))
-                .padding(.horizontal, 11)
+                .padding(.horizontal, 16)
                 .padding(.top, 0)
                 .padding(.bottom, 10)
 
-            VStack(spacing: Space.xxxs) {
+            VStack(spacing: 4) {
                 ForEach(Tab.allCases) { tab in
                     SidebarNavItem(
                         icon: tab.icon,
@@ -420,7 +423,7 @@ private struct SidebarView: View {
                     }
                 }
             }
-            .padding(.horizontal, Space.xs)
+            .padding(.horizontal, Space.sm)
             .padding(.bottom, Space.xs)
         }
     }
@@ -428,10 +431,10 @@ private struct SidebarView: View {
     // MARK: - Local State
 
     private var localOnlySection: some View {
-        HStack(spacing: Space.xs) {
+        HStack(spacing: Space.sm) {
             Rectangle()
                 .fill(Color.productive)
-                .frame(width: 9, height: 9)
+                .frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 1) {
                 Text("LOCAL MODE")
                     .font(TypeScale.tiny)
@@ -442,14 +445,15 @@ private struct SidebarView: View {
                     .foregroundStyle(Color.driftMuted)
             }
             Spacer()
+            SidebarMiniCactus()
+                .frame(width: 24, height: 34)
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
-        .frame(minHeight: 54)
+        .padding(.horizontal, 12)
+        .frame(height: 58)
         .background {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+            Rectangle()
                 .fill(Color.driftPanel)
-                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Color.border.opacity(0.55), lineWidth: 1))
+                .overlay(Rectangle().strokeBorder(Color.border.opacity(0.55), lineWidth: 1))
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 13)
@@ -492,21 +496,21 @@ struct SidebarNavItem: View {
                             : (isHovered ? Color.driftText.opacity(0.82) : Color.driftMuted)
                     )
 
-                Spacer()
+            Spacer()
 
-                Rectangle()
-                    .fill(appState.accentColor)
-                    .frame(width: 8, height: 8)
+            Rectangle()
+                .fill(appState.accentColor)
+                    .frame(width: 7, height: 7)
                     .opacity(isSelected ? 1 : 0)
             }
             .padding(.horizontal, 12)
-            .frame(height: 43)
+            .frame(height: 46)
             .background {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                Rectangle()
                     .fill(
                         isSelected
-                            ? appState.accentColor.opacity(0.20)
-                            : (isHovered ? Color.driftPanelRaised.opacity(0.72) : Color.clear)
+                            ? appState.accentColor.opacity(0.16)
+                            : (isHovered ? Color.driftPanelRaised.opacity(0.54) : Color.clear)
                     )
                     .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelected)
                     .animation(Anim.hover, value: isHovered)
@@ -533,6 +537,20 @@ struct SidebarNavItem: View {
         case "Tracking": return "waveform.path.ecg"
         case "Focus + Blocking": return "scope"
         default: return "gearshape"
+        }
+    }
+}
+
+private struct SidebarMiniCactus: View {
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle().fill(Color.productive.opacity(0.32)).frame(width: 20, height: 3)
+            Rectangle().fill(Color.productive.opacity(0.72)).frame(width: 6, height: 25).offset(y: -2)
+            Rectangle().fill(Color.productive.opacity(0.38)).frame(width: 2, height: 25).offset(x: -2, y: -2)
+            Rectangle().fill(Color.productive.opacity(0.80)).frame(width: 7, height: 4).offset(x: -6, y: -15)
+            Rectangle().fill(Color.productive.opacity(0.70)).frame(width: 4, height: 11).offset(x: -9, y: -18)
+            Rectangle().fill(Color.productive.opacity(0.76)).frame(width: 8, height: 4).offset(x: 7, y: -18)
+            Rectangle().fill(Color.productive.opacity(0.66)).frame(width: 4, height: 12).offset(x: 10, y: -22)
         }
     }
 }

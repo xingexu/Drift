@@ -458,9 +458,10 @@ struct DriftButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .offset(x: configuration.isPressed ? 3 : 0, y: configuration.isPressed ? 3 : 0)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .offset(x: configuration.isPressed ? 1 : 0, y: configuration.isPressed ? 1 : 0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
-            .animation(Anim.tap, value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -503,10 +504,10 @@ struct PrimaryButton: View {
             .padding(.vertical, Space.sm + 1)
             .frame(maxWidth: isFullWidth ? .infinity : nil)
             .background {
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                Rectangle()
                     .fill(isHovered ? Color.driftPanelRaised : Color.driftPanel)
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(color, lineWidth: 1.5))
-                    .shadow(color: Color.driftShadow, radius: 0, x: isHovered ? 4 : 3, y: isHovered ? 4 : 3)
+                    .overlay(Rectangle().strokeBorder(color.opacity(isHovered ? 0.95 : 0.72), lineWidth: 1.5))
+                    .shadow(color: Color.driftShadow, radius: 0, x: isHovered ? 3 : 2, y: isHovered ? 3 : 2)
             }
             .foregroundStyle(Color.driftText)
             .animation(Anim.hover, value: isHovered)
@@ -544,10 +545,10 @@ struct SecondaryButton: View {
             .padding(.horizontal, Space.md)
             .padding(.vertical, Space.xs + 1)
             .background {
-                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                Rectangle()
                     .fill(isHovered ? Color.driftPanelRaised : Color.driftPanel)
                     .overlay {
-                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Color.driftBorder, lineWidth: 1)
+                        Rectangle().strokeBorder(Color.driftBorder.opacity(isHovered ? 0.9 : 0.65), lineWidth: 1)
                     }
                     .shadow(color: Color.driftShadow.opacity(0.55), radius: 0, x: isHovered ? 3 : 2, y: isHovered ? 3 : 2)
             }
@@ -608,10 +609,10 @@ struct IconBadge: View {
 
     var body: some View {
         ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(color.opacity(0.12))
-                    .frame(width: size, height: size)
-                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(color.opacity(0.42), lineWidth: 1))
+            Rectangle()
+                .fill(color.opacity(0.12))
+                .frame(width: size, height: size)
+                .overlay(Rectangle().strokeBorder(color.opacity(0.42), lineWidth: 1))
             Image(systemName: systemName)
                 .font(.system(size: size * 0.44, weight: .semibold))
                 .foregroundStyle(color)
@@ -813,13 +814,13 @@ struct DriftGlassCard: ViewModifier {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                Rectangle()
                     .fill(Color.driftPanel)
                     .overlay {
-                        RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.driftBorder, lineWidth: 1)
+                        Rectangle().strokeBorder(Color.driftBorder.opacity(0.85), lineWidth: 1)
                     }
-                    .shadow(color: accentColor.opacity(0.18), radius: 0, x: 3, y: 3)
-                    .shadow(color: Color.driftShadow, radius: 0, x: 3, y: 3)
+                    .shadow(color: accentColor.opacity(0.14), radius: 0, x: 2, y: 2)
+                    .shadow(color: Color.driftShadow, radius: 0, x: 2, y: 2)
             }
     }
 }
@@ -842,10 +843,10 @@ struct PixelPanel: ViewModifier {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                Rectangle()
                     .fill(fill)
-                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(border, lineWidth: 1))
-                    .shadow(color: shadow ? Color.driftShadow : .clear, radius: 0, x: 4, y: 4)
+                    .overlay(Rectangle().strokeBorder(border.opacity(0.86), lineWidth: 1))
+                    .shadow(color: shadow ? Color.driftShadow : .clear, radius: 0, x: 3, y: 3)
             }
     }
 }

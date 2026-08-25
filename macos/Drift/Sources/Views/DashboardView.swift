@@ -11,21 +11,35 @@ struct TrackingView: View {
                 header
                 currentContext
 
-                efficiencyPanel
-                metricStrip
-                attentionMap
+                if hasVisibleActivity {
+                    efficiencyPanel
+                    metricStrip
+                    attentionMap
 
-                HStack(alignment: .top, spacing: Space.lg) {
-                    recentActivity
-                        .frame(maxWidth: .infinity)
-                    applicationSummary
-                        .frame(width: 360)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: Space.lg) {
+                            recentActivity
+                                .frame(maxWidth: .infinity)
+                            applicationSummary
+                                .frame(width: 340)
+                        }
+
+                        VStack(alignment: .leading, spacing: Space.lg) {
+                            recentActivity
+                            applicationSummary
+                        }
+                    }
+                } else {
+                    emptyOverview
                 }
             }
-            .padding(.horizontal, Space.xxl)
-            .padding(.vertical, Space.xxl)
+            .frame(maxWidth: 1320, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .padding(.horizontal, 28)
+            .padding(.top, 26)
+            .padding(.bottom, 32)
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 10)
+            .offset(y: appeared ? 0 : 6)
         }
         .onAppear {
             withAnimation(Anim.appear) { appeared = true }
@@ -35,14 +49,13 @@ struct TrackingView: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             HStack(alignment: .top, spacing: Space.md) {
-                Image(systemName: "sparkle")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(Color.streak)
-                    .padding(.top, 4)
+                PixelHeaderIcon(color: appState.accentColor)
+                    .frame(width: 30, height: 30)
+                    .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: Space.xs) {
                     Text(greeting.uppercased())
-                        .font(TypeScale.h1)
+                        .font(.system(size: 32, weight: .semibold, design: .default))
                     Text("Live activity, context, and classification.")
                         .font(TypeScale.bodyMd)
                         .foregroundStyle(Color.driftMuted)
@@ -57,20 +70,21 @@ struct TrackingView: View {
         HStack(spacing: Space.lg) {
             Rectangle()
                 .fill(tracker.activeCategory.color)
-                .frame(width: 0, height: 0)
-                .opacity(0)
+                .frame(width: 5)
 
             PixelCurrentActivityIcon()
-                .frame(width: 62, height: 48)
+                .frame(width: 56, height: 48)
 
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(tracker.activeApp.isEmpty ? "No active app" : tracker.activeApp)
                     .font(TypeScale.h2)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Text(currentContextSubtitle)
                     .font(TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
 
             Spacer()
@@ -79,6 +93,10 @@ struct TrackingView: View {
                 PrimaryButton("Start Tracking", icon: "play.fill", color: appState.accentColor) {
                     tracker.start()
                 }
+                .fixedSize()
+            } else {
+                StatusBadge(label: "Tracking", color: .productive, pulsing: true)
+                    .fixedSize()
             }
 
             Text(tracker.activeCategory.label.uppercased())
@@ -93,9 +111,9 @@ struct TrackingView: View {
                         .overlay(Rectangle().strokeBorder(tracker.activeCategory.color.opacity(0.28), lineWidth: 1))
                 )
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 13)
-        .frame(minHeight: 75)
+        .padding(.trailing, 22)
+        .padding(.vertical, 16)
+        .frame(height: 86)
         .panelSurface()
     }
 
@@ -128,9 +146,10 @@ struct TrackingView: View {
             Spacer()
 
             CardDesertScene()
-                .frame(width: 265)
+                .frame(maxWidth: 240)
+                .opacity(0.74)
         }
-        .frame(minHeight: 152)
+        .frame(height: 162)
         .panelSurface()
     }
 
@@ -142,6 +161,7 @@ struct TrackingView: View {
             metricDivider
             MetricCell(icon: "arrow.triangle.2.circlepath", label: "CONTEXT SWITCHES", value: "\(contextSwitches)", detail: switchesPerHourLabel, color: .streak)
         }
+        .frame(height: 104)
         .panelSurface()
     }
 
@@ -192,10 +212,11 @@ struct TrackingView: View {
                         }
                     }
                 }
-                .frame(height: 54)
+                .frame(height: 34)
             }
         }
         .padding(Space.lg)
+        .frame(height: 116)
         .panelSurface()
     }
 
@@ -258,7 +279,7 @@ struct TrackingView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, Space.lg)
-                    .padding(.vertical, Space.sm)
+                    .frame(height: 52)
                 }
             }
         }
@@ -266,29 +287,44 @@ struct TrackingView: View {
     }
 
     private var emptyOverview: some View {
-        VStack(spacing: Space.xl) {
-            PixelDLogo(size: 84, background: appState.accentColor)
+        HStack(spacing: 30) {
+            EmptyDesertMarker(accent: appState.accentColor)
+                .frame(width: 180, height: 150)
 
-            VStack(spacing: Space.xs) {
-                Text("START LIVE TRACKING")
-                    .font(TypeScale.h2)
-                Text("Apps, sites, page titles, and context will appear as soon as tracking starts.")
-                    .font(TypeScale.bodyMd)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 440)
+            VStack(alignment: .leading, spacing: Space.md) {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Text("READY TO MAP YOUR DAY")
+                        .font(TypeScale.h2)
+                    Text("Start tracking to see apps, websites, page titles, duration, and context in one timeline.")
+                        .font(TypeScale.bodyMd)
+                        .foregroundStyle(Color.driftMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 520, alignment: .leading)
+                }
+
+                HStack(spacing: Space.sm) {
+                    DriftTag(text: "APPS", color: .productive)
+                    DriftTag(text: "SITES", color: appState.accentColor)
+                    DriftTag(text: "CONTEXT", color: .streak)
+                }
+
+                HStack(spacing: Space.md) {
+                    PrimaryButton("Start Tracking", icon: "play.fill", color: appState.accentColor) {
+                        tracker.start()
+                    }
+
+                    Text("Never keystrokes or screen contents.")
+                        .font(TypeScale.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
-            PrimaryButton("START TRACKING", icon: "play.fill", color: appState.accentColor) {
-                tracker.start()
-            }
-
-            Text("Tracks apps, window titles, domains, and durations. Never keystrokes or screen contents.")
-                .font(TypeScale.caption)
-                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 80)
+        .padding(.horizontal, 34)
+        .padding(.vertical, 36)
+        .frame(height: 264)
         .panelSurface()
     }
 
@@ -326,7 +362,7 @@ struct TrackingView: View {
             Spacer()
         }
         .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.md)
+        .frame(height: 42)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.border).frame(height: 0.5)
         }
@@ -358,7 +394,7 @@ struct TrackingView: View {
     private var currentContextSubtitle: String {
         if !tracker.activeTitle.isEmpty { return tracker.activeTitle }
         if !tracker.activeURL.isEmpty { return tracker.activeURL }
-        return tracker.isTracking ? "Waiting for active window detail" : "Start tracking to classify activity"
+        return "Start tracking to classify activity"
     }
 
     private var todaySessions: [PastSession] {
@@ -384,7 +420,7 @@ struct TrackingView: View {
 
     private var hasActivity: Bool { todayTotal >= 60_000 }
     private var hasVisibleActivity: Bool {
-        tracker.isTracking || hasActivity || !todayEvents.isEmpty
+        hasActivity || !visibleEvents.isEmpty
     }
     private var visibleEvents: [AppEvent] {
         var events = todayEvents
@@ -518,6 +554,26 @@ struct TrackingView: View {
     private static let liveEventID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
 }
 
+private struct PixelHeaderIcon: View {
+    let color: Color
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Rectangle()
+                .fill(color.opacity(0.11))
+                .overlay(Rectangle().strokeBorder(color.opacity(0.34), lineWidth: 1))
+
+            HStack(alignment: .bottom, spacing: 3) {
+                Rectangle().fill(color).frame(width: 4, height: 9)
+                Rectangle().fill(color.opacity(0.78)).frame(width: 4, height: 18)
+                Rectangle().fill(color).frame(width: 4, height: 13)
+                Rectangle().fill(Color.productive).frame(width: 4, height: 22)
+            }
+            .padding(5)
+        }
+    }
+}
+
 private struct MetricCell: View {
     let icon: String
     let label: String
@@ -568,6 +624,38 @@ private struct PixelCurrentActivityIcon: View {
                 .fill(Color.productive)
                 .frame(width: 10, height: 5)
                 .offset(x: 14, y: -24)
+        }
+    }
+}
+
+private struct EmptyDesertMarker: View {
+    let accent: Color
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.driftPanelInset.opacity(0.65))
+                .overlay(Rectangle().strokeBorder(Color.driftBorder.opacity(0.38), lineWidth: 1))
+
+            PixelMesa()
+                .fill(Color.accentDeep.opacity(0.20))
+                .frame(width: 112, height: 38)
+                .offset(x: -18, y: -17)
+
+            PixelCactusSprite(scale: 0.42)
+                .offset(x: 42, y: -17)
+
+            PixelDLogo(size: 42, background: accent)
+                .offset(x: -42, y: -58)
+
+            HStack(spacing: 4) {
+                ForEach(0..<9, id: \.self) { index in
+                    Rectangle()
+                        .fill(index < 6 ? Color.productive.opacity(0.75) : Color.driftMuted.opacity(0.22))
+                        .frame(width: 10, height: 7)
+                }
+            }
+            .offset(y: -10)
         }
     }
 }
@@ -727,7 +815,7 @@ private struct ActivityRow: View {
             Text(isLive ? "LIVE" : Self.timeFormatter.string(from: event.timestamp))
                 .font(TypeScale.monoXs)
                 .foregroundStyle(isLive ? Color.productive : Color.driftMuted)
-                .frame(width: 62, alignment: .leading)
+                .frame(width: 76, alignment: .leading)
 
             ZStack {
                 Rectangle()
@@ -754,17 +842,20 @@ private struct ActivityRow: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(formatDurationWords(event.durationMs))
-                    .font(TypeScale.monoXs)
-                    .foregroundStyle(.secondary)
-                Text(event.category.label.uppercased())
-                    .font(TypeScale.tiny)
-                    .foregroundStyle(event.category.color)
-            }
+            Text(formatDurationWords(event.durationMs))
+                .font(TypeScale.monoXs)
+                .foregroundStyle(.secondary)
+                .frame(width: 52, alignment: .trailing)
+
+            Text(event.category.label.uppercased())
+                .font(TypeScale.tiny)
+                .foregroundStyle(event.category.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(width: 90, alignment: .trailing)
         }
         .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.sm)
+        .frame(height: 48)
         .background(isLive ? Color.productive.opacity(0.06) : Color.clear)
     }
 
@@ -806,12 +897,12 @@ private struct ActivityRow: View {
 private extension View {
     func panelSurface() -> some View {
         background {
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(Color.driftPanel)
-                .shadow(color: Color.driftShadow, radius: 0, x: 4, y: 4)
+            Rectangle()
+                .fill(Color.driftPanel.opacity(0.94))
+                .shadow(color: Color.driftShadow.opacity(0.74), radius: 0, x: 3, y: 3)
                 .overlay {
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(Color.driftBorder, lineWidth: 1)
+                    Rectangle()
+                        .strokeBorder(Color.driftBorder.opacity(0.46), lineWidth: 1)
                 }
         }
     }
@@ -860,144 +951,181 @@ struct DriftAmbientBackground: View {
     @Environment(\.colorScheme) private var colorScheme
     let accent: Color
     let reduceMotion: Bool
-    @State private var shifted = false
+    var showLizard: Bool = true
 
     var body: some View {
-        GeometryReader { _ in
-            Canvas { context, size in
-                let isDark = colorScheme == .dark
-                let width = max(Int(size.width), 1)
-                let skyHeight = isDark ? size.height * 0.74 : size.height * 0.84
-                let motionOffset = shifted ? 9 : 0
-
-                func block(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat, _ color: Color) {
-                    context.fill(
-                        Path(CGRect(x: x.rounded(), y: y.rounded(), width: width.rounded(), height: height.rounded())),
-                        with: .color(color)
-                    )
-                }
-
-                func cloud(_ x: CGFloat, _ y: CGFloat, _ unit: CGFloat) {
-                    let shadow = isDark ? Color(red: 0.25, green: 0.12, blue: 0.34) : Color(red: 0.86, green: 0.53, blue: 0.55)
-                    let light = isDark ? Color(red: 0.38, green: 0.22, blue: 0.48) : Color(red: 1.0, green: 0.72, blue: 0.62)
-                    block(x, y + unit * 3, unit * 10, unit * 2, shadow)
-                    block(x + unit, y + unit * 2, unit * 3, unit * 2, shadow)
-                    block(x + unit * 3, y + unit, unit * 4, unit * 3, light)
-                    block(x + unit * 6, y + unit * 2, unit * 3, unit * 2, light)
-                    block(x + unit * 8, y + unit * 3, unit * 3, unit, shadow)
-                }
-
-                func cactus(_ x: CGFloat, _ ground: CGFloat, _ unit: CGFloat) {
-                    let dark = isDark ? Color(red: 0.055, green: 0.20, blue: 0.16) : Color(red: 0.12, green: 0.30, blue: 0.19)
-                    let green = isDark ? Color(red: 0.26, green: 0.40, blue: 0.18) : Color(red: 0.31, green: 0.45, blue: 0.19)
-                    let light = isDark ? Color(red: 0.55, green: 0.62, blue: 0.20) : Color(red: 0.58, green: 0.62, blue: 0.20)
-                    block(x, ground - unit * 9, unit * 3, unit * 9, green)
-                    block(x, ground - unit * 9, unit, unit * 9, dark)
-                    block(x + unit * 2, ground - unit * 9, unit, unit * 9, light)
-                    block(x - unit * 3, ground - unit * 6, unit * 3, unit * 2, green)
-                    block(x - unit * 3, ground - unit * 8, unit * 2, unit * 4, green)
-                    block(x + unit * 3, ground - unit * 5, unit * 3, unit * 2, dark)
-                    block(x + unit * 5, ground - unit * 7, unit * 2, unit * 4, green)
-                    block(x - unit, ground, unit * 5, unit, Color.driftShadow.opacity(0.55))
-                }
-
-                func mesa(_ centerX: CGFloat, _ baseY: CGFloat, _ unit: CGFloat, _ color: Color, _ highlight: Color) {
-                    block(centerX - unit * 3, baseY - unit * 5, unit * 6, unit, highlight)
-                    block(centerX - unit * 5, baseY - unit * 4, unit * 10, unit, color)
-                    block(centerX - unit * 7, baseY - unit * 3, unit * 14, unit, color)
-                    block(centerX - unit * 9, baseY - unit * 2, unit * 18, unit * 2, color)
-                    block(centerX - unit * 4, baseY - unit * 4, unit, unit * 3, Color.driftShadow.opacity(0.28))
-                    block(centerX, baseY - unit * 4, unit, unit * 2, Color.driftShadow.opacity(0.20))
-                }
-
-                let skyBands: [Color] = isDark
-                    ? [
-                        Color(red: 0.035, green: 0.016, blue: 0.09),
-                        Color(red: 0.055, green: 0.024, blue: 0.13),
-                        Color(red: 0.075, green: 0.032, blue: 0.17),
-                        Color(red: 0.11, green: 0.045, blue: 0.21),
-                        Color(red: 0.16, green: 0.065, blue: 0.24)
-                    ]
-                    : [
-                        Color(red: 0.990, green: 0.982, blue: 0.960),
-                        Color(red: 0.988, green: 0.974, blue: 0.948),
-                        Color(red: 0.982, green: 0.958, blue: 0.925),
-                        Color(red: 0.972, green: 0.938, blue: 0.898),
-                        Color(red: 0.958, green: 0.910, blue: 0.860)
-                    ]
-                let bandHeight = skyHeight / CGFloat(skyBands.count)
-                for (index, color) in skyBands.enumerated() {
-                    block(0, CGFloat(index) * bandHeight, size.width, bandHeight + 1, color)
-                }
-
-                let starCount = isDark ? 96 : 26
-                for index in 0..<starCount {
-                    let x = CGFloat((index * 97 + motionOffset) % width)
-                    let y = CGFloat((index * 53 + 17) % max(Int(skyHeight * 0.83), 1))
-                    let side: CGFloat = index.isMultiple(of: 13) ? 3 : (index.isMultiple(of: 5) ? 2 : 1)
-                    let color = index.isMultiple(of: 9)
-                        ? Color.streak.opacity(isDark ? 0.86 : 0.38)
-                        : (isDark ? Color.white.opacity(0.46) : Color.driftText.opacity(0.12))
-                    block(x, y, side, side, color)
-                    if index.isMultiple(of: 17) {
-                        block(x - side, y, side * 3, side, color)
-                        block(x, y - side, side, side * 3, color)
-                    }
-                }
-
-                cloud(size.width * 0.10 + CGFloat(motionOffset), size.height * 0.14, 5)
-                cloud(size.width * 0.58 - CGFloat(motionOffset), size.height * 0.22, 4)
-
-                let celestialX = size.width * 0.82
-                let celestialY = size.height * 0.09
-                let moonLight = isDark ? Color(red: 1.0, green: 0.90, blue: 0.48) : Color(red: 1.0, green: 0.82, blue: 0.34)
-                let moonShade = isDark ? Color(red: 0.82, green: 0.56, blue: 0.25) : Color(red: 0.98, green: 0.68, blue: 0.34)
-                block(celestialX + 8, celestialY, 24, 4, moonLight)
-                block(celestialX + 4, celestialY + 4, 32, 4, moonLight)
-                block(celestialX, celestialY + 8, 40, 24, moonLight)
-                block(celestialX + 4, celestialY + 32, 32, 4, moonLight)
-                block(celestialX + 8, celestialY + 36, 24, 4, moonShade)
-                block(celestialX + 28, celestialY + 12, 12, 20, moonShade)
-                block(celestialX + 10, celestialY + 14, 6, 6, moonShade.opacity(0.72))
-                block(celestialX + 20, celestialY + 24, 7, 7, moonShade.opacity(0.72))
-
-                let mesaColor = isDark ? Color(red: 0.22, green: 0.08, blue: 0.20) : Color(red: 0.78, green: 0.58, blue: 0.68).opacity(0.32)
-                let mesaLight = isDark ? Color(red: 0.38, green: 0.13, blue: 0.24) : Color(red: 0.95, green: 0.70, blue: 0.54).opacity(0.42)
-                mesa(size.width * 0.17, skyHeight + 2, 7, mesaColor, mesaLight)
-                mesa(size.width * 0.78, skyHeight + 6, 6, mesaColor, mesaLight)
-
-                let farSand = isDark ? Color(red: 0.45, green: 0.20, blue: 0.20) : Color(red: 0.99, green: 0.78, blue: 0.58)
-                let midSand = isDark ? Color(red: 0.58, green: 0.27, blue: 0.20) : Color(red: 1.00, green: 0.70, blue: 0.48)
-                let nearSand = isDark ? Color(red: 0.66, green: 0.32, blue: 0.20) : Color(red: 1.00, green: 0.62, blue: 0.38)
-                block(0, skyHeight, size.width, size.height - skyHeight, farSand)
-                block(0, skyHeight + size.height * 0.07, size.width, size.height, midSand)
-                block(0, skyHeight + size.height * 0.16, size.width, size.height, nearSand)
-
-                for index in 0..<14 {
-                    let x = CGFloat((index * 137 + 31) % width)
-                    let y = skyHeight + CGFloat((index * 29) % max(Int(size.height - skyHeight), 1))
-                    let run = CGFloat(10 + (index * 7) % 34)
-                    block(x, y, run, 3, index.isMultiple(of: 2) ? mesaLight.opacity(0.46) : Color.driftShadow.opacity(0.20))
-                }
-
-                cactus(size.width * 0.08, size.height - 10, max(3, min(7, size.width / 150)))
-                cactus(size.width * 0.88, size.height - 12, max(3, min(6, size.width / 180)))
-                cactus(size.width * 0.58, size.height - 8, max(2, min(4, size.width / 260)))
-
-                for index in 0..<9 {
-                    let x = CGFloat((index * 173 + motionOffset * 2) % width)
-                    let y = size.height * 0.64 + CGFloat((index * 37) % max(Int(size.height * 0.20), 1))
-                    block(x, y, 3, 3, Color.streak.opacity(isDark ? 0.28 : 0.20))
-                }
-            }
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) {
-                    shifted = true
-                }
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 12.0)) { timeline in
+            Canvas(opaque: false, rendersAsynchronously: true) { context, size in
+                drawScene(in: context, size: size, time: timeline.date.timeIntervalSinceReferenceDate)
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func drawScene(in context: GraphicsContext, size: CGSize, time: TimeInterval) {
+        let isDark = colorScheme == .dark
+        let width = max(Int(size.width), 1)
+        let height = max(Int(size.height), 1)
+        let skyHeight = isDark ? size.height * 0.80 : size.height * 0.82
+
+        func block(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat, _ color: Color) {
+            context.fill(
+                Path(CGRect(x: x.rounded(), y: y.rounded(), width: width.rounded(), height: height.rounded())),
+                with: .color(color)
+            )
+        }
+
+        func cloud(_ x: CGFloat, _ y: CGFloat, _ unit: CGFloat, opacity: Double) {
+            let shadow = isDark ? Color(red: 0.24, green: 0.13, blue: 0.32).opacity(opacity) : Color(red: 0.80, green: 0.69, blue: 0.82).opacity(opacity)
+            let light = isDark ? Color(red: 0.36, green: 0.22, blue: 0.45).opacity(opacity * 0.88) : Color(red: 0.92, green: 0.82, blue: 0.88).opacity(opacity * 0.85)
+            block(x, y + unit * 3, unit * 10, unit * 2, shadow)
+            block(x + unit, y + unit * 2, unit * 3, unit * 2, shadow)
+            block(x + unit * 3, y + unit, unit * 4, unit * 3, light)
+            block(x + unit * 6, y + unit * 2, unit * 3, unit * 2, light)
+            block(x + unit * 8, y + unit * 3, unit * 3, unit, shadow)
+        }
+
+        func cactus(_ x: CGFloat, _ ground: CGFloat, _ unit: CGFloat, opacity: Double = 1) {
+            let dark = (isDark ? Color(red: 0.08, green: 0.20, blue: 0.14) : Color(red: 0.17, green: 0.31, blue: 0.20)).opacity(opacity)
+            let green = (isDark ? Color(red: 0.25, green: 0.39, blue: 0.17) : Color(red: 0.34, green: 0.48, blue: 0.25)).opacity(opacity)
+            let light = (isDark ? Color(red: 0.47, green: 0.56, blue: 0.18) : Color(red: 0.57, green: 0.64, blue: 0.30)).opacity(opacity)
+            block(x, ground - unit * 9, unit * 3, unit * 9, green)
+            block(x, ground - unit * 9, unit, unit * 9, dark)
+            block(x + unit * 2, ground - unit * 9, unit, unit * 9, light)
+            block(x - unit * 3, ground - unit * 6, unit * 3, unit * 2, green)
+            block(x - unit * 3, ground - unit * 8, unit * 2, unit * 4, green)
+            block(x + unit * 3, ground - unit * 5, unit * 3, unit * 2, dark)
+            block(x + unit * 5, ground - unit * 7, unit * 2, unit * 4, green)
+            block(x - unit, ground, unit * 5, unit, Color.driftShadow.opacity(0.34 * opacity))
+        }
+
+        func mesa(_ centerX: CGFloat, _ baseY: CGFloat, _ unit: CGFloat, _ color: Color, _ highlight: Color) {
+            block(centerX - unit * 3, baseY - unit * 5, unit * 6, unit, highlight)
+            block(centerX - unit * 5, baseY - unit * 4, unit * 10, unit, color)
+            block(centerX - unit * 7, baseY - unit * 3, unit * 14, unit, color)
+            block(centerX - unit * 9, baseY - unit * 2, unit * 18, unit * 2, color)
+            block(centerX - unit * 4, baseY - unit * 4, unit, unit * 3, Color.driftShadow.opacity(0.12))
+            block(centerX, baseY - unit * 4, unit, unit * 2, Color.driftShadow.opacity(0.10))
+        }
+
+        func lizard(_ x: CGFloat, _ y: CGFloat, tongue: Bool, tailUp: Bool) {
+            let body = isDark ? Color(red: 0.33, green: 0.49, blue: 0.25) : Color(red: 0.39, green: 0.55, blue: 0.29)
+            let dark = isDark ? Color(red: 0.12, green: 0.25, blue: 0.15) : Color(red: 0.20, green: 0.35, blue: 0.19)
+            let belly = isDark ? Color(red: 0.56, green: 0.63, blue: 0.25) : Color(red: 0.62, green: 0.67, blue: 0.32)
+            block(x + 10, y + 3, 21, 7, body)
+            block(x + 15, y + 8, 12, 2, belly)
+            block(x + 31, y + 2, 8, 6, body)
+            block(x + 36, y + 4, 2, 2, Color.driftText.opacity(isDark ? 0.72 : 0.56))
+            block(x + 3, y + (tailUp ? 1 : 5), 8, 3, dark)
+            block(x, y + (tailUp ? 0 : 6), 5, 2, dark)
+            block(x + 11, y + 10, 3, 3, dark)
+            block(x + 22, y + 10, 3, 3, dark)
+            block(x + 29, y + 9, 3, 3, dark)
+            block(x + 39, y + 6, 3, 2, body)
+            if tongue {
+                block(x + 42, y + 6, 5, 1, Color.distraction)
+                block(x + 47, y + 5, 2, 1, Color.distraction)
+            }
+        }
+
+        let skyBands: [Color] = isDark
+            ? [
+                Color(red: 0.026, green: 0.023, blue: 0.071),
+                Color(red: 0.039, green: 0.033, blue: 0.095),
+                Color(red: 0.052, green: 0.043, blue: 0.122),
+                Color(red: 0.070, green: 0.050, blue: 0.153),
+                Color(red: 0.094, green: 0.061, blue: 0.183),
+                Color(red: 0.126, green: 0.075, blue: 0.208)
+            ]
+            : [
+                Color(red: 0.996, green: 0.987, blue: 0.970),
+                Color(red: 0.995, green: 0.976, blue: 0.948),
+                Color(red: 0.992, green: 0.961, blue: 0.921),
+                Color(red: 0.984, green: 0.936, blue: 0.890),
+                Color(red: 0.972, green: 0.907, blue: 0.845),
+                Color(red: 0.955, green: 0.870, blue: 0.790)
+            ]
+        let bandHeight = skyHeight / CGFloat(skyBands.count)
+        for (index, color) in skyBands.enumerated() {
+            block(0, CGFloat(index) * bandHeight, size.width, bandHeight + 1, color)
+        }
+
+        if isDark {
+            for index in 0..<46 {
+                let x = CGFloat((index * 149 + 37) % width)
+                let y = CGFloat((index * 83 + 19) % max(Int(skyHeight * 0.72), 1))
+                let side: CGFloat = index.isMultiple(of: 11) ? 2 : 1
+                let star = index.isMultiple(of: 7) ? Color.streak.opacity(0.54) : Color.white.opacity(0.34)
+                block(x, y, side, side, star)
+                if index.isMultiple(of: 17) {
+                    block(x - 2, y, 5, 1, star.opacity(0.72))
+                    block(x, y - 2, 1, 5, star.opacity(0.72))
+                }
+            }
+        }
+
+        for index in 0..<75 {
+            let x = CGFloat((index * 71 + 13) % width)
+            let range = max(Int(size.height - skyHeight), 1)
+            let y = skyHeight + CGFloat((index * 47 + 29) % range)
+            let particle = index.isMultiple(of: 3)
+                ? Color.streak.opacity(isDark ? 0.16 : 0.22)
+                : (isDark ? Color.white.opacity(0.07) : Color.accentDeep.opacity(0.13))
+            block(x, y, index.isMultiple(of: 5) ? 2 : 1, index.isMultiple(of: 7) ? 2 : 1, particle)
+        }
+
+        let mesaColor = isDark ? Color(red: 0.20, green: 0.08, blue: 0.18).opacity(0.48) : Color(red: 0.72, green: 0.57, blue: 0.68).opacity(0.18)
+        let mesaLight = isDark ? Color(red: 0.35, green: 0.13, blue: 0.24).opacity(0.42) : Color(red: 0.96, green: 0.70, blue: 0.52).opacity(0.20)
+        mesa(size.width * 0.18, skyHeight + 2, 7, mesaColor, mesaLight)
+        mesa(size.width * 0.82, skyHeight + 5, 6, mesaColor, mesaLight)
+
+        let sandBands: [Color] = isDark
+            ? [
+                Color(red: 0.28, green: 0.12, blue: 0.17),
+                Color(red: 0.35, green: 0.16, blue: 0.17),
+                Color(red: 0.42, green: 0.20, blue: 0.16),
+                Color(red: 0.48, green: 0.24, blue: 0.17)
+            ]
+            : [
+                Color(red: 0.99, green: 0.84, blue: 0.70),
+                Color(red: 0.99, green: 0.79, blue: 0.64),
+                Color(red: 0.97, green: 0.73, blue: 0.56),
+                Color(red: 0.94, green: 0.67, blue: 0.49)
+            ]
+        let groundHeight = size.height - skyHeight
+        for (index, color) in sandBands.enumerated() {
+            let y = skyHeight + groundHeight * CGFloat(index) / CGFloat(sandBands.count)
+            block(0, y, size.width, groundHeight / CGFloat(sandBands.count) + 1, color)
+        }
+
+        for index in 0..<32 {
+            let x = CGFloat((index * 173 + 41) % width)
+            let y = skyHeight + CGFloat((index * 31 + 9) % max(Int(groundHeight), 1))
+            let run = CGFloat(8 + (index * 7) % 34)
+            block(x, y, run, 2, Color.driftShadow.opacity(isDark ? 0.18 : 0.12))
+        }
+
+        cactus(size.width * 0.08, size.height - 10, max(3, min(7, size.width / 150)), opacity: 0.88)
+        cactus(size.width * 0.88, size.height - 12, max(3, min(6, size.width / 180)), opacity: 0.82)
+        cactus(size.width * 0.58, size.height - 8, max(2, min(4, size.width / 260)), opacity: 0.70)
+
+        guard showLizard else { return }
+        let routeDuration = 86.0
+        let pauseEvery = 18.0
+        let pauseDuration = 2.0
+        let raw = reduceMotion ? 12.0 : time.truncatingRemainder(dividingBy: routeDuration)
+        let segmentTime = raw.truncatingRemainder(dividingBy: pauseEvery)
+        let pausesCompleted = floor(raw / pauseEvery)
+        let pauseOverflow = max(0, segmentTime - (pauseEvery - pauseDuration))
+        let movingTime = raw - pausesCompleted * pauseDuration - pauseOverflow
+        let movingTotal = routeDuration - floor(routeDuration / pauseEvery) * pauseDuration
+        let progress = CGFloat(max(0, min(1, movingTime / movingTotal)))
+        let lizardX = -54 + (size.width + 108) * progress
+        let lizardY = CGFloat(height) - 24
+        let isPaused = reduceMotion || segmentTime > pauseEvery - pauseDuration
+        let tongue = isPaused && !reduceMotion && Int((segmentTime - (pauseEvery - pauseDuration)) * 4).isMultiple(of: 2)
+        let tailUp = reduceMotion ? false : Int(time * 2).isMultiple(of: 2)
+        lizard(lizardX, lizardY, tongue: tongue, tailUp: tailUp)
     }
 }
