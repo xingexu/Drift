@@ -6,12 +6,91 @@ private struct DriftSidebarWorld: View {
     let accent: Color
 
     var body: some View {
-        ZStack {
-            Color.driftPanel
-            DriftAmbientBackground(accent: accent, reduceMotion: false)
-                .opacity(colorScheme == .dark ? 0.72 : 0.66)
-        }
+        DriftHomeBackdrop(mode: colorScheme == .dark ? .sidebarDark : .sidebarLight)
         .accessibilityHidden(true)
+    }
+}
+
+private struct DriftHomeBackdrop: View {
+    enum Mode {
+        case contentDark
+        case contentLight
+        case sidebarDark
+        case sidebarLight
+    }
+
+    let mode: Mode
+
+    var body: some View {
+        GeometryReader { proxy in
+            Image("drift-home-scene", bundle: .module)
+                .resizable()
+                .interpolation(.none)
+                .antialiased(false)
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .scaleEffect(scale)
+                .offset(x: xOffset(for: proxy.size), y: yOffset(for: proxy.size))
+                .clipped()
+                .overlay {
+                    Rectangle().fill(overlayColor)
+                }
+                .overlay {
+                    LinearGradient(
+                        colors: gradientColors,
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var scale: CGFloat {
+        switch mode {
+        case .contentDark, .contentLight: return 1.03
+        case .sidebarDark, .sidebarLight: return 1.18
+        }
+    }
+
+    private func xOffset(for size: CGSize) -> CGFloat {
+        switch mode {
+        case .contentDark, .contentLight: return 0
+        case .sidebarDark, .sidebarLight: return -size.width * 0.12
+        }
+    }
+
+    private func yOffset(for size: CGSize) -> CGFloat {
+        switch mode {
+        case .contentDark, .contentLight: return -size.height * 0.03
+        case .sidebarDark, .sidebarLight: return -size.height * 0.02
+        }
+    }
+
+    private var overlayColor: Color {
+        switch mode {
+        case .contentDark: return Color(red: 0.03, green: 0.02, blue: 0.08).opacity(0.18)
+        case .contentLight: return Color.white.opacity(0.38)
+        case .sidebarDark: return Color(red: 0.03, green: 0.02, blue: 0.08).opacity(0.38)
+        case .sidebarLight: return Color.white.opacity(0.46)
+        }
+    }
+
+    private var gradientColors: [Color] {
+        switch mode {
+        case .contentDark, .sidebarDark:
+            return [
+                Color(red: 0.02, green: 0.01, blue: 0.06).opacity(0.34),
+                Color.clear,
+                Color.black.opacity(0.22)
+            ]
+        case .contentLight, .sidebarLight:
+            return [
+                Color.white.opacity(0.28),
+                Color.white.opacity(0.12),
+                Color(red: 1.0, green: 0.74, blue: 0.50).opacity(0.18)
+            ]
+        }
     }
 }
 
@@ -201,13 +280,21 @@ struct MainAppView: View {
         .background {
             ZStack {
                 Color.driftBackground
-                DriftAmbientBackground(
-                    accent: appState.accentColor,
-                    reduceMotion: appState.reduceMotion
-                )
+                DriftHomeBackdrop(mode: resolvedBackdropMode)
             }
         }
         .animation(.easeOut(duration: 0.22), value: appState.currentTab)
+    }
+
+    private var resolvedBackdropMode: DriftHomeBackdrop.Mode {
+        switch appState.theme {
+        case .light: return .contentLight
+        case .dark: return .contentDark
+        case .system:
+            return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? .contentDark
+                : .contentLight
+        }
     }
 
     private var pageTransition: AnyTransition {
@@ -323,23 +410,22 @@ struct TopbarView: View {
 
             Spacer()
 
-            Rectangle()
-                .fill(tracker.isTracking ? Color.productive : Color.productive.opacity(0.80))
-                .frame(width: 8, height: 8)
+            StatusDot(status: tracker.isTracking ? .tracking : .idle)
             Text(tracker.isTracking ? "Tracking" : "Offline")
                 .font(TypeScale.caption)
                 .foregroundStyle(Color.driftText)
-            Text("Last sync: 2h ago")
+            Text(tracker.isTracking ? "Local capture" : "Local mode")
                 .font(TypeScale.caption)
                 .foregroundStyle(Color.driftMuted)
         }
         .padding(.horizontal, 28)
         .frame(height: 58)
         .background(
-            Color.driftPanel.opacity(0.96)
+            Rectangle()
+                .fill(Color.driftPanel.opacity(0.76))
                 .overlay(alignment: .bottom) {
                     Rectangle()
-                        .fill(Color.driftBorder.opacity(0.58))
+                        .fill(Color.border.opacity(0.44))
                         .frame(height: 1)
                 }
         )
@@ -369,7 +455,7 @@ private struct SidebarView: View {
             Spacer(minLength: 0)
             localOnlySection
         }
-        .frame(width: 228)
+        .frame(width: 232)
         .background {
             DriftSidebarWorld(accent: appState.accentColor)
         }
@@ -378,17 +464,17 @@ private struct SidebarView: View {
     // MARK: - Header
 
     private var sidebarHeader: some View {
-        HStack(spacing: Space.sm) {
-            PixelDLogo(size: 39, background: appState.accentColor)
+        HStack(spacing: Space.md) {
+            PixelDLogo(size: 42, background: appState.accentColor)
 
             Text("Drift")
-                .font(.system(size: 21, weight: .semibold, design: .default))
+                .font(PixelFont.font(18))
                 .foregroundStyle(Color.driftText)
 
             Spacer()
         }
-        .padding(.horizontal, 10)
-        .frame(height: 39)
+        .padding(.horizontal, 16)
+        .frame(height: 42)
         .padding(.top, 22)
         .padding(.bottom, 32)
     }
@@ -399,13 +485,13 @@ private struct SidebarView: View {
         VStack(alignment: .leading, spacing: Space.xxs) {
             Text("DRIFT")
                 .font(TypeScale.tiny)
-                .tracking(1.6)
+                .tracking(0)
                 .foregroundStyle(Color.driftMuted.opacity(0.75))
-                .padding(.horizontal, 11)
+                .padding(.horizontal, 16)
                 .padding(.top, 0)
                 .padding(.bottom, 10)
 
-            VStack(spacing: Space.xxxs) {
+            VStack(spacing: 4) {
                 ForEach(Tab.allCases) { tab in
                     SidebarNavItem(
                         icon: tab.icon,
@@ -420,7 +506,7 @@ private struct SidebarView: View {
                     }
                 }
             }
-            .padding(.horizontal, Space.xs)
+            .padding(.horizontal, Space.sm)
             .padding(.bottom, Space.xs)
         }
     }
@@ -428,28 +514,30 @@ private struct SidebarView: View {
     // MARK: - Local State
 
     private var localOnlySection: some View {
-        HStack(spacing: Space.xs) {
+        HStack(spacing: Space.sm) {
             Rectangle()
                 .fill(Color.productive)
-                .frame(width: 9, height: 9)
+                .frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 1) {
                 Text("LOCAL MODE")
                     .font(TypeScale.tiny)
-                    .tracking(1.2)
+                    .tracking(0)
                     .foregroundStyle(Color.driftText)
                 Text("Your activity stays on this Mac")
                     .font(TypeScale.tiny)
                     .foregroundStyle(Color.driftMuted)
             }
             Spacer()
+            SidebarMiniCactus()
+                .frame(width: 24, height: 34)
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
-        .frame(minHeight: 54)
+        .padding(.horizontal, 12)
+        .frame(height: 58)
         .background {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Color.driftPanel)
-                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Color.border.opacity(0.55), lineWidth: 1))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.driftPanel.opacity(0.78))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.border.opacity(0.42), lineWidth: 1))
+                .shadow(color: Color.black.opacity(0.22), radius: 0, x: 3, y: 3)
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 13)
@@ -485,29 +573,41 @@ struct SidebarNavItem: View {
 
                 Text(label)
                     .font(TypeScale.caption)
-                    .tracking(0.1)
+                    .tracking(0)
                     .foregroundStyle(
                         isSelected
                             ? Color.driftText
                             : (isHovered ? Color.driftText.opacity(0.82) : Color.driftMuted)
                     )
 
-                Spacer()
+            Spacer()
 
-                Rectangle()
-                    .fill(appState.accentColor)
-                    .frame(width: 8, height: 8)
+            Rectangle()
+                .fill(appState.accentColor)
+                    .frame(width: 7, height: 7)
                     .opacity(isSelected ? 1 : 0)
             }
             .padding(.horizontal, 12)
-            .frame(height: 43)
+            .frame(height: 46)
             .background {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(
                         isSelected
-                            ? appState.accentColor.opacity(0.20)
-                            : (isHovered ? Color.driftPanelRaised.opacity(0.72) : Color.clear)
+                            ? appState.accentColor.opacity(0.11)
+                            : (isHovered ? Color.driftPanelRaised.opacity(0.28) : Color.clear)
                     )
+                    .background {
+                        if isSelected || isHovered {
+                            Rectangle().fill(Color.driftPanel.opacity(0.50))
+                        }
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(
+                                isSelected ? appState.accentColor.opacity(0.38) : Color.clear,
+                                lineWidth: 1
+                            )
+                    }
                     .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelected)
                     .animation(Anim.hover, value: isHovered)
             }
@@ -515,7 +615,7 @@ struct SidebarNavItem: View {
             .overlay(alignment: .leading) {
                 Rectangle()
                     .fill(appState.accentColor)
-                    .frame(width: 3)
+                    .frame(width: 2)
                     .padding(.vertical, 0)
                     .opacity(isSelected ? 1 : 0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelected)
@@ -533,6 +633,20 @@ struct SidebarNavItem: View {
         case "Tracking": return "waveform.path.ecg"
         case "Focus + Blocking": return "scope"
         default: return "gearshape"
+        }
+    }
+}
+
+private struct SidebarMiniCactus: View {
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle().fill(Color.productive.opacity(0.32)).frame(width: 20, height: 3)
+            Rectangle().fill(Color.productive.opacity(0.72)).frame(width: 6, height: 25).offset(y: -2)
+            Rectangle().fill(Color.productive.opacity(0.38)).frame(width: 2, height: 25).offset(x: -2, y: -2)
+            Rectangle().fill(Color.productive.opacity(0.80)).frame(width: 7, height: 4).offset(x: -6, y: -15)
+            Rectangle().fill(Color.productive.opacity(0.70)).frame(width: 4, height: 11).offset(x: -9, y: -18)
+            Rectangle().fill(Color.productive.opacity(0.76)).frame(width: 8, height: 4).offset(x: 7, y: -18)
+            Rectangle().fill(Color.productive.opacity(0.66)).frame(width: 4, height: 12).offset(x: 10, y: -22)
         }
     }
 }

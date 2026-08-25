@@ -16,14 +16,10 @@ struct StudyView: View {
 
     var body: some View {
         ZStack {
-            // Ambient layered background
-            AmbientBackground(
-                mode: viewModel.mode,
-                driftFraction: viewModel.driftFraction
-            )
+            Color.clear
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: Space.lg) {
+                VStack(spacing: Space.xxl) {
 
                     // Blocked banner
                     if viewModel.showBlockedBanner {
@@ -36,10 +32,9 @@ struct StudyView: View {
 
                     // Page header
                     HStack(alignment: .top, spacing: Space.md) {
-                        Image(systemName: "scope")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Color.accent)
-                            .padding(.top, 2)
+                        StudyPageIcon(color: Color.accent)
+                            .frame(width: 30, height: 30)
+                            .padding(.top, 1)
                         VStack(alignment: .leading, spacing: Space.xs) {
                             Text("FOCUS + BLOCKING")
                                 .font(TypeScale.h1)
@@ -62,7 +57,11 @@ struct StudyView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     }
                 }
-                .padding(Space.page)
+                .frame(maxWidth: 1320, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.horizontal, 28)
+                .padding(.top, 26)
+                .padding(.bottom, 32)
             }
 
             // Completion flash overlay
@@ -103,7 +102,7 @@ struct StudyView: View {
     private var mainCard: some View {
         HStack(alignment: .top, spacing: 12) {
             ringTimerPanel
-                .frame(minWidth: 300, maxWidth: 360, minHeight: 353)
+                .frame(minWidth: 330, maxWidth: 360, minHeight: 353)
                 .pixelPanel()
 
             controlsPanel
@@ -124,13 +123,12 @@ struct StudyView: View {
     private var ringTimerPanel: some View {
         ZStack {
             Rectangle()
-                .stroke(Color.accentDeep, lineWidth: 4)
+                .stroke(Color.accentDeep.opacity(0.46), lineWidth: 1)
                 .overlay {
                     Rectangle()
-                        .stroke(Color.streak, lineWidth: 2)
+                        .stroke(Color.streak.opacity(0.34), lineWidth: 1)
                         .padding(7)
                 }
-                .shadow(color: Color.accentDeep.opacity(0.25), radius: 0, x: 5, y: 5)
 
             VStack(spacing: 12) {
                 Image(systemName: "hourglass")
@@ -138,25 +136,25 @@ struct StudyView: View {
                     .foregroundStyle(Color.streak)
                     .padding(.bottom, 18)
                 Text(formatCountdown(viewModel.timeRemaining))
-                    .font(.system(size: 68, weight: .semibold, design: .rounded))
+                    .font(PixelFont.font(56))
                     .contentTransition(.numericText())
                     .animation(Anim.count, value: viewModel.timeRemaining)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
 
                 Text(viewModel.modeLabelDisplay)
-                    .font(.system(size: 13, weight: .medium, design: .default))
+                    .font(TypeScale.caption)
                     .foregroundStyle(viewModel.mode == .idle
                         ? Color.secondary.opacity(0.5)
                         : viewModel.ringColor.opacity(0.85))
-                    .tracking(2.5)
+                    .tracking(0)
                     .textCase(.uppercase)
                     .animation(Anim.quick, value: viewModel.mode)
 
                 HStack(spacing: 5) {
                     ForEach(0..<10, id: \.self) { index in
                         Rectangle()
-                            .fill(index < 8 ? Color.productive : Color.clear)
+                            .fill(index < Int((viewModel.progress * 10).rounded(.up)) ? Color.productive : Color.clear)
                             .overlay(Rectangle().strokeBorder(Color.border.opacity(0.6), lineWidth: 1))
                             .frame(width: 13, height: 9)
                     }
@@ -189,7 +187,7 @@ struct StudyView: View {
                     Text("FOCUS")
                         .font(TypeScale.tiny)
                         .foregroundStyle(.tertiary)
-                        .tracking(1.0)
+                        .tracking(0)
                     ForEach([25, 45, 60], id: \.self) { mins in
                         DurationChip(
                             label: "\(mins)m",
@@ -208,7 +206,7 @@ struct StudyView: View {
                     Text("BREAK")
                         .font(TypeScale.tiny)
                         .foregroundStyle(.tertiary)
-                        .tracking(1.0)
+                        .tracking(0)
                     ForEach([5, 10, 15], id: \.self) { mins in
                         DurationChip(
                             label: "\(mins)m",
@@ -242,8 +240,8 @@ struct StudyView: View {
                         Rectangle()
                             .fill(Color.accent)
                             .frame(width: 76, height: 76)
-                            .overlay(Rectangle().strokeBorder(Color.driftText.opacity(0.45), lineWidth: 2))
-                            .shadow(color: Color.driftShadow, radius: 0, x: 6, y: 6)
+                            .overlay(Rectangle().strokeBorder(Color.driftText.opacity(0.30), lineWidth: 1))
+                            .shadow(color: Color.driftShadow, radius: 0, x: 4, y: 4)
                             .overlay(
                                 Image(systemName: "play.fill")
                                     .font(.system(size: 20, weight: .semibold))
@@ -350,13 +348,28 @@ struct StudyView: View {
         .padding(.horizontal, Space.lg)
         .padding(.vertical, Space.md)
         .background(
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+            Rectangle()
                 .fill(Color.distraction.opacity(0.04))
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .strokeBorder(Color.distraction.opacity(0.12), lineWidth: 0.5)
+                    Rectangle()
+                        .strokeBorder(Color.distraction.opacity(0.18), lineWidth: 1)
                 )
         )
+    }
+}
+
+private struct StudyPageIcon: View {
+    let color: Color
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(color.opacity(0.11))
+                .overlay(Rectangle().strokeBorder(color.opacity(0.34), lineWidth: 1))
+            Rectangle().stroke(color, lineWidth: 2).frame(width: 16, height: 16)
+            Rectangle().fill(color).frame(width: 6, height: 6)
+            Rectangle().fill(Color.productive).frame(width: 4, height: 4).offset(x: 9, y: -9)
+        }
     }
 }
 
@@ -799,12 +812,12 @@ private struct FocusBlockerSection: View {
                             blocker.isBlocking
                                 ? Color.distraction.opacity(0.42)
                                 : Color.driftBorder,
-                            lineWidth: 2
+                            lineWidth: 1
                         )
                 }
                 .shadow(
                     color: blocker.isBlocking ? Color.distraction.opacity(0.22) : Color.driftShadow,
-                    radius: 0, x: 7, y: 7
+                    radius: 0, x: 3, y: 3
                 )
         }
         .onAppear { startTick() }

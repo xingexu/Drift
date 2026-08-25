@@ -551,9 +551,9 @@ enum AppCategory: String, Codable {
 
     var color: Color {
         switch self {
-        case .productive:  return Color("Green")
-        case .neutral:     return Color("TextMuted")
-        case .distraction: return Color("Red")
+        case .productive:  return .productive
+        case .neutral:     return .driftMuted
+        case .distraction: return .distraction
         }
     }
 

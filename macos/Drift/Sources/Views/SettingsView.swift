@@ -11,12 +11,10 @@ struct SettingsView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: Space.xxl) {
 
-                // Page header
                 HStack(alignment: .top, spacing: Space.md) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(Color.driftMuted)
-                        .padding(.top, 2)
+                    SettingsPageIcon(color: Color.streak)
+                        .frame(width: 30, height: 30)
+                        .padding(.top, 1)
                     VStack(alignment: .leading, spacing: Space.xs) {
                         Text("SETTINGS")
                             .font(TypeScale.h1)
@@ -41,10 +39,11 @@ struct SettingsView: View {
                                 get: { appState.theme },
                                 set: { appState.setTheme($0) }
                             ), options: [
+                                (AppTheme.system.label, AppTheme.system),
                                 (AppTheme.light.label, AppTheme.light),
                                 (AppTheme.dark.label, AppTheme.dark)
                             ])
-                            .frame(width: 160)
+                            .frame(width: 230)
                             .accessibilityLabel("Theme selector")
                             .accessibilityValue(appState.theme.label)
                         }
@@ -130,12 +129,11 @@ struct SettingsView: View {
                 settingsSection("DANGER ZONE", icon: "exclamationmark.triangle") {
                     VStack(alignment: .leading, spacing: Space.sm) {
                         HStack(spacing: Space.md) {
-                            IconBadge(systemName: "trash", color: Color.distraction, size: 28)
+                            IconBadge(systemName: "trash", color: Color.distraction, size: 36)
 
                             VStack(alignment: .leading, spacing: Space.xxxs) {
                                 Text("Reset All Data")
-                                    .font(TypeScale.bodyMd)
-                                    .fontWeight(.medium)
+                                    .font(TypeScale.heading)
                                     .foregroundStyle(Color.distraction)
                                 Text("Permanently erase all sessions and local preferences.")
                                     .font(TypeScale.caption)
@@ -149,7 +147,6 @@ struct SettingsView: View {
                             } label: {
                                 Text("Reset")
                                     .font(TypeScale.caption)
-                                    .fontWeight(.semibold)
                                     .foregroundStyle(Color.distraction)
                                     .padding(.horizontal, Space.md)
                                     .padding(.vertical, Space.xxs + 1)
@@ -158,7 +155,7 @@ struct SettingsView: View {
                                             .fill(Color.distraction.opacity(0.10))
                                             .overlay(
                                                 Rectangle()
-                                                    .strokeBorder(Color.distraction.opacity(0.42), lineWidth: 2)
+                                                    .strokeBorder(Color.distraction.opacity(0.42), lineWidth: 1)
                                             )
                                     )
                             }
@@ -167,18 +164,16 @@ struct SettingsView: View {
                             .accessibilityHint("Opens a confirmation dialog before erasing all data")
                         }
                         .padding(Space.md)
+                        .frame(minHeight: 72)
                     }
-                    .background(
-                        Rectangle()
-                            .fill(Color.driftPanel)
-                            .overlay(
-                                Rectangle().strokeBorder(Color.distraction.opacity(0.42), lineWidth: 2)
-                            )
-                    )
-                    .clipShape(Rectangle())
+                    .pixelPanel(border: Color.distraction.opacity(0.70), fill: Color.driftPanel, shadow: true)
                 }
             }
-            .padding(Space.page)
+            .frame(maxWidth: 1320, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .padding(.horizontal, 28)
+            .padding(.top, 26)
+            .padding(.bottom, 32)
         }
         .alert("Reset All Data?", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -209,7 +204,7 @@ struct SettingsView: View {
 
                 Text(title)
                     .font(TypeScale.label)
-                    .tracking(1.5)
+                    .tracking(0)
                     .foregroundStyle(Color.streak)
             }
 
@@ -253,21 +248,27 @@ struct SettingsView: View {
     }
 }
 
+private struct SettingsPageIcon: View {
+    let color: Color
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(color.opacity(0.11))
+                .overlay(Rectangle().strokeBorder(color.opacity(0.34), lineWidth: 1))
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(color)
+        }
+    }
+}
+
 // MARK: - Section Card Modifier
 
 private extension View {
     func sectionCard() -> some View {
         self
-            .background(
-                Rectangle()
-                    .fill(Color.driftPanel)
-                    .overlay(
-                        Rectangle()
-                            .strokeBorder(Color.driftBorder, lineWidth: 2)
-                    )
-                    .shadow(color: Color.driftShadow, radius: 0, x: 7, y: 7)
-            )
-            .clipShape(Rectangle())
+            .pixelPanel(border: Color.driftBorder, fill: Color.driftPanel, shadow: true)
     }
 }
 
@@ -297,11 +298,11 @@ struct SettingsToggleRow: View {
 
     var body: some View {
         HStack(spacing: Space.md) {
-            IconBadge(systemName: icon, color: iconColor, size: 28)
+            IconBadge(systemName: icon, color: iconColor, size: 36)
 
             VStack(alignment: .leading, spacing: Space.xxxs) {
                 Text(title)
-                    .font(TypeScale.bodyMd)
+                    .font(TypeScale.heading)
                 if let sub = subtitle {
                     Text(sub)
                         .font(TypeScale.caption)
@@ -316,8 +317,8 @@ struct SettingsToggleRow: View {
                 .accessibilityValue(isOn ? "Enabled" : "Disabled")
         }
         .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.lg)
-        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
+        .frame(minHeight: 76)
+        .background(isHovered ? Color.driftPanelRaised.opacity(0.72) : .clear)
         .animation(Anim.hover, value: isHovered)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)
@@ -357,8 +358,8 @@ private struct PixelOptionPicker<Value: Hashable>: View {
                     withAnimation(Anim.quick) { selection = option.1 }
                 } label: {
                     Text(option.0.uppercased())
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .tracking(0.4)
+                        .font(TypeScale.tiny)
+                        .tracking(0)
                         .foregroundStyle(selection == option.1 ? Color.white : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
@@ -402,11 +403,11 @@ struct SettingsPickerRow<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: Space.md) {
-            IconBadge(systemName: icon, color: iconColor, size: 28)
+            IconBadge(systemName: icon, color: iconColor, size: 36)
 
             VStack(alignment: .leading, spacing: Space.xxxs) {
                 Text(title)
-                    .font(TypeScale.bodyMd)
+                    .font(TypeScale.heading)
                 if let sub = subtitle {
                     Text(sub)
                         .font(TypeScale.caption)
@@ -419,8 +420,8 @@ struct SettingsPickerRow<Trailing: View>: View {
             trailing()
         }
         .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.lg)
-        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
+        .frame(minHeight: 76)
+        .background(isHovered ? Color.driftPanelRaised.opacity(0.72) : .clear)
         .animation(Anim.hover, value: isHovered)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)

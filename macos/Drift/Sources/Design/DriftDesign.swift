@@ -231,21 +231,21 @@ enum Radius {
 // MARK: - Typography Scale
 
 enum TypeScale {
-    static let display: Font = .system(size: 48, weight: .semibold, design: .default)
-    static let h1:      Font = .system(size: 28, weight: .semibold, design: .default)
-    static let h2:      Font = .system(size: 17, weight: .semibold, design: .default)
-    static let heading: Font = .system(size: 15, weight: .medium, design: .default)
-    static let bodyMd:  Font = .system(size: 13.5, weight: .regular, design: .default)
-    static let bodySm:  Font = .system(size: 12.5, weight: .regular, design: .default)
-    static let caption: Font = .system(size: 11.5, weight: .regular, design: .default)
-    static let tiny:    Font = .system(size: 10.5, weight: .medium, design: .default)
-    // Monospaced — timer, durations
-    static let monoLg:  Font = .system(size: 28, weight: .semibold, design: .monospaced)
-    static let monoMd:  Font = .system(size: 17, weight: .semibold, design: .monospaced)
-    static let monoSm:  Font = .system(size: 13, weight: .medium, design: .monospaced)
-    static let monoXs:  Font = .system(size: 11.5, weight: .regular, design: .monospaced)
+    static let display: Font = PixelFont.font(36)
+    static let h1:      Font = PixelFont.font(24)
+    static let h2:      Font = PixelFont.font(15)
+    static let heading: Font = PixelFont.font(11)
+    static let bodyMd:  Font = PixelFont.font(10)
+    static let bodySm:  Font = PixelFont.font(9)
+    static let caption: Font = PixelFont.font(8)
+    static let tiny:    Font = PixelFont.font(7)
+    // Numeric display keeps the landing-page arcade character.
+    static let monoLg:  Font = PixelFont.font(28)
+    static let monoMd:  Font = PixelFont.font(15)
+    static let monoSm:  Font = PixelFont.font(10)
+    static let monoXs:  Font = PixelFont.font(8)
     // Section overline labels
-    static let label:   Font = .system(size: 12, weight: .semibold, design: .default)
+    static let label:   Font = PixelFont.font(8)
     // Legacy aliases
     static let hero     = h1
     static let title    = h2
@@ -283,7 +283,7 @@ struct SectionLabel: ViewModifier {
             .font(TypeScale.label)
             .foregroundStyle(Color.driftMuted)
             .textCase(.uppercase)
-            .tracking(1.5)
+            .tracking(0)
     }
 }
 
@@ -458,9 +458,10 @@ struct DriftButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .offset(x: configuration.isPressed ? 3 : 0, y: configuration.isPressed ? 3 : 0)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .offset(x: configuration.isPressed ? 1 : 0, y: configuration.isPressed ? 1 : 0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
-            .animation(Anim.tap, value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -503,10 +504,10 @@ struct PrimaryButton: View {
             .padding(.vertical, Space.sm + 1)
             .frame(maxWidth: isFullWidth ? .infinity : nil)
             .background {
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                Rectangle()
                     .fill(isHovered ? Color.driftPanelRaised : Color.driftPanel)
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(color, lineWidth: 1.5))
-                    .shadow(color: Color.driftShadow, radius: 0, x: isHovered ? 4 : 3, y: isHovered ? 4 : 3)
+                    .overlay(Rectangle().strokeBorder(color.opacity(isHovered ? 0.95 : 0.72), lineWidth: 1.5))
+                    .shadow(color: Color.driftShadow, radius: 0, x: isHovered ? 3 : 2, y: isHovered ? 3 : 2)
             }
             .foregroundStyle(Color.driftText)
             .animation(Anim.hover, value: isHovered)
@@ -544,10 +545,10 @@ struct SecondaryButton: View {
             .padding(.horizontal, Space.md)
             .padding(.vertical, Space.xs + 1)
             .background {
-                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                Rectangle()
                     .fill(isHovered ? Color.driftPanelRaised : Color.driftPanel)
                     .overlay {
-                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Color.driftBorder, lineWidth: 1)
+                        Rectangle().strokeBorder(Color.driftBorder.opacity(isHovered ? 0.9 : 0.65), lineWidth: 1)
                     }
                     .shadow(color: Color.driftShadow.opacity(0.55), radius: 0, x: isHovered ? 3 : 2, y: isHovered ? 3 : 2)
             }
@@ -608,10 +609,10 @@ struct IconBadge: View {
 
     var body: some View {
         ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(color.opacity(0.12))
-                    .frame(width: size, height: size)
-                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(color.opacity(0.42), lineWidth: 1))
+            Rectangle()
+                .fill(color.opacity(0.12))
+                .frame(width: size, height: size)
+                .overlay(Rectangle().strokeBorder(color.opacity(0.42), lineWidth: 1))
             Image(systemName: systemName)
                 .font(.system(size: size * 0.44, weight: .semibold))
                 .foregroundStyle(color)
@@ -813,13 +814,13 @@ struct DriftGlassCard: ViewModifier {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                Rectangle()
                     .fill(Color.driftPanel)
                     .overlay {
-                        RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.driftBorder, lineWidth: 1)
+                        Rectangle().strokeBorder(Color.driftBorder.opacity(0.85), lineWidth: 1)
                     }
-                    .shadow(color: accentColor.opacity(0.18), radius: 0, x: 3, y: 3)
-                    .shadow(color: Color.driftShadow, radius: 0, x: 3, y: 3)
+                    .shadow(color: accentColor.opacity(0.14), radius: 0, x: 2, y: 2)
+                    .shadow(color: Color.driftShadow, radius: 0, x: 2, y: 2)
             }
     }
 }
@@ -842,10 +843,28 @@ struct PixelPanel: ViewModifier {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                    .fill(fill)
-                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(border, lineWidth: 1))
-                    .shadow(color: shadow ? Color.driftShadow : .clear, radius: 0, x: 4, y: 4)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(fill.opacity(0.88))
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.10),
+                                Color.clear,
+                                Color.black.opacity(0.12)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(border.opacity(0.78), lineWidth: 1))
+                    .overlay(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(Color.streak.opacity(0.72))
+                            .frame(width: 46, height: 2)
+                            .padding(.leading, 18)
+                    }
+                    .shadow(color: shadow ? Color.black.opacity(0.22) : .clear, radius: 0, x: 4, y: 4)
             }
     }
 }
