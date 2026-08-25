@@ -231,21 +231,21 @@ enum Radius {
 // MARK: - Typography Scale
 
 enum TypeScale {
-    static let display: Font = .system(size: 48, weight: .semibold, design: .default)
-    static let h1:      Font = .system(size: 28, weight: .semibold, design: .default)
-    static let h2:      Font = .system(size: 17, weight: .semibold, design: .default)
-    static let heading: Font = .system(size: 15, weight: .medium, design: .default)
-    static let bodyMd:  Font = .system(size: 13.5, weight: .regular, design: .default)
-    static let bodySm:  Font = .system(size: 12.5, weight: .regular, design: .default)
-    static let caption: Font = .system(size: 11.5, weight: .regular, design: .default)
-    static let tiny:    Font = .system(size: 10.5, weight: .medium, design: .default)
-    // Monospaced — timer, durations
-    static let monoLg:  Font = .system(size: 28, weight: .semibold, design: .monospaced)
-    static let monoMd:  Font = .system(size: 17, weight: .semibold, design: .monospaced)
-    static let monoSm:  Font = .system(size: 13, weight: .medium, design: .monospaced)
-    static let monoXs:  Font = .system(size: 11.5, weight: .regular, design: .monospaced)
+    static let display: Font = PixelFont.font(36)
+    static let h1:      Font = PixelFont.font(24)
+    static let h2:      Font = PixelFont.font(15)
+    static let heading: Font = PixelFont.font(11)
+    static let bodyMd:  Font = PixelFont.font(10)
+    static let bodySm:  Font = PixelFont.font(9)
+    static let caption: Font = PixelFont.font(8)
+    static let tiny:    Font = PixelFont.font(7)
+    // Numeric display keeps the landing-page arcade character.
+    static let monoLg:  Font = PixelFont.font(28)
+    static let monoMd:  Font = PixelFont.font(15)
+    static let monoSm:  Font = PixelFont.font(10)
+    static let monoXs:  Font = PixelFont.font(8)
     // Section overline labels
-    static let label:   Font = .system(size: 12, weight: .semibold, design: .default)
+    static let label:   Font = PixelFont.font(8)
     // Legacy aliases
     static let hero     = h1
     static let title    = h2
@@ -283,7 +283,7 @@ struct SectionLabel: ViewModifier {
             .font(TypeScale.label)
             .foregroundStyle(Color.driftMuted)
             .textCase(.uppercase)
-            .tracking(1.5)
+            .tracking(0)
     }
 }
 
@@ -843,10 +843,28 @@ struct PixelPanel: ViewModifier {
         content
             .padding(padding)
             .background {
-                Rectangle()
-                    .fill(fill)
-                    .overlay(Rectangle().strokeBorder(border.opacity(0.86), lineWidth: 1))
-                    .shadow(color: shadow ? Color.driftShadow : .clear, radius: 0, x: 3, y: 3)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(fill.opacity(0.88))
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.10),
+                                Color.clear,
+                                Color.black.opacity(0.12)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(border.opacity(0.78), lineWidth: 1))
+                    .overlay(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(Color.streak.opacity(0.72))
+                            .frame(width: 46, height: 2)
+                            .padding(.leading, 18)
+                    }
+                    .shadow(color: shadow ? Color.black.opacity(0.22) : .clear, radius: 0, x: 4, y: 4)
             }
     }
 }

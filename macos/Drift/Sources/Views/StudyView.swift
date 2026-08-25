@@ -37,7 +37,7 @@ struct StudyView: View {
                             .padding(.top, 1)
                         VStack(alignment: .leading, spacing: Space.xs) {
                             Text("FOCUS + BLOCKING")
-                                .font(.system(size: 32, weight: .semibold, design: .default))
+                                .font(TypeScale.h1)
                             Text("Set one task, start the timer, block distractions.")
                                 .font(TypeScale.bodyMd)
                                 .foregroundStyle(Color.driftMuted)
@@ -136,18 +136,18 @@ struct StudyView: View {
                     .foregroundStyle(Color.streak)
                     .padding(.bottom, 18)
                 Text(formatCountdown(viewModel.timeRemaining))
-                    .font(.system(size: 68, weight: .semibold, design: .rounded))
+                    .font(PixelFont.font(56))
                     .contentTransition(.numericText())
                     .animation(Anim.count, value: viewModel.timeRemaining)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
 
                 Text(viewModel.modeLabelDisplay)
-                    .font(.system(size: 13, weight: .medium, design: .default))
+                    .font(TypeScale.caption)
                     .foregroundStyle(viewModel.mode == .idle
                         ? Color.secondary.opacity(0.5)
                         : viewModel.ringColor.opacity(0.85))
-                    .tracking(2.5)
+                    .tracking(0)
                     .textCase(.uppercase)
                     .animation(Anim.quick, value: viewModel.mode)
 
@@ -187,7 +187,7 @@ struct StudyView: View {
                     Text("FOCUS")
                         .font(TypeScale.tiny)
                         .foregroundStyle(.tertiary)
-                        .tracking(1.0)
+                        .tracking(0)
                     ForEach([25, 45, 60], id: \.self) { mins in
                         DurationChip(
                             label: "\(mins)m",
@@ -206,7 +206,7 @@ struct StudyView: View {
                     Text("BREAK")
                         .font(TypeScale.tiny)
                         .foregroundStyle(.tertiary)
-                        .tracking(1.0)
+                        .tracking(0)
                     ForEach([5, 10, 15], id: \.self) { mins in
                         DurationChip(
                             label: "\(mins)m",

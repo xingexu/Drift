@@ -17,7 +17,7 @@ struct SettingsView: View {
                         .padding(.top, 1)
                     VStack(alignment: .leading, spacing: Space.xs) {
                         Text("SETTINGS")
-                            .font(.system(size: 32, weight: .semibold, design: .default))
+                            .font(TypeScale.h1)
 
                         Text("Core preferences for tracking and focus.")
                             .font(TypeScale.bodyMd)
@@ -133,7 +133,7 @@ struct SettingsView: View {
 
                             VStack(alignment: .leading, spacing: Space.xxxs) {
                                 Text("Reset All Data")
-                                    .font(.system(size: 15, weight: .semibold, design: .default))
+                                    .font(TypeScale.heading)
                                     .foregroundStyle(Color.distraction)
                                 Text("Permanently erase all sessions and local preferences.")
                                     .font(TypeScale.caption)
@@ -147,7 +147,6 @@ struct SettingsView: View {
                             } label: {
                                 Text("Reset")
                                     .font(TypeScale.caption)
-                                    .fontWeight(.semibold)
                                     .foregroundStyle(Color.distraction)
                                     .padding(.horizontal, Space.md)
                                     .padding(.vertical, Space.xxs + 1)
@@ -167,14 +166,7 @@ struct SettingsView: View {
                         .padding(Space.md)
                         .frame(minHeight: 72)
                     }
-                    .background(
-                        Rectangle()
-                            .fill(Color.driftPanel)
-                            .overlay(
-                                Rectangle().strokeBorder(Color.distraction.opacity(0.42), lineWidth: 1)
-                            )
-                    )
-                    .clipShape(Rectangle())
+                    .pixelPanel(border: Color.distraction.opacity(0.70), fill: Color.driftPanel, shadow: true)
                 }
             }
             .frame(maxWidth: 1320, alignment: .topLeading)
@@ -211,8 +203,8 @@ struct SettingsView: View {
                     .foregroundStyle(Color.streak)
 
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold, design: .default))
-                    .tracking(1.5)
+                    .font(TypeScale.label)
+                    .tracking(0)
                     .foregroundStyle(Color.streak)
             }
 
@@ -276,16 +268,7 @@ private struct SettingsPageIcon: View {
 private extension View {
     func sectionCard() -> some View {
         self
-            .background(
-                Rectangle()
-                    .fill(Color.driftPanel)
-                    .overlay(
-                        Rectangle()
-                            .strokeBorder(Color.driftBorder.opacity(0.86), lineWidth: 1)
-                    )
-                    .shadow(color: Color.driftShadow, radius: 0, x: 3, y: 3)
-            )
-            .clipShape(Rectangle())
+            .pixelPanel(border: Color.driftBorder, fill: Color.driftPanel, shadow: true)
     }
 }
 
@@ -319,7 +302,7 @@ struct SettingsToggleRow: View {
 
             VStack(alignment: .leading, spacing: Space.xxxs) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .default))
+                    .font(TypeScale.heading)
                 if let sub = subtitle {
                     Text(sub)
                         .font(TypeScale.caption)
@@ -375,8 +358,8 @@ private struct PixelOptionPicker<Value: Hashable>: View {
                     withAnimation(Anim.quick) { selection = option.1 }
                 } label: {
                     Text(option.0.uppercased())
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .tracking(0.4)
+                        .font(TypeScale.tiny)
+                        .tracking(0)
                         .foregroundStyle(selection == option.1 ? Color.white : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
@@ -424,7 +407,7 @@ struct SettingsPickerRow<Trailing: View>: View {
 
             VStack(alignment: .leading, spacing: Space.xxxs) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .default))
+                    .font(TypeScale.heading)
                 if let sub = subtitle {
                     Text(sub)
                         .font(TypeScale.caption)

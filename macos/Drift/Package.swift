@@ -12,7 +12,8 @@ let package = Package(
             name: "Drift",
             path: "Sources",
             resources: [
-                .copy("Resources/Fonts")
+                .copy("Resources/Fonts"),
+                .copy("Resources/Images")
             ]
         )
     ]
