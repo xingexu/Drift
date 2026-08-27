@@ -494,14 +494,6 @@ body {
   animation: interface-letter-shimmer 760ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
-.install-picker__option:nth-child(2) > span:last-child {
-  animation-delay: 70ms;
-}
-
-.install-picker__option + .install-picker__option {
-  border-top: 1px solid rgba(255, 255, 255, .1);
-}
-
 .install-picker__option:focus-visible {
   background: rgba(255, 255, 255, .105);
   box-shadow: inset 0 0 0 2px rgba(99, 181, 255, .68);
@@ -511,24 +503,11 @@ body {
   transform: scale(.985);
 }
 
-.install-picker__option.is-disabled {
-  cursor: not-allowed;
-  opacity: .48;
-}
-
-.install-picker__option.is-disabled:active {
-  transform: none;
-}
-
 .install-picker__icon {
   width: 20px;
   height: 20px;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, .88);
-}
-
-.install-picker__icon--windows {
   color: rgba(255, 255, 255, .88);
 }
 

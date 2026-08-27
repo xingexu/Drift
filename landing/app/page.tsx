@@ -57,7 +57,6 @@ const pixelMarks = {
 
 type PixelMark = keyof typeof pixelMarks;
 type BrandMark = "github" | "linkedin";
-type PlatformMark = "apple" | "windows";
 
 const pixelStars = Array.from({ length: 170 }, (_, index) => {
   const seed = (index + 3) * 9301 + 49297;
@@ -403,20 +402,18 @@ function BrandLogo({ mark }: { mark: BrandMark }) {
   );
 }
 
-function PlatformLogo({ mark }: { mark: PlatformMark }) {
-  const path =
-    mark === "apple"
-      ? "M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
-      : "M0 0h11.377v11.372H0V0Zm12.623 0H24v11.372H12.623V0ZM0 12.623h11.377V24H0V12.623Zm12.623 0H24V24H12.623V12.623Z";
-
+function AppleLogo() {
   return (
     <svg
       aria-hidden="true"
-      className={`platform-mark platform-mark--${mark}`}
+      className="platform-mark platform-mark--apple"
       focusable="false"
       viewBox="0 0 24 24"
     >
-      <path d={path} fill="currentColor" />
+      <path
+        d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+        fill="currentColor"
+      />
     </svg>
   );
 }
@@ -457,9 +454,7 @@ function InstallPicker() {
   const focusOption = (index: number) => {
     requestAnimationFrame(() => {
       const options = Array.from(
-        menuRef.current?.querySelectorAll<HTMLElement>(
-          '[role="menuitem"]:not([aria-disabled="true"])',
-        ) ?? [],
+        menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
       );
       options.at(index)?.focus();
     });
@@ -477,9 +472,7 @@ function InstallPicker() {
 
     event.preventDefault();
     const options = Array.from(
-      menuRef.current?.querySelectorAll<HTMLElement>(
-        '[role="menuitem"]:not([aria-disabled="true"])',
-      ) ?? [],
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
     );
     const activeIndex = options.indexOf(document.activeElement as HTMLElement);
 
@@ -554,20 +547,10 @@ function InstallPicker() {
             target="_blank"
           >
             <span className="install-picker__icon install-picker__icon--apple">
-              <PlatformLogo mark="apple" />
+              <AppleLogo />
             </span>
-            <span>macOS / Linux</span>
+            <span>Download for macOS</span>
           </a>
-          <span
-            aria-disabled="true"
-            className="install-picker__option is-disabled"
-            role="menuitem"
-          >
-            <span className="install-picker__icon install-picker__icon--windows">
-              <PlatformLogo mark="windows" />
-            </span>
-            <span>Windows — coming soon</span>
-          </span>
         </div>
       ) : null}
     </div>
