@@ -102,7 +102,10 @@ struct TrackingView: View {
             .padding(.leading, 16)
             .padding(.trailing, 8)
             .frame(height: 44)
-            .driftGlass(.standard, cornerRadius: Radius.pill)
+            .driftFunctionalGlass(
+                cornerRadius: Radius.pill,
+                dimmingOpacity: 0.50
+            )
         }
         .padding(.horizontal, 4)
         .frame(minHeight: 132)
@@ -159,7 +162,7 @@ struct TrackingView: View {
         }
         .padding(.horizontal, 22)
         .frame(minHeight: 88)
-        .tactilePanel(padding: 0, density: .standard)
+        .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
     }
 
     private var summaryStrip: some View {
@@ -173,7 +176,7 @@ struct TrackingView: View {
             summaryCell(label: "LONGEST RUN", value: formatDurationWords(longestProductiveStreak), color: .productive)
         }
         .frame(height: 86)
-        .tactilePanel(padding: 0, density: .light)
+        .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
     }
 
     private var summaryDivider: some View {
@@ -309,7 +312,7 @@ struct TrackingView: View {
                 ? "Drift is reading the frontmost app. Your first activity row will appear here shortly."
                 : "Your activity timeline will appear here after tracking begins. Drift never records keystrokes or screen contents."
         )
-        .tactilePanel(padding: 0, density: .standard)
+        .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
     }
 
     private func signal(icon: String, value: String, label: String) -> some View {
@@ -1191,7 +1194,10 @@ private struct ActivityRow: View {
 
 private extension View {
     func glassSurface(density: DriftGlassDensity = .data) -> some View {
-        driftGlass(density, cornerRadius: Radius.md)
+        driftContentSurface(
+            dense: density == .data,
+            cornerRadius: DriftSurfaceRadius.major
+        )
     }
 
     func glassTag(color: Color) -> some View {

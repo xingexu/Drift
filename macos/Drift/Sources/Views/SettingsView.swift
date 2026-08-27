@@ -9,7 +9,6 @@ private enum SettingsDestination: String, CaseIterable, Identifiable {
     case rules = "Rules"
     case blocking = "Blocking"
     case privacy = "Privacy"
-    case account = "Account"
 
     var id: String { rawValue }
 
@@ -20,7 +19,6 @@ private enum SettingsDestination: String, CaseIterable, Identifiable {
         case .rules: return "square.grid.2x2"
         case .blocking: return "shield"
         case .privacy: return "lock"
-        case .account: return "person.crop.circle"
         }
     }
 }
@@ -184,7 +182,7 @@ struct SettingsView: View {
             }
         }
         .padding(8)
-        .driftGlass(.standard, cornerRadius: Radius.lg)
+        .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
         .animation(
             appState.reduceMotion ? nil : .spring(duration: 0.20, bounce: 0.08),
             value: destination
@@ -199,7 +197,6 @@ struct SettingsView: View {
         case .rules: rulesSettings
         case .blocking: blockingSettings
         case .privacy: privacySettings
-        case .account: accountSettings
         }
     }
 
@@ -281,7 +278,7 @@ struct SettingsView: View {
     }
 
     private var rulesSettings: some View {
-        TactilePanel(padding: 0, density: .data, cornerRadius: Radius.lg) {
+        ContentSurfacePanel(padding: 0, dense: true, cornerRadius: DriftSurfaceRadius.major) {
             VStack(alignment: .leading, spacing: 0) {
                 settingsPanelHeader(title: "Rules", subtitle: "Correct how apps and websites are classified")
                     .padding(24)
@@ -304,14 +301,7 @@ struct SettingsView: View {
                     .padding(.horizontal, 12)
                     .frame(maxWidth: .infinity)
                     .frame(height: 36)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .fill(Color.cocoa.opacity(0.42))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                    .strokeBorder(Color.cream.opacity(0.14), lineWidth: 1)
-                            )
-                    )
+                    .driftInsetSurface()
 
                     Menu {
                         Button("All") { rulesFilter = nil }
@@ -324,8 +314,7 @@ struct SettingsView: View {
                             .foregroundStyle(Color.cream)
                             .padding(.horizontal, 12)
                             .frame(height: 36)
-                            .background(Capsule().fill(Color.cocoa.opacity(0.42)))
-                            .overlay(Capsule().strokeBorder(Color.cream.opacity(0.14), lineWidth: 1))
+                            .driftFunctionalGlass(cornerRadius: Radius.pill)
                     }
                     .menuStyle(.borderlessButton)
                 }
@@ -347,7 +336,7 @@ struct SettingsView: View {
     }
 
     private var blockingSettings: some View {
-        TactilePanel(padding: 0, density: .data, cornerRadius: Radius.lg) {
+        ContentSurfacePanel(padding: 0, dense: true, cornerRadius: DriftSurfaceRadius.major) {
             VStack(alignment: .leading, spacing: 0) {
                 settingsPanelHeader(title: "Blocking", subtitle: "Choose the websites Focus keeps quiet")
                     .padding(24)
@@ -361,14 +350,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 14)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
-                        .background(
-                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .fill(Color.cocoa.opacity(0.42))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                        .strokeBorder(Color.cream.opacity(0.14), lineWidth: 1)
-                                )
-                        )
+                        .driftInsetSurface()
                         .onSubmit(addBlockedSite)
 
                     PrimaryPillButton(title: "Add website", icon: "plus") { addBlockedSite() }
@@ -398,7 +380,7 @@ struct SettingsView: View {
     }
 
     private var privacySettings: some View {
-        TactilePanel(padding: 0, density: .data, cornerRadius: Radius.lg) {
+        ContentSurfacePanel(padding: 0, dense: true, cornerRadius: DriftSurfaceRadius.major) {
             VStack(alignment: .leading, spacing: 0) {
                 settingsPanelHeader(title: "Privacy", subtitle: "Your attention data stays under your control")
                     .padding(24)
@@ -433,23 +415,13 @@ struct SettingsView: View {
         }
     }
 
-    private var accountSettings: some View {
-        settingsPanel(title: "Account", subtitle: "Drift works without an account") {
-            SettingsRow(title: "Local-only mode", explanation: "No sign-in is required and cloud sync is off.") {
-                Label("Not connected", systemImage: "icloud.slash")
-                    .font(TypeScale.caption)
-                    .foregroundStyle(Color.driftMuted)
-            }
-        }
-    }
-
     @ViewBuilder
     private func settingsPanel<Content: View>(
         title: String,
         subtitle: String,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        TactilePanel(padding: 0, density: .data, cornerRadius: Radius.lg) {
+        ContentSurfacePanel(padding: 0, dense: true, cornerRadius: DriftSurfaceRadius.major) {
             VStack(alignment: .leading, spacing: 0) {
                 settingsPanelHeader(title: title, subtitle: subtitle)
                     .padding(24)

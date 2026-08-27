@@ -128,7 +128,7 @@ struct StudyView: View {
                             .foregroundStyle(Color.creamMuted)
                     }
 
-                    TactilePanel(padding: 28, density: .standard, cornerRadius: Radius.lg) {
+                    FunctionalGlassPanel(padding: 28, cornerRadius: DriftSurfaceRadius.major) {
                         VStack(alignment: .leading, spacing: 20) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("What do you want to finish?")
@@ -209,10 +209,7 @@ struct StudyView: View {
                                 .help("Customize blocked websites")
                                 .accessibilityLabel("Customize blocked websites")
                             }
-                            .background(
-                                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                    .fill(Color.cocoa.opacity(0.42))
-                            )
+                            .driftInsetSurface()
 
                             PrimaryPillButton(
                                 title: "Begin \(viewModel.focusDuration)-minute focus",
@@ -765,15 +762,12 @@ private struct TaskInputField: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 44)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                .fill(Color.cocoa.opacity(0.48))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(
-                            isFocused ? Color.cream.opacity(0.78) : Color.cream.opacity(0.14),
-                            lineWidth: isFocused ? 2 : 1
-                        )
+        .driftInsetSurface()
+        .overlay(
+            RoundedRectangle(cornerRadius: DriftSurfaceRadius.input, style: .continuous)
+                .strokeBorder(
+                    isFocused ? Color.cream.opacity(0.78) : Color.clear,
+                    lineWidth: isFocused ? 2 : 1
                 )
         )
         .animation(Anim.quick, value: isFocused)

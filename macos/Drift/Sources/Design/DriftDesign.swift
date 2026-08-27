@@ -423,6 +423,8 @@ enum Anim {
     static let breathe = Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)
     /// Hover enter/exit
     static let hover  = Animation.easeOut(duration: 0.18)
+    /// Strong ease-out for interruptible Liquid Glass hover feedback
+    static let glass  = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.18)
 }
 
 // MARK: - View Modifiers
@@ -447,25 +449,19 @@ extension View {
 // MARK: Standard card surface
 struct DriftCard: ViewModifier {
     var padding: CGFloat = Space.xl
-    var radius: CGFloat  = Radius.md
+    var radius: CGFloat  = DriftSurfaceRadius.major
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color.driftPanel)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(Color.cream.opacity(0.14), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.24), radius: 12, y: 5)
+                DriftGlassSurface(role: .content, cornerRadius: radius)
             }
     }
 }
 
 extension View {
-    func driftCard(padding: CGFloat = Space.xl, radius: CGFloat = Radius.lg) -> some View {
+    func driftCard(padding: CGFloat = Space.xl, radius: CGFloat = DriftSurfaceRadius.major) -> some View {
         modifier(DriftCard(padding: padding, radius: radius))
     }
 }
@@ -473,24 +469,19 @@ extension View {
 // MARK: Inset card — inner panel feel (slightly darker)
 struct InsetCard: ViewModifier {
     var padding: CGFloat = Space.md
-    var radius: CGFloat  = Radius.md
+    var radius: CGFloat  = DriftSurfaceRadius.input
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color.driftPanelInset)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(Color.cream.opacity(0.12), lineWidth: 1)
-                    )
+                DriftGlassSurface(role: .contentDense, cornerRadius: radius)
             }
     }
 }
 
 extension View {
-    func insetCard(padding: CGFloat = Space.md, radius: CGFloat = Radius.md) -> some View {
+    func insetCard(padding: CGFloat = Space.md, radius: CGFloat = DriftSurfaceRadius.input) -> some View {
         modifier(InsetCard(padding: padding, radius: radius))
     }
 }
@@ -499,25 +490,19 @@ extension View {
 struct AccentCard: ViewModifier {
     var color: Color = .accent
     var padding: CGFloat = Space.xl
-    var radius: CGFloat  = Radius.md
+    var radius: CGFloat  = DriftSurfaceRadius.major
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color.driftPanel)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(color.opacity(0.30), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.24), radius: 12, y: 5)
+                DriftGlassSurface(role: .content, cornerRadius: radius, tint: color)
             }
     }
 }
 
 extension View {
-    func accentCard(color: Color = .accent, padding: CGFloat = Space.xl, radius: CGFloat = Radius.lg) -> some View {
+    func accentCard(color: Color = .accent, padding: CGFloat = Space.xl, radius: CGFloat = DriftSurfaceRadius.major) -> some View {
         modifier(AccentCard(color: color, padding: padding, radius: radius))
     }
 }
@@ -703,8 +688,9 @@ struct SecondaryButton: View {
             .frame(height: 44)
             .background {
                 DriftGlassSurface(
-                    density: isHovered ? .data : .standard,
-                    cornerRadius: Radius.pill
+                    role: .functional,
+                    cornerRadius: Radius.pill,
+                    isHovered: isHovered
                 )
             }
             .foregroundStyle(Color.cream)
@@ -755,115 +741,302 @@ struct GhostButton: View {
     }
 }
 
-// MARK: - Tactile Surface Language
+// MARK: - Native Material Surface Language
 
-enum DriftGlassDensity {
-    case light
-    case standard
-    case data
-    case popover
+/// A semantic hierarchy keeps standard material in the content layer and
+/// reserves Liquid Glass for controls. This avoids the nested-card effect that
+/// appears when every rectangle competes for the same glass treatment.
+enum DriftSurfaceRole: Equatable {
+    case content
+    case contentDense
+    case functional
 
-    /// Lower than the baseline brief because Drift's new target is unusually
-    /// transparent glass; the native material supplies the localized blur.
-    var tintOpacity: Double {
+    var fallbackMaterial: Material {
         switch self {
-        case .light: return 0.12
-        case .standard: return 0.20
-        case .data: return 0.30
-        case .popover: return 0.52
+        case .content, .contentDense: return .regularMaterial
+        case .functional: return .thinMaterial
         }
     }
 
-    var material: Material {
-        switch self {
-        case .light, .standard, .data: return .ultraThinMaterial
-        case .popover: return .thinMaterial
-        }
-    }
-
-    /// The material is its own layer so reducing its strength never fades text,
-    /// controls, or borders. This keeps the desert legible through the blur.
     var materialOpacity: Double {
         switch self {
-        case .light: return 0.42
-        case .standard: return 0.50
-        case .data: return 0.58
-        case .popover: return 0.74
+        case .content: return 0.66
+        case .contentDense: return 0.76
+        case .functional: return 0.58
+        }
+    }
+
+    var tintOpacity: Double {
+        switch self {
+        case .content: return 0.24
+        case .contentDense: return 0.34
+        case .functional: return 0.14
         }
     }
 
     var borderOpacity: Double {
         switch self {
-        case .light: return 0.16
-        case .standard: return 0.18
-        case .data: return 0.20
-        case .popover: return 0.22
+        case .content: return 0.15
+        case .contentDense: return 0.18
+        case .functional: return 0.22
         }
     }
 
     var shadowOpacity: Double {
         switch self {
-        case .light: return 0.18
-        case .standard: return 0.22
-        case .data, .popover: return 0.26
+        case .content: return 0.18
+        case .contentDense: return 0.22
+        case .functional: return 0.20
         }
     }
 }
 
-/// Localized native-material blur with an independent warm tint. Foreground
-/// content remains fully opaque for legibility.
-struct DriftGlassSurface: View {
-    var density: DriftGlassDensity = .standard
-    var cornerRadius: CGFloat = Radius.md
+enum DriftSurfaceRadius {
+    static let major: CGFloat = 18
+    static let compact: CGFloat = 14
+    static let input: CGFloat = 12
+    static let icon: CGFloat = 10
+}
 
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        let highlightInset = min(cornerRadius, 18)
+/// Compatibility vocabulary for existing call sites. New page surfaces use
+/// `driftContentSurface` or `driftFunctionalGlass` so their hierarchy is clear.
+enum DriftGlassDensity: Equatable {
+    case light
+    case standard
+    case data
+    case popover
 
-        shape
-            .fill(density.material)
-            .opacity(density.materialOpacity)
-            .overlay { shape.fill(Color.cocoa.opacity(density.tintOpacity)) }
-            .overlay {
-                shape.strokeBorder(Color.cream.opacity(density.borderOpacity), lineWidth: 1)
-            }
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color.cream.opacity(0.16))
-                    .frame(height: 1)
-                    .padding(.horizontal, highlightInset)
-                    .clipShape(shape)
-            }
-            .shadow(color: Color.black.opacity(density.shadowOpacity), radius: 14, y: 6)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+    var surfaceRole: DriftSurfaceRole {
+        switch self {
+        case .light, .standard: return .content
+        case .data: return .contentDense
+        case .popover: return .functional
+        }
     }
 }
 
-private struct DriftGlassModifier: ViewModifier {
-    var density: DriftGlassDensity
+/// One adaptive implementation for every app box. On macOS 26, functional
+/// surfaces use native interactive Liquid Glass. Earlier systems use a native
+/// material fallback with the same geometry, hierarchy, and accessibility.
+struct DriftGlassSurface: View {
+    var density: DriftGlassDensity = .standard
+    var role: DriftSurfaceRole? = nil
+    var cornerRadius: CGFloat = DriftSurfaceRadius.compact
+    var tint: Color? = nil
+    var isHovered = false
+    var functionalDimming: Double = 0.16
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    private var resolvedRole: DriftSurfaceRole { role ?? density.surfaceRole }
+    private var resolvedTint: Color { tint ?? Color.cocoa }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let borderBoost = contrast == .increased ? 0.18 : 0
+        let hoverBoost = resolvedRole == .functional && isHovered ? 0.055 : 0
+
+        materialLayer(shape: shape, hoverBoost: hoverBoost)
+            .overlay {
+                if resolvedRole == .functional && !reduceTransparency {
+                    shape.fill(
+                        Color.black.opacity(
+                            isHovered ? max(0, functionalDimming - 0.03) : functionalDimming
+                        )
+                    )
+                }
+            }
+            .overlay {
+                shape.strokeBorder(
+                    Color.cream.opacity(resolvedRole.borderOpacity + borderBoost + hoverBoost),
+                    lineWidth: contrast == .increased ? 1.5 : 1
+                )
+            }
+            .overlay {
+                shape.strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(contrast == .increased ? 0.30 : 0.18),
+                            Color.white.opacity(0.035),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+            }
+            .shadow(
+                color: Color.black.opacity(resolvedRole.shadowOpacity + (isHovered ? 0.025 : 0)),
+                radius: resolvedRole == .functional ? 18 : 20,
+                y: resolvedRole == .functional ? 7 : 9
+            )
+            .animation(
+                reduceMotion ? nil : Anim.glass,
+                value: isHovered
+            )
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func materialLayer(
+        shape: RoundedRectangle,
+        hoverBoost: Double
+    ) -> some View {
+        if reduceTransparency {
+            shape
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay {
+                    shape.fill(Color.cocoa.opacity(resolvedRole == .functional ? 0.74 : 0.86))
+                }
+        } else if resolvedRole == .functional {
+            if #available(macOS 26.0, *) {
+                shape
+                    .fill(Color.clear)
+                    .glassEffect(
+                        .regular
+                            .tint(resolvedTint.opacity(0.32 + hoverBoost))
+                            .interactive(),
+                        in: shape
+                    )
+            } else {
+                fallbackMaterial(shape: shape, hoverBoost: hoverBoost)
+            }
+        } else {
+            fallbackMaterial(shape: shape, hoverBoost: hoverBoost)
+        }
+    }
+
+    private func fallbackMaterial(
+        shape: RoundedRectangle,
+        hoverBoost: Double
+    ) -> some View {
+        shape
+            .fill(resolvedRole.fallbackMaterial)
+            .opacity(resolvedRole.materialOpacity)
+            .overlay {
+                shape.fill(resolvedTint.opacity(resolvedRole.tintOpacity + hoverBoost))
+            }
+    }
+}
+
+private struct DriftSurfaceModifier: ViewModifier {
+    var role: DriftSurfaceRole
     var cornerRadius: CGFloat
+    var tint: Color?
+    var functionalDimming: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
 
     func body(content: Content) -> some View {
+        content
+            .background {
+                DriftGlassSurface(
+                    role: role,
+                    cornerRadius: cornerRadius,
+                    tint: tint,
+                    isHovered: isHovered,
+                    functionalDimming: functionalDimming
+                )
+            }
+            .onHover { hovering in
+                guard role == .functional else { return }
+                if reduceMotion {
+                    isHovered = hovering
+                } else {
+                    withAnimation(Anim.glass) {
+                        isHovered = hovering
+                    }
+                }
+            }
+    }
+}
+
+private struct DriftInsetSurfaceModifier: ViewModifier {
+    var cornerRadius: CGFloat
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
         content.background {
-            DriftGlassSurface(density: density, cornerRadius: cornerRadius)
+            shape
+                .fill(
+                    reduceTransparency
+                        ? Color(nsColor: .textBackgroundColor)
+                        : Color.black.opacity(0.22)
+                )
+                .overlay {
+                    shape.strokeBorder(
+                        Color.cream.opacity(contrast == .increased ? 0.34 : 0.13),
+                        lineWidth: contrast == .increased ? 1.5 : 1
+                    )
+                }
         }
     }
 }
 
 extension View {
+    func driftContentSurface(
+        dense: Bool = false,
+        cornerRadius: CGFloat = DriftSurfaceRadius.major
+    ) -> some View {
+        modifier(
+            DriftSurfaceModifier(
+                role: dense ? .contentDense : .content,
+                cornerRadius: cornerRadius,
+                tint: nil,
+                functionalDimming: 0
+            )
+        )
+    }
+
+    func driftFunctionalGlass(
+        cornerRadius: CGFloat = DriftSurfaceRadius.compact,
+        tint: Color? = nil,
+        dimmingOpacity: Double = 0.16
+    ) -> some View {
+        modifier(
+            DriftSurfaceModifier(
+                role: .functional,
+                cornerRadius: cornerRadius,
+                tint: tint,
+                functionalDimming: dimmingOpacity
+            )
+        )
+    }
+
+    func driftInsetSurface(
+        cornerRadius: CGFloat = DriftSurfaceRadius.input
+    ) -> some View {
+        modifier(DriftInsetSurfaceModifier(cornerRadius: cornerRadius))
+    }
+
     func driftGlass(
         _ density: DriftGlassDensity = .standard,
-        cornerRadius: CGFloat = Radius.md
+        cornerRadius: CGFloat = DriftSurfaceRadius.compact
     ) -> some View {
-        modifier(DriftGlassModifier(density: density, cornerRadius: cornerRadius))
+        modifier(
+            DriftSurfaceModifier(
+                role: density.surfaceRole,
+                cornerRadius: cornerRadius,
+                tint: nil,
+                functionalDimming: density == .popover ? 0.16 : 0
+            )
+        )
     }
 }
 
 struct TactilePanel<Content: View>: View {
     var padding: CGFloat = Space.xl
     var density: DriftGlassDensity = .standard
-    var cornerRadius: CGFloat = Radius.md
+    var cornerRadius: CGFloat = DriftSurfaceRadius.major
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -887,9 +1060,35 @@ extension View {
     func tactilePanel(
         padding: CGFloat = Space.xl,
         density: DriftGlassDensity = .standard,
-        cornerRadius: CGFloat = Radius.md
+        cornerRadius: CGFloat = DriftSurfaceRadius.major
     ) -> some View {
         modifier(TactilePanelModifier(padding: padding, density: density, cornerRadius: cornerRadius))
+    }
+}
+
+struct ContentSurfacePanel<Content: View>: View {
+    var padding: CGFloat = Space.xl
+    var dense = false
+    var cornerRadius: CGFloat = DriftSurfaceRadius.major
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .driftContentSurface(dense: dense, cornerRadius: cornerRadius)
+    }
+}
+
+struct FunctionalGlassPanel<Content: View>: View {
+    var padding: CGFloat = Space.xl
+    var cornerRadius: CGFloat = DriftSurfaceRadius.major
+    var tint: Color? = nil
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .driftFunctionalGlass(cornerRadius: cornerRadius, tint: tint)
     }
 }
 
@@ -939,8 +1138,9 @@ struct IconButton: View {
                 .frame(width: 36, height: 36)
                 .background(
                     DriftGlassSurface(
-                        density: isHovered ? .data : .standard,
-                        cornerRadius: Radius.md
+                        role: .functional,
+                        cornerRadius: DriftSurfaceRadius.icon,
+                        isHovered: isHovered
                     )
                 )
         }
@@ -992,7 +1192,7 @@ struct TactileMenu<Value: Hashable>: View {
             .padding(.horizontal, 14)
             .frame(height: 44)
             .background(
-                DriftGlassSurface(density: .data, cornerRadius: Radius.xl)
+                DriftGlassSurface(role: .functional, cornerRadius: DriftSurfaceRadius.compact)
             )
         }
         .menuStyle(.borderlessButton)
@@ -1037,7 +1237,7 @@ struct SegmentedControl<Value: Hashable>: View {
             }
         }
         .padding(4)
-        .driftGlass(.light, cornerRadius: Radius.pill)
+        .driftFunctionalGlass(cornerRadius: Radius.pill, dimmingOpacity: 0.42)
         .animation(
             reduceMotion ? nil : .spring(duration: 0.20, bounce: 0.08),
             value: selection
@@ -1349,25 +1549,23 @@ struct DriftDivider: View {
 struct DriftGlassCard: ViewModifier {
     var accentColor: Color = .clear
     var padding: CGFloat   = Space.xl
-    var radius: CGFloat    = Radius.lg
+    var radius: CGFloat    = DriftSurfaceRadius.major
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color.driftPanel)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(Color.cream.opacity(0.14), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.24), radius: 12, y: 5)
+                DriftGlassSurface(
+                    role: .functional,
+                    cornerRadius: radius,
+                    tint: accentColor
+                )
             }
     }
 }
 
 extension View {
-    func driftGlassCard(accent: Color = .clear, padding: CGFloat = Space.xl, radius: CGFloat = Radius.lg) -> some View {
+    func driftGlassCard(accent: Color = .clear, padding: CGFloat = Space.xl, radius: CGFloat = DriftSurfaceRadius.major) -> some View {
         modifier(DriftGlassCard(accentColor: accent, padding: padding, radius: radius))
     }
 }
@@ -1384,13 +1582,11 @@ struct PixelPanel: ViewModifier {
         content
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(fill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(border.opacity(0.90), lineWidth: 1)
-                    )
-                    .shadow(color: shadow ? Color.black.opacity(0.24) : .clear, radius: 12, y: 5)
+                DriftGlassSurface(
+                    role: .contentDense,
+                    cornerRadius: DriftSurfaceRadius.compact,
+                    tint: fill
+                )
             }
     }
 }

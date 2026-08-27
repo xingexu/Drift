@@ -170,7 +170,7 @@ struct HistoryView: View {
             )
         }
         .padding(18)
-        .tactilePanel(padding: 0, density: .light)
+        .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
     }
 
     private var kpiDivider: some View {
@@ -276,7 +276,7 @@ struct HistoryView: View {
             )
         }
         .padding(Space.xl)
-        .tactilePanel(padding: 0, density: .data)
+        .driftContentSurface(dense: true, cornerRadius: DriftSurfaceRadius.major)
     }
 
     private var contentPicker: some View {
@@ -355,7 +355,7 @@ struct HistoryView: View {
     }
 
     private func sessionInspector(_ session: PastSession) -> some View {
-        TactilePanel(padding: 20, density: .popover) {
+        ContentSurfacePanel(padding: 20, dense: true, cornerRadius: DriftSurfaceRadius.compact) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
@@ -410,14 +410,7 @@ struct HistoryView: View {
                 }
                 .padding(.horizontal, 12)
                 .frame(width: 230, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .fill(Color.cocoa.opacity(0.44))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .strokeBorder(Color.cream.opacity(0.14), lineWidth: 1)
-                        )
-                )
+                .driftInsetSurface()
 
                 Menu {
                     Button("All categories") { categoryFilter = nil }
@@ -435,8 +428,7 @@ struct HistoryView: View {
                     .foregroundStyle(Color.cream)
                     .padding(.horizontal, 12)
                     .frame(height: 36)
-                    .background(Capsule().fill(Color.cocoa.opacity(0.44)))
-                    .overlay(Capsule().strokeBorder(Color.cream.opacity(0.14), lineWidth: 1))
+                    .driftFunctionalGlass(cornerRadius: Radius.pill)
                 }
                 .menuStyle(.borderlessButton)
             }
@@ -494,7 +486,7 @@ struct HistoryView: View {
             icon: "chart.bar.xaxis",
             message: "Complete a tracked session in this range and Drift will build your private history here."
         )
-        .tactilePanel(padding: 0, density: .data)
+        .driftContentSurface(dense: true, cornerRadius: DriftSurfaceRadius.major)
     }
 
     private func chartHeader(title: String, detail: String) -> some View {
@@ -783,6 +775,6 @@ private struct AnalyticsKPI: View {
 
 private extension View {
     func analyticsSurface() -> some View {
-        driftGlass(.data, cornerRadius: Radius.md)
+        driftContentSurface(dense: true, cornerRadius: DriftSurfaceRadius.major)
     }
 }
