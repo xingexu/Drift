@@ -25,10 +25,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+#if DEBUG
+        let isSnapshotRun = ProcessInfo.processInfo.environment["DRIFT_SNAPSHOT_PATH"] != nil
+        if !isSnapshotRun {
+            configureNotifications()
+            checkAccessibilityAndStartTracking()
+            observeNetworkReconnection()
+        }
+#else
         configureNotifications()
         checkAccessibilityAndStartTracking()
-        activateMainWindow()
         observeNetworkReconnection()
+#endif
+        activateMainWindow()
+#if DEBUG
+        Task { @MainActor [weak self] in
+            self?.scheduleDebugSnapshotIfRequested()
+        }
+#endif
     }
 
     // MARK: - Termination
@@ -248,6 +262,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 && !window.className.contains("MenuBarExtra")
         }
     }
+
+#if DEBUG
+    @MainActor
+    private func scheduleDebugSnapshotIfRequested() {
+        let environment = ProcessInfo.processInfo.environment
+        guard let outputPath = environment["DRIFT_SNAPSHOT_PATH"] else { return }
+
+        let state = AppState.shared
+        state.hasOnboarded = true
+        state.theme = environment["DRIFT_SNAPSHOT_THEME"] == "light" ? .light : .dark
+        state.reduceMotion = environment["DRIFT_SNAPSHOT_REDUCE_MOTION"] == "true"
+        switch environment["DRIFT_SNAPSHOT_TAB"] {
+        case "focus": state.currentTab = .focus
+        case "history": state.currentTab = .history
+        case "settings": state.currentTab = .settings
+        default: state.currentTab = .tracking
+        }
+
+        let width = Double(environment["DRIFT_SNAPSHOT_WIDTH"] ?? "1440") ?? 1440
+        let height = Double(environment["DRIFT_SNAPSHOT_HEIGHT"] ?? "900") ?? 900
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self, let window = self.findMainWindow() else {
+                NSApp.terminate(nil)
+                return
+            }
+            window.setContentSize(NSSize(width: width, height: height))
+            window.makeKeyAndOrderFront(nil)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                guard let view = window.contentView else {
+                    NSApp.terminate(nil)
+                    return
+                }
+                view.layoutSubtreeIfNeeded()
+                guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                    NSApp.terminate(nil)
+                    return
+                }
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                if let data = bitmap.representation(using: .png, properties: [:]) {
+                    try? data.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
+                }
+                NSApp.terminate(nil)
+            }
+        }
+    }
+#endif
 
     @objc static func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)

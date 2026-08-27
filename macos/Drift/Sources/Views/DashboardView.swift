@@ -5,22 +5,22 @@ struct TrackingView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var tracker: WindowTracker
     @State private var appeared = false
+    @State private var showScoreInfo = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                massiveTrackingBar
+                todayHorizon
+                currentActivity
+                summaryStrip
 
                 if hasVisibleActivity {
-                    dashboardSummary
-                    attentionMap
-
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: Space.lg) {
                             recentActivity
                                 .frame(maxWidth: .infinity)
                             applicationSummary
-                                .frame(width: 340)
+                                .frame(width: 420)
                         }
 
                         VStack(alignment: .leading, spacing: Space.lg) {
@@ -32,158 +32,173 @@ struct TrackingView: View {
                     emptyOverview
                 }
             }
-            .frame(maxWidth: 1320, alignment: .topLeading)
+            .frame(maxWidth: 1180, alignment: .topLeading)
             .frame(maxWidth: .infinity, alignment: .top)
-            .padding(.horizontal, 28)
-            .padding(.top, 28)
-            .padding(.bottom, 32)
+            .padding(.horizontal, 32)
+            .padding(.top, 24)
+            .padding(.bottom, 44)
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 6)
+            .offset(y: appeared || appState.reduceMotion ? 0 : 6)
         }
         .onAppear {
-            withAnimation(Anim.appear) { appeared = true }
+            withAnimation(appState.reduceMotion ? nil : Anim.appear) { appeared = true }
         }
     }
 
-    private var massiveTrackingBar: some View {
+    private var todayHorizon: some View {
         HStack(alignment: .center, spacing: 28) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: Space.md) {
-                    PixelHeaderIcon(color: appState.accentColor)
-                        .frame(width: 34, height: 34)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(greeting.uppercased())
-                            .font(TypeScale.h1)
-                            .foregroundStyle(Color.driftText)
-                        Text("Live activity, context, and classification.")
-                            .font(TypeScale.bodyMd)
-                            .foregroundStyle(Color.driftMuted)
-                    }
-                }
-
-                HStack(spacing: Space.lg) {
-                    ZStack {
-                        Rectangle()
-                            .fill(tracker.activeCategory.color.opacity(0.18))
-                            .frame(width: 56, height: 50)
-                            .overlay(Rectangle().strokeBorder(tracker.activeCategory.color.opacity(0.36), lineWidth: 1))
-                        PixelCurrentActivityIcon()
-                            .frame(width: 42, height: 38)
-                    }
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(tracker.isTracking ? "CURRENT SIGNAL" : "READY TO CAPTURE")
-                            .sectionLabel()
-                        Text(tracker.activeApp.isEmpty ? "No active app" : tracker.activeApp)
-                            .font(TypeScale.h2)
-                            .lineLimit(1)
-                        Text(currentContextSubtitle)
-                            .font(TypeScale.caption)
-                            .foregroundStyle(Color.driftMuted)
-                            .lineLimit(1)
-                    }
-
-                    Text(tracker.activeCategory.label.uppercased())
-                        .glassTag(color: tracker.activeCategory.color)
-                }
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Today · \(Self.dayFormatter.string(from: Date()))")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(Color.desertMutedText)
+                Text(scoreHeadline)
+                    .font(TypeScale.h1)
+                    .foregroundStyle(Color.desertCreamText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+                    .layoutPriority(1)
+                Text(todaySummary)
+                    .font(TypeScale.bodyMd)
+                    .foregroundStyle(Color.desertCreamText.opacity(0.78))
             }
-
-            Spacer(minLength: 24)
-
-            VStack(alignment: .trailing, spacing: 16) {
-                HStack(spacing: Space.sm) {
-                    if tracker.isTracking {
-                        StatusBadge(label: "Tracking", color: .productive, pulsing: true)
-                    } else {
-                        PrimaryButton("Start Tracking", icon: "play.fill", color: appState.accentColor) {
-                            tracker.start()
-                        }
-                    }
-
-                    MiniSignalStrip(category: tracker.activeCategory, active: tracker.isTracking)
-                        .frame(width: 126)
-                }
-
-                HStack(spacing: 10) {
-                    HeroMetricTile(label: "Active", value: formatDurationWords(todayTotal), color: appState.accentColor)
-                    HeroMetricTile(label: "Focus", value: formatDurationWords(todayProductive), color: .productive)
-                    HeroMetricTile(label: "Switches", value: "\(contextSwitches)", color: .streak)
-                }
-            }
-        }
-        .padding(.horizontal, 30)
-        .padding(.vertical, 26)
-        .frame(minHeight: 178)
-        .glassSurface(tint: appState.accentColor)
-    }
-
-    private var dashboardSummary: some View {
-        HStack(spacing: 0) {
-            efficiencyPanel
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Rectangle()
-                .fill(Color.border.opacity(0.55))
-                .frame(width: 1)
-
-            metricRail
-                .frame(width: 390)
-        }
-        .frame(height: 220)
-        .glassSurface(tint: qualityColor)
-    }
-
-    private var efficiencyPanel: some View {
-        HStack(spacing: 0) {
-            EfficiencyGauge(score: efficiencyScore, accent: appState.accentColor)
-                .frame(width: 222)
-
-            VStack(alignment: .leading, spacing: Space.md) {
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text(scoreHeadline)
-                        .font(TypeScale.h2)
-                    Text(scoreComparison)
-                        .font(TypeScale.bodyMd)
-                        .foregroundStyle(baselineDelta == nil ? .secondary : comparisonColor)
-                }
-
-                Divider()
-
-                HStack(spacing: 42) {
-                    signal(icon: "clock", value: formatDurationWords(longestProductiveStreak), label: "Longest focus")
-                    signal(icon: "arrow.triangle.2.circlepath", value: "\(contextSwitches)", label: "Context switches")
-                    signal(icon: "scope", value: formatDurationWords(todayDistraction), label: "Distracted")
-                }
-
-                HStack(spacing: 5) {
-                    ForEach(0..<12, id: \.self) { index in
-                        Rectangle()
-                            .fill(index < max(1, efficiencyScore / 9) ? qualityColor.opacity(0.95) : Color.driftMuted.opacity(0.16))
-                            .frame(width: 18, height: 7)
-                    }
-                }
-                .padding(.top, Space.xs)
-            }
-            .padding(.horizontal, 26)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer()
 
-            CardDesertScene()
-                .frame(maxWidth: 240)
-                .opacity(0.74)
+            HStack(spacing: 10) {
+                Text("\(efficiencyScore)")
+                    .font(TypeScale.monoMd)
+                    .fontWeight(.bold)
+                    .monospacedDigit()
+                Text("Focus quality")
+                    .font(TypeScale.bodySm)
+                    .foregroundStyle(Color.creamMuted)
+
+                Button {
+                    showScoreInfo.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("How Drift calculates focus quality")
+                .accessibilityLabel("How Drift calculates focus quality")
+                .popover(isPresented: $showScoreInfo, arrowEdge: .bottom) {
+                    TactilePanel(padding: 18, density: .popover) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How focus quality works")
+                                .font(TypeScale.heading)
+                            Text("Focused share raises it. Distraction time and frequent context switches lower confidence in the result.")
+                                .font(TypeScale.caption)
+                                .foregroundStyle(Color.driftMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(width: 280, alignment: .leading)
+                    }
+                    .preferredColorScheme(.dark)
+                }
+            }
+            .foregroundStyle(Color.cream)
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .frame(height: 44)
+            .driftGlass(.standard, cornerRadius: Radius.pill)
         }
+        .padding(.horizontal, 4)
+        .frame(minHeight: 132)
+    }
+
+    private var currentActivity: some View {
+        HStack(spacing: 16) {
+            ApplicationIcon(name: tracker.isTracking ? tracker.activeApp : "Drift", size: 42)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("CURRENT ACTIVITY")
+                    .sectionLabel()
+                Text(tracker.isTracking ? (tracker.activeApp.isEmpty ? "Reading active app…" : tracker.activeApp) : "Tracking is off")
+                    .font(TypeScale.heading)
+                    .lineLimit(1)
+                Text(tracker.isTracking ? currentContextSubtitle : "Start tracking to classify your activity")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(Color.driftMuted)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if tracker.isTracking {
+                Text(formatDurationWords(liveEvent?.durationMs ?? 0))
+                    .font(TypeScale.monoSm)
+                    .foregroundStyle(Color.driftMuted)
+                    .monospacedDigit()
+
+                Menu {
+                    ForEach(AppCategory.allCases, id: \.rawValue) { category in
+                        Button {
+                            guard !tracker.activeApp.isEmpty else { return }
+                            appState.setClassificationOverride(category, for: "app:\(tracker.activeApp.lowercased())")
+                        } label: {
+                            Label(category.label, systemImage: categoryIcon(category))
+                        }
+                    }
+                } label: {
+                    ClassificationBadge(category: displayedActiveCategory)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Change classification")
+                .accessibilityLabel("Change classification for \(tracker.activeApp)")
+
+                SecondaryPillButton(title: "Stop tracking", icon: "stop.fill") {
+                    tracker.stop()
+                }
+            } else {
+                PrimaryPillButton(title: "Start tracking", icon: "play.fill") {
+                    tracker.start()
+                }
+            }
+        }
+        .padding(.horizontal, 22)
+        .frame(minHeight: 88)
+        .tactilePanel(padding: 0, density: .standard)
+    }
+
+    private var summaryStrip: some View {
+        HStack(spacing: 0) {
+            summaryCell(label: "FOCUSED", value: formatDurationWords(todayProductive), color: .productive)
+            summaryDivider
+            summaryCell(label: "DISTRACTED", value: formatDurationWords(todayDistraction), color: .distraction)
+            summaryDivider
+            summaryCell(label: "SWITCHES", value: "\(contextSwitches)", color: .streak)
+            summaryDivider
+            summaryCell(label: "LONGEST RUN", value: formatDurationWords(longestProductiveStreak), color: .productive)
+        }
+        .frame(height: 86)
+        .tactilePanel(padding: 0, density: .light)
+    }
+
+    private var summaryDivider: some View {
+        Rectangle().fill(Color.border).frame(width: 1).padding(.vertical, 18)
+    }
+
+    private func summaryCell(label: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label).sectionLabel()
+            Text(value)
+                .font(TypeScale.monoMd)
+                .monospacedDigit()
+                .foregroundStyle(color)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
     }
 
     private var metricRail: some View {
         VStack(spacing: 0) {
-            MetricCell(icon: "timer", label: "ACTIVE TIME", value: formatDurationWords(todayTotal), detail: "Today", color: appState.accentColor)
+            DashboardMetricCell(icon: "timer", label: "ACTIVE TIME", value: formatDurationWords(todayTotal), detail: "Today", color: appState.accentColor)
             metricDivider
-            MetricCell(icon: "target", label: "FOCUS TIME", value: formatDurationWords(todayProductive), detail: percent(todayProductive, of: todayTotal), color: .productive)
+            DashboardMetricCell(icon: "target", label: "FOCUS TIME", value: formatDurationWords(todayProductive), detail: percent(todayProductive, of: todayTotal), color: .productive)
             metricDivider
-            MetricCell(icon: "arrow.triangle.2.circlepath", label: "CONTEXT SWITCHES", value: "\(contextSwitches)", detail: switchesPerHourLabel, color: .streak)
+            DashboardMetricCell(icon: "arrow.triangle.2.circlepath", label: "CONTEXT SWITCHES", value: "\(contextSwitches)", detail: switchesPerHourLabel, color: .streak)
         }
     }
 
@@ -229,15 +244,15 @@ struct TrackingView: View {
             .padding(6)
             .background {
                 Rectangle()
-                    .fill(Color.driftPanelInset.opacity(0.72))
+                    .fill(Color.black.opacity(0.10))
                     .overlay {
                         Rectangle().strokeBorder(Color.border.opacity(0.42), lineWidth: 1)
                     }
             }
         }
         .padding(Space.lg)
-        .frame(height: 128)
-        .glassSurface(tint: appState.accentColor)
+        .frame(height: 150)
+        .glassSurface(density: .data)
     }
 
     private var recentActivity: some View {
@@ -259,7 +274,7 @@ struct TrackingView: View {
                 }
             }
         }
-        .glassSurface(tint: .productive)
+        .glassSurface(density: .data)
     }
 
     private var applicationSummary: some View {
@@ -274,56 +289,27 @@ struct TrackingView: View {
                 )
             } else {
                 ForEach(Array(appStats.prefix(5))) { app in
-                    ApplicationStatRow(app: app)
+                    ApplicationStatRow(
+                        app: app,
+                        maxDuration: appStats.first?.durationMs ?? 1
+                    )
                     if app.id != appStats.prefix(5).last?.id {
                         Divider()
                     }
                 }
             }
         }
-        .glassSurface(tint: .streak)
+        .glassSurface(density: .data)
     }
 
     private var emptyOverview: some View {
-        HStack(spacing: 30) {
-            EmptyDesertMarker(accent: appState.accentColor)
-                .frame(width: 180, height: 150)
-
-            VStack(alignment: .leading, spacing: Space.md) {
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    Text("READY TO MAP YOUR DAY")
-                        .font(TypeScale.h2)
-                    Text("Start tracking to see apps, websites, page titles, duration, and context in one timeline.")
-                        .font(TypeScale.bodyMd)
-                        .foregroundStyle(Color.driftMuted)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: 520, alignment: .leading)
-                }
-
-                HStack(spacing: Space.sm) {
-                    DriftTag(text: "APPS", color: .productive)
-                    DriftTag(text: "SITES", color: appState.accentColor)
-                    DriftTag(text: "CONTEXT", color: .streak)
-                }
-
-                HStack(spacing: Space.md) {
-                    PrimaryButton("Start Tracking", icon: "play.fill", color: appState.accentColor) {
-                        tracker.start()
-                    }
-
-                    Text("Never keystrokes or screen contents.")
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 34)
-        .padding(.vertical, 36)
-        .frame(height: 264)
-        .glassSurface(tint: appState.accentColor)
+        EmptyState(
+            icon: "point.3.connected.trianglepath.dotted",
+            message: tracker.isTracking
+                ? "Drift is reading the frontmost app. Your first activity row will appear here shortly."
+                : "Your activity timeline will appear here after tracking begins. Drift never records keystrokes or screen contents."
+        )
+        .tactilePanel(padding: 0, density: .standard)
     }
 
     private func signal(icon: String, value: String, label: String) -> some View {
@@ -359,8 +345,8 @@ struct TrackingView: View {
                 .sectionLabel()
             Spacer()
         }
-        .padding(.horizontal, Space.lg)
-        .frame(height: 42)
+        .padding(.horizontal, Space.xl)
+        .frame(height: 54)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.border).frame(height: 0.5)
         }
@@ -386,7 +372,7 @@ struct TrackingView: View {
     }
 
     private var greeting: String {
-        "Tracking"
+        "WHERE DID YOUR TIME GO?"
     }
 
     private var currentContextSubtitle: String {
@@ -427,8 +413,35 @@ struct TrackingView: View {
         }
         return events.sorted { $0.timestamp < $1.timestamp }
     }
+    private var mergedVisibleEvents: [AppEvent] {
+        var merged: [AppEvent] = []
+        for event in visibleEvents {
+            guard let previous = merged.last,
+                  previous.owner == event.owner,
+                  previous.title == event.title,
+                  previous.category == event.category else {
+                merged.append(event)
+                continue
+            }
+
+            merged.removeLast()
+            merged.append(
+                AppEvent(
+                    id: event.id == Self.liveEventID ? event.id : previous.id,
+                    owner: previous.owner,
+                    title: previous.title,
+                    isBrowser: previous.isBrowser,
+                    url: previous.url,
+                    category: previous.category,
+                    timestamp: previous.timestamp,
+                    durationMs: previous.durationMs + event.durationMs
+                )
+            )
+        }
+        return merged
+    }
     private var recentEvents: [AppEvent] {
-        Array(visibleEvents.suffix(7).reversed())
+        Array(mergedVisibleEvents.suffix(5).reversed())
     }
     private var liveEvent: AppEvent? {
         guard tracker.isTracking, !tracker.activeApp.isEmpty else { return nil }
@@ -483,15 +496,17 @@ struct TrackingView: View {
     }
 
     private var scoreHeadline: String {
-        if todayTotal < 15 * 60_000 {
-            return "Early tracking signal"
-        }
-        switch efficiencyScore {
-        case 85...: return "A highly efficient day"
-        case 70..<85: return "Strong, focused progress"
-        case 50..<70: return "A mixed attention day"
-        default: return "Attention was fragmented"
-        }
+        guard todayTotal >= 5 * 60_000 else { return "Not enough activity yet" }
+        let switchesPerHour = Double(contextSwitches) / max(todayTotal / 3_600_000, 0.25)
+        if todayDistraction / max(todayTotal, 1) > 0.28 { return "Frequent distractions" }
+        if switchesPerHour > 18 { return "Productive, but fragmented" }
+        if efficiencyScore >= 82 && longestProductiveStreak >= 20 * 60_000 { return "Deep, uninterrupted focus" }
+        if todayProductive / max(todayTotal, 1) < 0.42 { return "Mostly neutral activity" }
+        return "Focused, with a few detours"
+    }
+
+    private var todaySummary: String {
+        "\(formatDurationWords(todayProductive)) focused out of \(formatDurationWords(todayTotal)) tracked"
     }
 
     private var scoreComparison: String {
@@ -515,6 +530,19 @@ struct TrackingView: View {
         case 70...: return .productive
         case 40..<70: return .streak
         default: return .distraction
+        }
+    }
+
+    private var focusScoreBlocks: Int {
+        max(1, Int((Double(efficiencyScore) / 100.0 * 14.0).rounded()))
+    }
+
+    private var scoreShortLabel: String {
+        switch efficiencyScore {
+        case 75...: return "Strong focus"
+        case 55..<75: return "Steady focus"
+        case 35..<55: return "Building focus"
+        default: return "Needs focus"
         }
     }
 
@@ -563,13 +591,27 @@ struct TrackingView: View {
         if tracker.isIdle { return "Idle" }
         if tracker.isPaused { return "Paused" }
         if tracker.isTracking { return "Tracking" }
-        return "Offline"
+        return "Ready"
     }
 
     private var trackerColor: Color {
         if tracker.isPaused { return .streak }
         if tracker.isTracking { return .productive }
         return Color(.tertiaryLabelColor)
+    }
+
+    private var displayedActiveCategory: AppCategory {
+        guard !tracker.activeApp.isEmpty else { return tracker.activeCategory }
+        return appState.classificationOverride(for: "app:\(tracker.activeApp.lowercased())")
+            ?? tracker.activeCategory
+    }
+
+    private func categoryIcon(_ category: AppCategory) -> String {
+        switch category {
+        case .productive: return "checkmark.circle.fill"
+        case .neutral: return "minus.circle.fill"
+        case .distraction: return "exclamationmark.triangle.fill"
+        }
     }
 
     private struct AppStat: Identifiable {
@@ -581,44 +623,49 @@ struct TrackingView: View {
 
     private struct ApplicationStatRow: View {
         let app: AppStat
+        let maxDuration: TimeInterval
 
         var body: some View {
-            HStack(spacing: Space.md) {
-                ZStack {
-                    Rectangle()
-                        .fill(app.category.color.opacity(0.15))
-                        .frame(width: 34, height: 34)
-                        .overlay(Rectangle().strokeBorder(app.category.color.opacity(0.55), lineWidth: 1))
-                    Text(String(app.name.prefix(1)).uppercased())
-                        .font(TypeScale.caption)
-                        .fontWeight(.bold)
-                        .foregroundStyle(app.category.color)
-                }
+            HStack(spacing: Space.lg) {
+                ApplicationIcon(name: app.name, size: 42)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(app.name)
-                        .font(TypeScale.bodySm)
+                        .font(TypeScale.bodyMd)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.driftText)
                         .lineLimit(1)
-                    Text(app.category.label)
-                        .font(TypeScale.tiny)
-                        .foregroundStyle(Color.driftMuted)
+                    Label(app.category.label, systemImage: categoryIcon)
+                        .font(TypeScale.caption)
+                        .foregroundStyle(app.category.color)
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 7) {
                     Text(formatDurationWords(app.durationMs))
-                        .font(TypeScale.monoXs)
+                        .font(TypeScale.monoSm)
                         .foregroundStyle(Color.driftText.opacity(0.82))
                     Rectangle()
-                        .fill(app.category.color.opacity(0.72))
-                        .frame(width: 36, height: 4)
+                        .fill(Color.cream.opacity(0.10))
+                        .frame(width: 82, height: 5)
+                        .overlay(alignment: .leading) {
+                            Rectangle()
+                                .fill(app.category.color.opacity(0.78))
+                                .frame(width: 82 * CGFloat(max(0.05, min(1, app.durationMs / max(maxDuration, 1)))))
+                        }
                 }
             }
-            .padding(.horizontal, Space.lg)
-            .frame(height: 58)
+            .padding(.horizontal, Space.xl)
+            .frame(height: 78)
+        }
+
+        private var categoryIcon: String {
+            switch app.category {
+            case .productive: return "checkmark.circle.fill"
+            case .neutral: return "minus.circle.fill"
+            case .distraction: return "exclamationmark.triangle.fill"
+            }
         }
     }
 
@@ -646,27 +693,73 @@ struct TrackingView: View {
     private static let liveEventID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
 }
 
+struct ApplicationIcon: View {
+    let name: String
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let applicationURL {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: applicationURL.path))
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .padding(4)
+            } else {
+                ZStack {
+                    Color.accent.opacity(0.10)
+                    Text(String(name.prefix(1)).uppercased().isEmpty ? "D" : String(name.prefix(1)).uppercased())
+                        .font(TypeScale.heading)
+                        .foregroundStyle(Color.accent)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .background(Color.driftPanelRaised.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.border, lineWidth: 1))
+    }
+
+    private var applicationURL: URL? {
+        if let runningURL = NSWorkspace.shared.runningApplications.first(where: {
+            $0.localizedName?.localizedCaseInsensitiveCompare(name) == .orderedSame
+        })?.bundleURL {
+            return runningURL
+        }
+
+        let fileManager = FileManager.default
+        let candidates = [
+            URL(fileURLWithPath: "/Applications").appendingPathComponent("\(name).app"),
+            URL(fileURLWithPath: "/System/Applications").appendingPathComponent("\(name).app"),
+            fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Applications")
+                .appendingPathComponent("\(name).app")
+        ]
+        return candidates.first { fileManager.fileExists(atPath: $0.path) }
+    }
+}
+
 private struct PixelHeaderIcon: View {
     let color: Color
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle()
-                .fill(color.opacity(0.11))
-                .overlay(Rectangle().strokeBorder(color.opacity(0.34), lineWidth: 1))
+                .fill(Color.black.opacity(0.14))
+                .overlay(Rectangle().strokeBorder(Color.driftBorder, lineWidth: 2))
 
             HStack(alignment: .bottom, spacing: 3) {
-                Rectangle().fill(color).frame(width: 4, height: 9)
-                Rectangle().fill(color.opacity(0.78)).frame(width: 4, height: 18)
-                Rectangle().fill(color).frame(width: 4, height: 13)
-                Rectangle().fill(Color.productive).frame(width: 4, height: 22)
+                Rectangle().fill(color).frame(width: 5, height: 12)
+                Rectangle().fill(color.opacity(0.62)).frame(width: 5, height: 25)
+                Rectangle().fill(color).frame(width: 5, height: 18)
+                Rectangle().fill(Color.productive).frame(width: 5, height: 31)
             }
-            .padding(5)
+            .padding(7)
         }
     }
 }
 
-private struct MetricCell: View {
+private struct DashboardMetricCell: View {
     let icon: String
     let label: String
     let value: String
@@ -693,36 +786,150 @@ private struct MetricCell: View {
     }
 }
 
+private struct FocusStatTile: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 70, height: 70)
+                Image(systemName: icon)
+                    .font(.system(size: 27, weight: .medium))
+                    .foregroundStyle(color)
+            }
+
+            VStack(spacing: 8) {
+                Text(value)
+                    .font(TypeScale.monoMd)
+                    .monospacedDigit()
+                    .foregroundStyle(Color.driftText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(label)
+                    .font(TypeScale.bodySm)
+                    .foregroundStyle(Color.driftMuted)
+            }
+        }
+        .frame(width: 210, height: 204)
+        .background {
+            Rectangle()
+                .fill(Color.black.opacity(0.18))
+                .overlay(Rectangle().strokeBorder(Color.driftBorder, lineWidth: 2))
+                .shadow(color: Color.black.opacity(0.42), radius: 0, x: 5, y: 5)
+        }
+    }
+}
+
 private struct HeroMetricTile: View {
     let label: String
     let value: String
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.2)
+                .font(TypeScale.label)
+                .tracking(0)
                 .foregroundStyle(Color.driftMuted)
             Text(value)
-                .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                .font(TypeScale.monoMd)
                 .monospacedDigit()
                 .foregroundStyle(Color.driftText)
             Rectangle()
-                .fill(color.opacity(0.82))
-                .frame(height: 3)
+                .fill(color.opacity(0.78))
+                .frame(height: 5)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(width: 118, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 15)
+        .frame(width: 154, alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.driftPanelInset.opacity(0.58))
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(color.opacity(0.18), lineWidth: 1))
+            Rectangle()
+                .fill(Color.black.opacity(0.16))
+                .overlay(Rectangle().strokeBorder(Color.driftBorder, lineWidth: 2))
         }
+    }
+}
+
+private struct TrackingToggleButton: View {
+    let isTracking: Bool
+    let isPaused: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    private var label: String {
+        if isTracking { return "Stop tracking" }
+        return "Start tracking"
+    }
+
+    private var icon: String {
+        if isTracking { return "stop.fill" }
+        return "play.fill"
+    }
+
+    private var fill: Color {
+        if isTracking { return Color.distraction }
+        return Color.productive
+    }
+
+    private var caption: String {
+        if isTracking { return isPaused ? "Paused" : "Recording activity" }
+        return "Ready when you are"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.18))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .bold))
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(label)
+                        .font(TypeScale.heading)
+                        .lineLimit(1)
+                    Text(caption)
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Color.white.opacity(0.78))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 18)
+            .frame(width: 286, height: 76)
+            .background {
+                Rectangle()
+                    .fill(fill.opacity(isHovered ? 0.88 : 0.94))
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.22),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                    .overlay {
+                        Rectangle().strokeBorder(Color.black.opacity(0.18), lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(isHovered ? 0.48 : 0.38), radius: 0, x: isHovered ? 6 : 5, y: isHovered ? 6 : 5)
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .accessibilityLabel(label)
     }
 }
 
@@ -742,9 +949,9 @@ private struct MiniSignalStrip: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.driftPanelInset.opacity(active ? 0.88 : 0.52))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.border.opacity(0.34), lineWidth: 1))
+            Rectangle()
+                .fill(Color.black.opacity(0.14))
+                .overlay(Rectangle().strokeBorder(Color.driftBorder, lineWidth: 2))
         }
     }
 
@@ -758,26 +965,11 @@ private struct MiniSignalStrip: View {
 private struct PixelCurrentActivityIcon: View {
     var body: some View {
         ZStack(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.accentDeep)
-                .frame(width: 34, height: 8)
-                .offset(y: 0)
-            Rectangle()
-                .fill(Color.streak)
-                .frame(width: 12, height: 4)
-                .offset(x: 8, y: -8)
-            Rectangle()
-                .fill(Color.productive)
-                .frame(width: 6, height: 28)
-                .offset(x: 3, y: -8)
-            Rectangle()
-                .fill(Color.productive)
-                .frame(width: 11, height: 5)
-                .offset(x: -5, y: -18)
-            Rectangle()
-                .fill(Color.productive)
-                .frame(width: 10, height: 5)
-                .offset(x: 14, y: -24)
+            Rectangle().fill(Color.accent.opacity(0.74)).frame(width: 28, height: 5)
+            Rectangle().fill(Color.productive.opacity(0.86)).frame(width: 6, height: 30).offset(y: -4)
+            Rectangle().fill(Color.productive.opacity(0.58)).frame(width: 12, height: 5).offset(x: -8, y: -18)
+            Rectangle().fill(Color.productive.opacity(0.72)).frame(width: 12, height: 5).offset(x: 9, y: -23)
+            Rectangle().fill(Color.streak.opacity(0.70)).frame(width: 4, height: 4).offset(x: 17, y: -8)
         }
     }
 }
@@ -788,28 +980,21 @@ private struct EmptyDesertMarker: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Rectangle()
-                .fill(Color.driftPanelInset.opacity(0.65))
-                .overlay(Rectangle().strokeBorder(Color.driftBorder.opacity(0.38), lineWidth: 1))
+                .fill(Color.black.opacity(0.14))
+                .overlay(Rectangle().strokeBorder(Color.driftBorder, lineWidth: 2))
 
-            PixelMesa()
-                .fill(Color.accentDeep.opacity(0.20))
-                .frame(width: 112, height: 38)
-                .offset(x: -18, y: -17)
-
-            PixelCactusSprite(scale: 0.42)
-                .offset(x: 42, y: -17)
-
-            PixelDLogo(size: 42, background: accent)
-                .offset(x: -42, y: -58)
-
-            HStack(spacing: 4) {
-                ForEach(0..<9, id: \.self) { index in
-                    Rectangle()
-                        .fill(index < 6 ? Color.productive.opacity(0.75) : Color.driftMuted.opacity(0.22))
-                        .frame(width: 10, height: 7)
+            VStack(spacing: 8) {
+                PixelCurrentActivityIcon()
+                    .frame(width: 64, height: 54)
+                HStack(spacing: 4) {
+                    ForEach(0..<6, id: \.self) { index in
+                        Rectangle()
+                            .fill(index.isMultiple(of: 2) ? accent.opacity(0.75) : Color.streak.opacity(0.62))
+                            .frame(width: 7, height: 5)
+                    }
                 }
             }
-            .offset(y: -10)
+            .padding(.bottom, 18)
         }
     }
 }
@@ -838,12 +1023,12 @@ private struct EfficiencyGauge: View {
                     .rotationEffect(.degrees(132))
                 VStack(spacing: 6) {
                     Text("\(score)")
-                        .font(.system(size: 34, weight: .regular, design: .rounded))
+                        .font(TypeScale.monoLg)
                         .monospacedDigit()
                         .foregroundStyle(Color.streak)
                     Text("EFFICIENCY")
-                        .font(.system(size: 8, weight: .medium))
-                        .tracking(1.2)
+                        .font(TypeScale.tiny)
+                        .tracking(0)
                         .foregroundStyle(Color.driftMuted)
                 }
             }
@@ -852,7 +1037,7 @@ private struct EfficiencyGauge: View {
             HStack(spacing: 3) {
                 ForEach(0..<10, id: \.self) { index in
                     Rectangle()
-                        .fill(index * 10 < score ? Color.distraction.opacity(index < 3 ? 1 : 0.85) : Color.driftMuted.opacity(0.18))
+                        .fill(index * 10 < score ? qualityFill(for: index) : Color.driftMuted.opacity(0.16))
                         .frame(width: 8, height: 6)
                 }
             }
@@ -862,133 +1047,31 @@ private struct EfficiencyGauge: View {
             Rectangle().fill(Color.border.opacity(0.5)).frame(width: 1)
         }
     }
-}
 
-private struct CardDesertScene: View {
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                Spacer()
-                Rectangle().fill(Color(red: 0.35, green: 0.16, blue: 0.20).opacity(0.38)).frame(height: 20)
-                Rectangle().fill(Color(red: 0.44, green: 0.20, blue: 0.22).opacity(0.44)).frame(height: 30)
-            }
-
-            PixelCloud()
-                .fill(Color(red: 0.31, green: 0.15, blue: 0.24).opacity(0.45))
-                .frame(width: 72, height: 18)
-                .offset(x: -78, y: -76)
-            PixelCloud()
-                .fill(Color(red: 0.31, green: 0.15, blue: 0.24).opacity(0.35))
-                .frame(width: 52, height: 13)
-                .offset(x: 44, y: -88)
-
-            PixelMesa()
-                .fill(Color(red: 0.31, green: 0.15, blue: 0.24).opacity(0.72))
-                .frame(width: 86, height: 31)
-                .offset(x: -54, y: -23)
-            PixelMesa()
-                .fill(Color(red: 0.31, green: 0.15, blue: 0.24).opacity(0.58))
-                .frame(width: 68, height: 22)
-                .offset(x: 24, y: -22)
-            PixelCactusSprite(scale: 0.62)
-                .offset(x: 88, y: -11)
-        }
-        .clipped()
-    }
-}
-
-private struct PixelCloud: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width
-        let h = rect.height
-        var p = Path()
-        p.move(to: CGPoint(x: 0, y: h * 0.8))
-        p.addLine(to: CGPoint(x: w * 0.12, y: h * 0.8))
-        p.addLine(to: CGPoint(x: w * 0.12, y: h * 0.5))
-        p.addLine(to: CGPoint(x: w * 0.24, y: h * 0.5))
-        p.addLine(to: CGPoint(x: w * 0.24, y: h * 0.22))
-        p.addLine(to: CGPoint(x: w * 0.44, y: h * 0.22))
-        p.addLine(to: CGPoint(x: w * 0.44, y: h * 0.08))
-        p.addLine(to: CGPoint(x: w * 0.63, y: h * 0.08))
-        p.addLine(to: CGPoint(x: w * 0.63, y: h * 0.25))
-        p.addLine(to: CGPoint(x: w * 0.78, y: h * 0.25))
-        p.addLine(to: CGPoint(x: w * 0.78, y: h * 0.5))
-        p.addLine(to: CGPoint(x: w * 0.91, y: h * 0.5))
-        p.addLine(to: CGPoint(x: w * 0.91, y: h * 0.8))
-        p.addLine(to: CGPoint(x: w, y: h * 0.8))
-        p.addLine(to: CGPoint(x: w, y: h))
-        p.addLine(to: CGPoint(x: 0, y: h))
-        p.closeSubpath()
-        return p
-    }
-}
-
-private struct PixelMesa: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width
-        let h = rect.height
-        var p = Path()
-        p.move(to: CGPoint(x: 0, y: h))
-        p.addLine(to: CGPoint(x: w * 0.14, y: h))
-        p.addLine(to: CGPoint(x: w * 0.14, y: h * 0.60))
-        p.addLine(to: CGPoint(x: w * 0.35, y: h * 0.60))
-        p.addLine(to: CGPoint(x: w * 0.35, y: h * 0.20))
-        p.addLine(to: CGPoint(x: w * 0.70, y: h * 0.20))
-        p.addLine(to: CGPoint(x: w * 0.70, y: h * 0.60))
-        p.addLine(to: CGPoint(x: w, y: h * 0.60))
-        p.addLine(to: CGPoint(x: w, y: h))
-        p.closeSubpath()
-        return p
-    }
-}
-
-private struct PixelCactusSprite: View {
-    var scale: CGFloat = 1
-
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            Rectangle().fill(Color(red: 0.33, green: 0.46, blue: 0.24)).frame(width: 16, height: 88)
-            Rectangle().fill(Color(red: 0.43, green: 0.58, blue: 0.24)).frame(width: 5, height: 88).offset(x: -5.5)
-            Rectangle().fill(Color(red: 0.20, green: 0.31, blue: 0.18)).frame(width: 4, height: 88).offset(x: 6)
-            Rectangle().fill(Color(red: 0.33, green: 0.46, blue: 0.24)).frame(width: 18, height: 12).offset(x: -14, y: -46)
-            Rectangle().fill(Color(red: 0.33, green: 0.46, blue: 0.24)).frame(width: 10, height: 29).offset(x: -20, y: -56)
-            Rectangle().fill(Color(red: 0.33, green: 0.46, blue: 0.24)).frame(width: 19, height: 12).offset(x: 15, y: -56)
-            Rectangle().fill(Color(red: 0.33, green: 0.46, blue: 0.24)).frame(width: 10, height: 31).offset(x: 21, y: -66)
-        }
-        .frame(width: 50, height: 92)
-        .scaleEffect(scale, anchor: .bottom)
+    private func qualityFill(for index: Int) -> Color {
+        index < 4 ? Color.distraction.opacity(0.88) : Color.productive.opacity(0.82)
     }
 }
 
 private struct ActivityRow: View {
     let event: AppEvent
     var isLive: Bool = false
+    @EnvironmentObject private var appState: AppState
+    @State private var isHovered = false
+    @State private var showDetails = false
 
     var body: some View {
-        HStack(spacing: Space.md) {
-            Rectangle()
-                .fill(event.category.color.opacity(isLive ? 0.95 : 0.62))
-                .frame(width: 4)
-
-            Text(isLive ? "LIVE" : Self.timeFormatter.string(from: event.timestamp))
-                .font(TypeScale.monoXs)
+        HStack(spacing: Space.lg) {
+            Text(isLive ? "LIVE" : timeRange)
+                .font(TypeScale.monoSm)
                 .foregroundStyle(isLive ? Color.productive : Color.driftMuted)
-                .frame(width: 68, alignment: .leading)
+                .frame(width: 132, alignment: .leading)
 
-            ZStack {
-                Rectangle()
-                    .fill(event.category.color.opacity(0.16))
-                    .frame(width: 32, height: 32)
-                    .overlay(Rectangle().strokeBorder(event.category.color.opacity(0.66), lineWidth: 1))
-                Text(String(rowTitle.prefix(1)).uppercased())
-                    .font(TypeScale.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(event.category.color)
-            }
+            ApplicationIcon(name: event.owner, size: 38)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(rowTitle)
-                    .font(TypeScale.bodySm)
+                    .font(TypeScale.bodyMd)
                     .fontWeight(.semibold)
                     .foregroundStyle(Color.driftText)
                     .lineLimit(1)
@@ -1001,20 +1084,58 @@ private struct ActivityRow: View {
             Spacer()
 
             Text(formatDurationWords(event.durationMs))
-                .font(TypeScale.monoXs)
+                .font(TypeScale.monoSm)
                 .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .trailing)
+                .frame(width: 70, alignment: .trailing)
 
-            Text(event.category.label.uppercased())
-                .font(TypeScale.tiny)
-                .foregroundStyle(event.category.color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(width: 90, alignment: .trailing)
+            ClassificationBadge(category: displayedCategory)
+
+            Menu {
+                Menu("Change classification") {
+                    ForEach(AppCategory.allCases, id: \.rawValue) { category in
+                        Button {
+                            appState.setClassificationOverride(category, for: classificationKey)
+                        } label: {
+                            Text(category.label)
+                        }
+                    }
+                }
+                Button("View details") {
+                    showDetails = true
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.creamMuted)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                            .fill(isHovered ? Color.cream.opacity(0.07) : Color.clear)
+                    )
+            }
+            .menuStyle(.borderlessButton)
+            .opacity(isHovered ? 1 : 0.35)
+            .help("Activity actions")
+            .accessibilityLabel("Actions for \(rowTitle)")
+            .popover(isPresented: $showDetails, arrowEdge: .trailing) {
+                TactilePanel(padding: 18, density: .popover) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(rowTitle).font(TypeScale.heading)
+                        Text(rowSubtitle).font(TypeScale.caption).foregroundStyle(Color.driftMuted)
+                        Text("\(timeRange) · \(formatDurationWords(event.durationMs))")
+                            .font(TypeScale.monoXs)
+                            .foregroundStyle(Color.driftMuted)
+                        ClassificationBadge(category: displayedCategory)
+                    }
+                    .frame(width: 300, alignment: .leading)
+                }
+                .preferredColorScheme(.dark)
+            }
         }
-        .padding(.trailing, Space.lg)
-        .frame(height: 52)
-        .background(isLive ? Color.productive.opacity(0.075) : Color.clear)
+        .padding(.horizontal, Space.xl)
+        .frame(height: 72)
+        .background(isLive ? Color.productive.opacity(0.075) : (isHovered ? Color.cream.opacity(0.055) : Color.clear))
+        .onHover { isHovered = $0 }
     }
 
     private var rowTitle: String {
@@ -1030,6 +1151,22 @@ private struct ActivityRow: View {
             return "\(event.owner) - \(title)"
         }
         return title
+    }
+
+    private var displayedCategory: AppCategory {
+        appState.classificationOverride(for: classificationKey) ?? event.category
+    }
+
+    private var classificationKey: String {
+        if let domain = domainName(from: event.url), !domain.isEmpty {
+            return "domain:\(domain.lowercased())"
+        }
+        return "app:\(event.owner.lowercased())"
+    }
+
+    private var timeRange: String {
+        let end = event.timestamp.addingTimeInterval(event.durationMs / 1000)
+        return "\(Self.timeFormatter.string(from: event.timestamp))–\(Self.timeFormatter.string(from: end))"
     }
 
     private func domainName(from value: String?) -> String? {
@@ -1053,42 +1190,8 @@ private struct ActivityRow: View {
 }
 
 private extension View {
-    func glassSurface(tint: Color = .accent) -> some View {
-        background {
-            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-            ZStack {
-                shape
-                    .fill(Color.driftPanel.opacity(0.90))
-                shape
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.16)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.08),
-                        tint.opacity(0.06),
-                        Color.black.opacity(0.16)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .clipShape(shape)
-            }
-            .shadow(color: Color.black.opacity(0.24), radius: 0, x: 5, y: 5)
-            .overlay {
-                shape
-                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-            }
-            .overlay {
-                shape
-                    .strokeBorder(Color.driftBorder.opacity(0.52), lineWidth: 1)
-            }
-            .overlay(alignment: .topLeading) {
-                Rectangle()
-                    .fill(tint.opacity(0.70))
-                    .frame(width: 46, height: 2)
-                    .padding(.leading, 28)
-            }
-        }
+    func glassSurface(density: DriftGlassDensity = .data) -> some View {
+        driftGlass(density, cornerRadius: Radius.md)
     }
 
     func glassTag(color: Color) -> some View {
@@ -1098,9 +1201,9 @@ private extension View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                Capsule()
                     .fill(color.opacity(0.12))
-                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(color.opacity(0.38), lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(color.opacity(0.30), lineWidth: 1))
             }
     }
 }
@@ -1134,8 +1237,8 @@ struct StatusBadge: View {
         .padding(.vertical, Space.xxs)
         .background(
             Rectangle()
-                .fill(color.opacity(0.10))
-                .overlay(Rectangle().strokeBorder(color.opacity(0.28), lineWidth: 1))
+                .fill(color.opacity(0.08))
+                .overlay(Rectangle().strokeBorder(color.opacity(0.20), lineWidth: 1))
         )
         .onAppear {
             guard pulsing else { return }
@@ -1144,240 +1247,14 @@ struct StatusBadge: View {
     }
 }
 
-private struct PixelDustOverlay: View {
-    let isDark: Bool
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { timeline in
-            Canvas(opaque: false, rendersAsynchronously: true) { context, size in
-                let time = timeline.date.timeIntervalSinceReferenceDate
-                let width = max(Int(size.width), 1)
-                let height = max(Int(size.height), 1)
-
-                for index in 0..<90 {
-                    let baseX = CGFloat((index * 83 + 29) % width)
-                    let drift = CGFloat((time * Double(4 + index % 5)).truncatingRemainder(dividingBy: 34))
-                    let x = (baseX + drift).truncatingRemainder(dividingBy: size.width)
-                    let y = CGFloat((index * 47 + 61) % height)
-                    let opacity = isDark ? 0.08 : 0.10
-                    let color = index.isMultiple(of: 9)
-                        ? Color.streak.opacity(opacity * 1.8)
-                        : Color.white.opacity(opacity)
-                    context.fill(
-                        Path(CGRect(x: x.rounded(), y: y.rounded(), width: index.isMultiple(of: 11) ? 2 : 1, height: 1)),
-                        with: .color(color)
-                    )
-                }
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
 struct DriftAmbientBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
     let accent: Color
     let reduceMotion: Bool
     var showLizard: Bool = true
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                Image("drift-desert-night", bundle: .module)
-                    .resizable()
-                    .interpolation(.none)
-                    .antialiased(false)
-                    .scaledToFill()
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .clipped()
-                    .overlay {
-                        Rectangle()
-                            .fill(Color.driftBackground.opacity(colorScheme == .dark ? 0.08 : 0.46))
-                    }
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                Color.black.opacity(colorScheme == .dark ? 0.10 : 0.00),
-                                Color.clear,
-                                Color.black.opacity(colorScheme == .dark ? 0.18 : 0.00)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-
-                if !reduceMotion {
-                    PixelDustOverlay(isDark: colorScheme == .dark)
-                }
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private func drawScene(in context: GraphicsContext, size: CGSize, time: TimeInterval) {
-        let isDark = colorScheme == .dark
-        let width = max(Int(size.width), 1)
-        let height = max(Int(size.height), 1)
-        let skyHeight = isDark ? size.height * 0.86 : size.height * 0.87
-
-        func block(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat, _ color: Color) {
-            context.fill(
-                Path(CGRect(x: x.rounded(), y: y.rounded(), width: width.rounded(), height: height.rounded())),
-                with: .color(color)
-            )
-        }
-
-        func cloud(_ x: CGFloat, _ y: CGFloat, _ unit: CGFloat, opacity: Double) {
-            let shadow = isDark ? Color(red: 0.24, green: 0.13, blue: 0.32).opacity(opacity) : Color(red: 0.80, green: 0.69, blue: 0.82).opacity(opacity)
-            let light = isDark ? Color(red: 0.36, green: 0.22, blue: 0.45).opacity(opacity * 0.88) : Color(red: 0.92, green: 0.82, blue: 0.88).opacity(opacity * 0.85)
-            block(x, y + unit * 3, unit * 10, unit * 2, shadow)
-            block(x + unit, y + unit * 2, unit * 3, unit * 2, shadow)
-            block(x + unit * 3, y + unit, unit * 4, unit * 3, light)
-            block(x + unit * 6, y + unit * 2, unit * 3, unit * 2, light)
-            block(x + unit * 8, y + unit * 3, unit * 3, unit, shadow)
-        }
-
-        func cactus(_ x: CGFloat, _ ground: CGFloat, _ unit: CGFloat, opacity: Double = 1) {
-            let dark = (isDark ? Color(red: 0.08, green: 0.20, blue: 0.14) : Color(red: 0.17, green: 0.31, blue: 0.20)).opacity(opacity)
-            let green = (isDark ? Color(red: 0.25, green: 0.39, blue: 0.17) : Color(red: 0.34, green: 0.48, blue: 0.25)).opacity(opacity)
-            let light = (isDark ? Color(red: 0.47, green: 0.56, blue: 0.18) : Color(red: 0.57, green: 0.64, blue: 0.30)).opacity(opacity)
-            block(x, ground - unit * 9, unit * 3, unit * 9, green)
-            block(x, ground - unit * 9, unit, unit * 9, dark)
-            block(x + unit * 2, ground - unit * 9, unit, unit * 9, light)
-            block(x - unit * 3, ground - unit * 6, unit * 3, unit * 2, green)
-            block(x - unit * 3, ground - unit * 8, unit * 2, unit * 4, green)
-            block(x + unit * 3, ground - unit * 5, unit * 3, unit * 2, dark)
-            block(x + unit * 5, ground - unit * 7, unit * 2, unit * 4, green)
-            block(x - unit, ground, unit * 5, unit, Color.driftShadow.opacity(0.34 * opacity))
-        }
-
-        func mesa(_ centerX: CGFloat, _ baseY: CGFloat, _ unit: CGFloat, _ color: Color, _ highlight: Color) {
-            block(centerX - unit * 3, baseY - unit * 5, unit * 6, unit, highlight)
-            block(centerX - unit * 5, baseY - unit * 4, unit * 10, unit, color)
-            block(centerX - unit * 7, baseY - unit * 3, unit * 14, unit, color)
-            block(centerX - unit * 9, baseY - unit * 2, unit * 18, unit * 2, color)
-            block(centerX - unit * 4, baseY - unit * 4, unit, unit * 3, Color.driftShadow.opacity(0.12))
-            block(centerX, baseY - unit * 4, unit, unit * 2, Color.driftShadow.opacity(0.10))
-        }
-
-        func lizard(_ x: CGFloat, _ y: CGFloat, tongue: Bool, tailUp: Bool) {
-            let body = isDark ? Color(red: 0.33, green: 0.49, blue: 0.25) : Color(red: 0.39, green: 0.55, blue: 0.29)
-            let dark = isDark ? Color(red: 0.12, green: 0.25, blue: 0.15) : Color(red: 0.20, green: 0.35, blue: 0.19)
-            let belly = isDark ? Color(red: 0.56, green: 0.63, blue: 0.25) : Color(red: 0.62, green: 0.67, blue: 0.32)
-            block(x + 10, y + 3, 21, 7, body)
-            block(x + 15, y + 8, 12, 2, belly)
-            block(x + 31, y + 2, 8, 6, body)
-            block(x + 36, y + 4, 2, 2, Color.driftText.opacity(isDark ? 0.72 : 0.56))
-            block(x + 3, y + (tailUp ? 1 : 5), 8, 3, dark)
-            block(x, y + (tailUp ? 0 : 6), 5, 2, dark)
-            block(x + 11, y + 10, 3, 3, dark)
-            block(x + 22, y + 10, 3, 3, dark)
-            block(x + 29, y + 9, 3, 3, dark)
-            block(x + 39, y + 6, 3, 2, body)
-            if tongue {
-                block(x + 42, y + 6, 5, 1, Color.distraction)
-                block(x + 47, y + 5, 2, 1, Color.distraction)
-            }
-        }
-
-        let skyBands: [Color] = isDark
-            ? [
-                Color(red: 0.026, green: 0.023, blue: 0.071),
-                Color(red: 0.039, green: 0.033, blue: 0.095),
-                Color(red: 0.052, green: 0.043, blue: 0.122),
-                Color(red: 0.070, green: 0.050, blue: 0.153),
-                Color(red: 0.094, green: 0.061, blue: 0.183),
-                Color(red: 0.126, green: 0.075, blue: 0.208)
-            ]
-            : [
-                Color(red: 0.996, green: 0.987, blue: 0.970),
-                Color(red: 0.995, green: 0.976, blue: 0.948),
-                Color(red: 0.992, green: 0.961, blue: 0.921),
-                Color(red: 0.984, green: 0.936, blue: 0.890),
-                Color(red: 0.972, green: 0.907, blue: 0.845),
-                Color(red: 0.955, green: 0.870, blue: 0.790)
-            ]
-        let bandHeight = skyHeight / CGFloat(skyBands.count)
-        for (index, color) in skyBands.enumerated() {
-            block(0, CGFloat(index) * bandHeight, size.width, bandHeight + 1, color)
-        }
-
-        if isDark {
-            for index in 0..<72 {
-                let x = CGFloat((index * 149 + 37) % width)
-                let y = CGFloat((index * 83 + 19) % max(Int(skyHeight * 0.72), 1))
-                let side: CGFloat = index.isMultiple(of: 11) ? 2 : 1
-                let star = index.isMultiple(of: 7) ? Color.streak.opacity(0.38) : Color.white.opacity(0.24)
-                block(x, y, side, side, star)
-                if index.isMultiple(of: 17) {
-                    block(x - 2, y, 5, 1, star.opacity(0.72))
-                    block(x, y - 2, 1, 5, star.opacity(0.72))
-                }
-            }
-        }
-
-        for index in 0..<112 {
-            let x = CGFloat((index * 71 + 13) % width)
-            let range = max(Int(size.height - skyHeight), 1)
-            let y = skyHeight + CGFloat((index * 47 + 29) % range)
-            let particle = index.isMultiple(of: 3)
-                ? Color.streak.opacity(isDark ? 0.16 : 0.22)
-                : (isDark ? Color.white.opacity(0.07) : Color.accentDeep.opacity(0.13))
-            block(x, y, index.isMultiple(of: 5) ? 2 : 1, index.isMultiple(of: 7) ? 2 : 1, particle)
-        }
-
-        let mesaColor = isDark ? Color(red: 0.20, green: 0.08, blue: 0.18).opacity(0.34) : Color(red: 0.72, green: 0.57, blue: 0.68).opacity(0.13)
-        let mesaLight = isDark ? Color(red: 0.35, green: 0.13, blue: 0.24).opacity(0.28) : Color(red: 0.96, green: 0.70, blue: 0.52).opacity(0.16)
-        mesa(size.width * 0.18, skyHeight + 2, 7, mesaColor, mesaLight)
-        mesa(size.width * 0.82, skyHeight + 5, 6, mesaColor, mesaLight)
-
-        let sandBands: [Color] = isDark
-            ? [
-                Color(red: 0.22, green: 0.10, blue: 0.15),
-                Color(red: 0.28, green: 0.13, blue: 0.15),
-                Color(red: 0.34, green: 0.17, blue: 0.15),
-                Color(red: 0.40, green: 0.20, blue: 0.15)
-            ]
-            : [
-                Color(red: 0.99, green: 0.87, blue: 0.74),
-                Color(red: 0.99, green: 0.82, blue: 0.67),
-                Color(red: 0.97, green: 0.76, blue: 0.59),
-                Color(red: 0.94, green: 0.70, blue: 0.52)
-            ]
-        let groundHeight = size.height - skyHeight
-        for (index, color) in sandBands.enumerated() {
-            let y = skyHeight + groundHeight * CGFloat(index) / CGFloat(sandBands.count)
-            block(0, y, size.width, groundHeight / CGFloat(sandBands.count) + 1, color)
-        }
-
-        for index in 0..<32 {
-            let x = CGFloat((index * 173 + 41) % width)
-            let y = skyHeight + CGFloat((index * 31 + 9) % max(Int(groundHeight), 1))
-            let run = CGFloat(8 + (index * 7) % 34)
-            block(x, y, run, 2, Color.driftShadow.opacity(isDark ? 0.18 : 0.12))
-        }
-
-        cactus(size.width * 0.08, size.height - 10, max(3, min(6, size.width / 180)), opacity: 0.76)
-        cactus(size.width * 0.90, size.height - 12, max(3, min(5, size.width / 220)), opacity: 0.66)
-
-        guard showLizard else { return }
-        let routeDuration = 86.0
-        let pauseEvery = 18.0
-        let pauseDuration = 2.0
-        let raw = reduceMotion ? 12.0 : time.truncatingRemainder(dividingBy: routeDuration)
-        let segmentTime = raw.truncatingRemainder(dividingBy: pauseEvery)
-        let pausesCompleted = floor(raw / pauseEvery)
-        let pauseOverflow = max(0, segmentTime - (pauseEvery - pauseDuration))
-        let movingTime = raw - pausesCompleted * pauseDuration - pauseOverflow
-        let movingTotal = routeDuration - floor(routeDuration / pauseEvery) * pauseDuration
-        let progress = CGFloat(max(0, min(1, movingTime / movingTotal)))
-        let lizardX = -54 + (size.width + 108) * progress
-        let lizardY = CGFloat(height) - 24
-        let isPaused = reduceMotion || segmentTime > pauseEvery - pauseDuration
-        let tongue = isPaused && !reduceMotion && Int((segmentTime - (pauseEvery - pauseDuration)) * 4).isMultiple(of: 2)
-        let tailUp = reduceMotion ? false : Int(time * 2).isMultiple(of: 2)
-        lizard(lizardX, lizardY, tongue: tongue, tailUp: tailUp)
+        DriftPixelBackdrop(imageOpacity: 1, washOpacity: 0.18, blurRadius: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }

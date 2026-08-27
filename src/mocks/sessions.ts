@@ -94,7 +94,7 @@ export const mixedSession: BrowsingEvent[] = [
   // Minor drift
   mockEvent({
     rawUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    title: "Quick break video",
+    title: "Funny viral music video",
     startTime: BASE + min(80) + 1000,
     endTime: BASE + min(84),
   }),
@@ -113,8 +113,8 @@ export const mixedSession: BrowsingEvent[] = [
   }),
   // Small distraction
   mockEvent({
-    rawUrl: "https://reddit.com/r/programming",
-    title: "r/programming",
+    rawUrl: "https://reddit.com/r/popular",
+    title: "r/popular",
     startTime: BASE + min(100) + 3000,
     endTime: BASE + min(105),
   }),

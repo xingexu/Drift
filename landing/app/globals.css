@@ -102,6 +102,11 @@ body {
   white-space: nowrap;
   padding: 0 clamp(14px, 1.25vw, 24px);
   outline-offset: 6px;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .scene-download span {
@@ -213,8 +218,7 @@ body {
   text-decoration: none;
 }
 
-.pixel-logo,
-.pixel-github-logo {
+.pixel-logo {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
@@ -239,18 +243,45 @@ body {
   box-shadow: none;
 }
 
-.pixel-github-logo {
+.brand-logo {
   display: block;
   width: 28px;
   height: 28px;
-  object-fit: fill;
+  color: #f8f3e7;
+  filter: drop-shadow(2px 2px 0 #020611);
+}
+
+.brand-logo--linkedin {
+  width: 29px;
+  height: 29px;
+  color: #0a66c2;
+}
+
+.brand-logo--github {
+  color: #f8f3e7;
 }
 
 .scene-footer__icon:hover,
 .scene-footer__icon:focus-visible {
-  color: #ffffff;
   border-color: #e29243;
   outline: none;
+}
+
+.scene-footer__icon {
+  transition:
+    border-color 160ms ease,
+    transform 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.scene-footer__icon--github:hover .brand-logo,
+.scene-footer__icon--github:focus-visible .brand-logo {
+  color: #ffffff;
+}
+
+.scene-footer__icon--linkedin:hover .brand-logo,
+.scene-footer__icon--linkedin:focus-visible .brand-logo {
+  color: #1688df;
 }
 
 .scene-footer__icon:active {
@@ -323,9 +354,14 @@ body {
     height: 2px;
   }
 
-  .pixel-github-logo {
+  .brand-logo {
     width: 26px;
     height: 26px;
+  }
+
+  .brand-logo--linkedin {
+    width: 27px;
+    height: 27px;
   }
 }
 
@@ -349,8 +385,20 @@ body {
     transform: scale(.86);
   }
 
-  .pixel-github-logo {
+  .brand-logo {
     width: 24px;
     height: 24px;
+  }
+
+  .brand-logo--linkedin {
+    width: 25px;
+    height: 25px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-download,
+  .scene-footer__icon {
+    transition-duration: 0ms;
   }
 }

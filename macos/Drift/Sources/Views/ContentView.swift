@@ -1,99 +1,6 @@
 import SwiftUI
 import AppKit
 
-private struct DriftSidebarWorld: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let accent: Color
-
-    var body: some View {
-        DriftHomeBackdrop(mode: colorScheme == .dark ? .sidebarDark : .sidebarLight)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct DriftHomeBackdrop: View {
-    enum Mode {
-        case contentDark
-        case contentLight
-        case sidebarDark
-        case sidebarLight
-    }
-
-    let mode: Mode
-
-    var body: some View {
-        GeometryReader { proxy in
-            Image("drift-home-scene", bundle: .module)
-                .resizable()
-                .interpolation(.none)
-                .antialiased(false)
-                .scaledToFill()
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .scaleEffect(scale)
-                .offset(x: xOffset(for: proxy.size), y: yOffset(for: proxy.size))
-                .clipped()
-                .overlay {
-                    Rectangle().fill(overlayColor)
-                }
-                .overlay {
-                    LinearGradient(
-                        colors: gradientColors,
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private var scale: CGFloat {
-        switch mode {
-        case .contentDark, .contentLight: return 1.03
-        case .sidebarDark, .sidebarLight: return 1.18
-        }
-    }
-
-    private func xOffset(for size: CGSize) -> CGFloat {
-        switch mode {
-        case .contentDark, .contentLight: return 0
-        case .sidebarDark, .sidebarLight: return -size.width * 0.12
-        }
-    }
-
-    private func yOffset(for size: CGSize) -> CGFloat {
-        switch mode {
-        case .contentDark, .contentLight: return -size.height * 0.03
-        case .sidebarDark, .sidebarLight: return -size.height * 0.02
-        }
-    }
-
-    private var overlayColor: Color {
-        switch mode {
-        case .contentDark: return Color(red: 0.03, green: 0.02, blue: 0.08).opacity(0.18)
-        case .contentLight: return Color.white.opacity(0.38)
-        case .sidebarDark: return Color(red: 0.03, green: 0.02, blue: 0.08).opacity(0.38)
-        case .sidebarLight: return Color.white.opacity(0.46)
-        }
-    }
-
-    private var gradientColors: [Color] {
-        switch mode {
-        case .contentDark, .sidebarDark:
-            return [
-                Color(red: 0.02, green: 0.01, blue: 0.06).opacity(0.34),
-                Color.clear,
-                Color.black.opacity(0.22)
-            ]
-        case .contentLight, .sidebarLight:
-            return [
-                Color.white.opacity(0.28),
-                Color.white.opacity(0.12),
-                Color(red: 1.0, green: 0.74, blue: 0.50).opacity(0.18)
-            ]
-        }
-    }
-}
-
 // MARK: - Root Content View
 
 struct ContentView: View {
@@ -124,6 +31,7 @@ struct ContentView: View {
                 ))
             case .main:
                 MainAppView()
+                    .ignoresSafeArea(.container, edges: .top)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .trailing)),
                         removal: .opacity.combined(with: .move(edge: .trailing))
@@ -143,9 +51,10 @@ struct ContentView: View {
     }
 
     private var colorScheme: ColorScheme? {
+        guard currentScreen == .main else { return .dark }
         switch appState.theme {
-        case .light:  return .light
-        case .dark:   return .dark
+        case .light: return .light
+        case .dark: return .dark
         case .system: return nil
         }
     }
@@ -169,31 +78,44 @@ struct MainAppView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                SidebarView()
-                    .accessibilityElement(children: .contain)
-                    .accessibilityLabel("Navigation sidebar")
+        ZStack {
+            DesertBackdrop(
+                imageName: appState.currentTab.backgroundImageName,
+                washOpacity: appState.currentTab.backgroundWashOpacity
+            )
+            .id(appState.currentTab.backgroundImageName)
+            .transition(.opacity)
 
-                Rectangle()
-                    .fill(Color.border.opacity(0.55))
-                    .frame(width: 1)
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    if !isImmersiveFocus {
+                        SidebarView()
+                            .environment(\.colorScheme, .dark)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel("Navigation sidebar")
+                    }
 
-                VStack(spacing: 0) {
-                    // Sticky topbar
-                    TopbarView()
+                    VStack(spacing: 0) {
+                        if !isImmersiveFocus {
+                            TopbarView()
+                                .environment(\.colorScheme, .dark)
+                        }
 
-                    // Tab content with smooth page transitions
-                    mainContent
+                        mainContent
+                    }
+                }
+
+                if showStatusBar && !isImmersiveFocus {
+                    globalFocusStatusBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-
-            if showStatusBar {
-                globalFocusStatusBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
         }
-        .animation(Anim.tap, value: showStatusBar)
+        .animation(appState.reduceMotion ? nil : Anim.page, value: appState.currentTab)
+        .animation(appState.reduceMotion ? nil : Anim.tap, value: showStatusBar)
+        .background(Color.driftBackground)
+        .clipped()
+        .tint(Color.sand)
         .onAppear  { setupKeyboardNavigation() }
         .onDisappear { teardownKeyboardNavigation() }
         .onChange(of: tracker.activeApp) { _, newApp in
@@ -236,13 +158,16 @@ struct MainAppView: View {
             guard let appState else { return event }
             switch event.charactersIgnoringModifiers {
             case "1":
-                DispatchQueue.main.async { withAnimation(Anim.tap) { appState.currentTab = .tracking } }
+                DispatchQueue.main.async { appState.currentTab = .tracking }
                 return nil
             case "2":
-                DispatchQueue.main.async { withAnimation(Anim.tap) { appState.currentTab = .focus } }
+                DispatchQueue.main.async { appState.currentTab = .focus }
                 return nil
             case "3":
-                DispatchQueue.main.async { withAnimation(Anim.tap) { appState.currentTab = .settings } }
+                DispatchQueue.main.async { appState.currentTab = .history }
+                return nil
+            case "4":
+                DispatchQueue.main.async { appState.currentTab = .settings }
                 return nil
             default:
                 return event
@@ -271,37 +196,28 @@ struct MainAppView: View {
                 StudyView()
                     .transition(pageTransition)
             }
+            if appState.currentTab == .history {
+                HistoryView()
+                    .transition(pageTransition)
+            }
             if appState.currentTab == .settings {
                 SettingsView()
                     .transition(pageTransition)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            ZStack {
-                Color.driftBackground
-                DriftHomeBackdrop(mode: resolvedBackdropMode)
-            }
-        }
-        .animation(.easeOut(duration: 0.22), value: appState.currentTab)
-    }
-
-    private var resolvedBackdropMode: DriftHomeBackdrop.Mode {
-        switch appState.theme {
-        case .light: return .contentLight
-        case .dark: return .contentDark
-        case .system:
-            return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                ? .contentDark
-                : .contentLight
-        }
+        .clipped()
+        .animation(appState.reduceMotion ? nil : Anim.page, value: appState.currentTab)
     }
 
     private var pageTransition: AnyTransition {
-        .asymmetric(
-            insertion: .opacity.combined(with: .offset(x: 0, y: 14)),
-            removal:   .opacity.combined(with: .offset(x: 0, y: -6))
-        )
+        appState.reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .offset(y: 6))
+    }
+
+    private var isImmersiveFocus: Bool {
+        appState.currentTab == .focus && appState.focusModeActive
     }
 
     // MARK: - Global Focus Status Bar
@@ -395,40 +311,27 @@ struct MainAppView: View {
 // MARK: - Topbar
 
 struct TopbarView: View {
-    @EnvironmentObject private var tracker: WindowTracker
-
     var body: some View {
         HStack(spacing: Space.md) {
             Image(systemName: "calendar")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.driftMuted)
+                .foregroundStyle(Color.desertMutedText)
 
             Text(dateString)
                 .font(TypeScale.caption)
-                .foregroundStyle(Color.driftMuted)
+                .foregroundStyle(Color.desertMutedText)
                 .monospacedDigit()
 
             Spacer()
-
-            StatusDot(status: tracker.isTracking ? .tracking : .idle)
-            Text(tracker.isTracking ? "Tracking" : "Offline")
-                .font(TypeScale.caption)
-                .foregroundStyle(Color.driftText)
-            Text(tracker.isTracking ? "Local capture" : "Local mode")
-                .font(TypeScale.caption)
-                .foregroundStyle(Color.driftMuted)
         }
-        .padding(.horizontal, 28)
-        .frame(height: 58)
-        .background(
+        .padding(.horizontal, 32)
+        .frame(height: 54)
+        .background { DriftShellSurface(layer: .toolbar) }
+        .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.driftPanel.opacity(0.76))
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.border.opacity(0.44))
-                        .frame(height: 1)
-                }
-        )
+                .fill(Color.desertCreamText.opacity(0.12))
+                .frame(height: 1)
+        }
         .accessibilityElement(children: .contain)
     }
 
@@ -447,102 +350,80 @@ struct TopbarView: View {
 
 private struct SidebarView: View {
     @EnvironmentObject var appState: AppState
+    @Namespace private var selectionNamespace
+    @State private var brandAppeared = false
+    @State private var brandHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             sidebarHeader
             navSection
             Spacer(minLength: 0)
-            localOnlySection
         }
-        .frame(width: 232)
-        .background {
-            DriftSidebarWorld(accent: appState.accentColor)
+        .frame(width: 220)
+        .background { DriftShellSurface(layer: .sidebar) }
+        .overlay(alignment: .trailing) {
+            ZStack(alignment: .trailing) {
+                Rectangle()
+                    .fill(Color.desertCreamText.opacity(0.13))
+                    .frame(width: 1)
+                Rectangle()
+                    .fill(Color.white.opacity(0.035))
+                    .frame(width: 1)
+                    .offset(x: -1)
+            }
+        }
+        .onAppear {
+            withAnimation(appState.reduceMotion ? nil : .easeOut(duration: 0.20)) {
+                brandAppeared = true
+            }
         }
     }
 
     // MARK: - Header
 
     private var sidebarHeader: some View {
-        HStack(spacing: Space.md) {
-            PixelDLogo(size: 42, background: appState.accentColor)
+        HStack(spacing: 12) {
+            PixelDLogo(size: 40, background: .sand, isHighlighted: brandHovered)
 
             Text("Drift")
-                .font(PixelFont.font(18))
-                .foregroundStyle(Color.driftText)
-
-            Spacer()
+                .font(PixelFont.font(22))
+                .foregroundStyle(Color.desertCreamText)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 42)
-        .padding(.top, 22)
-        .padding(.bottom, 32)
+        .padding(20)
+        .padding(.top, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(brandAppeared ? 1 : 0)
+        .offset(y: brandAppeared || appState.reduceMotion ? 0 : 4)
+        .contentShape(Rectangle())
+        .onHover { brandHovered = $0 }
     }
 
     // MARK: - Navigation
 
     private var navSection: some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
-            Text("DRIFT")
-                .font(TypeScale.tiny)
-                .tracking(0)
-                .foregroundStyle(Color.driftMuted.opacity(0.75))
-                .padding(.horizontal, 16)
-                .padding(.top, 0)
-                .padding(.bottom, 10)
-
-            VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(spacing: 8) {
                 ForEach(Tab.allCases) { tab in
                     SidebarNavItem(
                         icon: tab.icon,
                         iconSelected: tab.iconSelected,
                         label: tab.rawValue,
                         shortcutKey: tab.shortcutKey,
-                        isSelected: appState.currentTab == tab
+                        isSelected: appState.currentTab == tab,
+                        selectionNamespace: selectionNamespace
                     ) {
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            appState.currentTab = tab
-                        }
+                        appState.currentTab = tab
                     }
                 }
             }
-            .padding(.horizontal, Space.sm)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
             .padding(.bottom, Space.xs)
         }
-    }
-
-    // MARK: - Local State
-
-    private var localOnlySection: some View {
-        HStack(spacing: Space.sm) {
-            Rectangle()
-                .fill(Color.productive)
-                .frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("LOCAL MODE")
-                    .font(TypeScale.tiny)
-                    .tracking(0)
-                    .foregroundStyle(Color.driftText)
-                Text("Your activity stays on this Mac")
-                    .font(TypeScale.tiny)
-                    .foregroundStyle(Color.driftMuted)
-            }
-            Spacer()
-            SidebarMiniCactus()
-                .frame(width: 24, height: 34)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 58)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.driftPanel.opacity(0.78))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.border.opacity(0.42), lineWidth: 1))
-                .shadow(color: Color.black.opacity(0.22), radius: 0, x: 3, y: 3)
-        }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 13)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Local mode. Your activity stays on this Mac")
     }
 }
 
@@ -554,84 +435,82 @@ struct SidebarNavItem: View {
     let label: String
     let shortcutKey: String
     let isSelected: Bool
+    let selectionNamespace: Namespace.ID
     let action: () -> Void
 
     @EnvironmentObject private var appState: AppState
     @State private var isHovered = false
+    @FocusState private var isKeyboardFocused: Bool
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: Space.sm) {
+            HStack(spacing: Space.md) {
                 Image(systemName: pixelGlyph)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(
                         isSelected
-                            ? appState.accentColor
-                            : (isHovered ? Color.driftText.opacity(0.82) : Color.driftMuted.opacity(0.82))
+                            ? Color.sand
+                            : (isHovered ? Color.desertCreamText.opacity(0.86) : Color.desertMutedText)
                     )
                     .frame(width: 24)
 
                 Text(label)
-                    .font(TypeScale.caption)
-                    .tracking(0)
+                    .font(TypeScale.bodyMd)
                     .foregroundStyle(
                         isSelected
-                            ? Color.driftText
-                            : (isHovered ? Color.driftText.opacity(0.82) : Color.driftMuted)
+                            ? Color.desertCreamText
+                            : (isHovered ? Color.desertCreamText.opacity(0.86) : Color.desertMutedText)
                     )
 
-            Spacer()
+                Spacer()
 
-            Rectangle()
-                .fill(appState.accentColor)
-                    .frame(width: 7, height: 7)
-                    .opacity(isSelected ? 1 : 0)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .frame(height: 46)
             .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? appState.accentColor.opacity(0.11)
-                            : (isHovered ? Color.driftPanelRaised.opacity(0.28) : Color.clear)
-                    )
-                    .background {
-                        if isSelected || isHovered {
-                            Rectangle().fill(Color.driftPanel.opacity(0.50))
-                        }
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(
-                                isSelected ? appState.accentColor.opacity(0.38) : Color.clear,
-                                lineWidth: 1
-                            )
-                    }
-                    .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelected)
-                    .animation(Anim.hover, value: isHovered)
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.sand.opacity(0.16))
+                        .matchedGeometryEffect(id: "sidebar-selection", in: selectionNamespace)
+                } else if isHovered {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.desertCreamText.opacity(0.055))
+                }
             }
-            // Left accent bar — matches handoff `inset 2px 0 0 accent`
             .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(appState.accentColor)
-                    .frame(width: 2)
-                    .padding(.vertical, 0)
-                    .opacity(isSelected ? 1 : 0)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelected)
+                if isSelected {
+                    Capsule()
+                        .fill(Color.sand)
+                        .frame(width: 3, height: 26)
+                        .matchedGeometryEffect(id: "sidebar-indicator", in: selectionNamespace)
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        Color.desertCreamText.opacity(isKeyboardFocused ? 0.58 : 0),
+                        lineWidth: 1.5
+                    )
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DriftResponsivePressStyle(reduceMotion: appState.reduceMotion))
+        .focused($isKeyboardFocused)
         .onHover { isHovered = $0 }
+        .animation(Anim.quick, value: isHovered)
+        .animation(
+            appState.reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08),
+            value: isSelected
+        )
         .accessibilityLabel("\(label), tab")
         .accessibilityValue(isSelected ? "selected" : "")
     }
 
     private var pixelGlyph: String {
         switch label {
-        case "Tracking": return "waveform.path.ecg"
-        case "Focus + Blocking": return "scope"
+        case "Today": return "sun.max"
+        case "Focus": return "scope"
+        case "History": return "clock.arrow.circlepath"
         default: return "gearshape"
         }
     }
@@ -654,10 +533,29 @@ private struct SidebarMiniCactus: View {
 // MARK: - Tab Extensions
 
 extension Tab {
+    var backgroundImageName: String {
+        switch self {
+        case .tracking: return "drift-tab-tracking"
+        case .focus:    return "drift-tab-focus"
+        case .history:  return "drift-tab-tracking"
+        case .settings: return "drift-tab-settings"
+        }
+    }
+
+    var backgroundWashOpacity: Double {
+        switch self {
+        case .tracking: return 0.34
+        case .focus:    return 0.32
+        case .history:  return 0.34
+        case .settings: return 0.34
+        }
+    }
+
     var iconSelected: String {
         switch self {
         case .tracking: return "dot.radiowaves.left.and.right"
         case .focus:    return "shield.lefthalf.filled"
+        case .history:  return "clock.arrow.circlepath"
         case .settings: return "gearshape.fill"
         }
     }
@@ -666,7 +564,8 @@ extension Tab {
         switch self {
         case .tracking: return "1"
         case .focus:    return "2"
-        case .settings: return "3"
+        case .history:  return "3"
+        case .settings: return "4"
         }
     }
 }

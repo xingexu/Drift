@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Drift",
-  description: "Download Drift for macOS or Windows from a pixel-art desert title screen.",
+  title: "Drift — Make focus feel like progress",
+  description: "A private desktop focus tool that turns attention into a living desert journey.",
   openGraph: {
-    title: "Drift",
-    description: "A polished pixel-art desert title screen for Drift downloads.",
+    title: "Drift — Make focus feel like progress",
+    description: "A private desktop focus tool that turns attention into a living desert journey.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Drift",
-    description: "A polished pixel-art desert title screen for Drift downloads.",
+    title: "Drift — Make focus feel like progress",
+    description: "A private desktop focus tool that turns attention into a living desert journey.",
   },
 };
 

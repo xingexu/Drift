@@ -46,7 +46,7 @@ class AppState: ObservableObject {
 
     // MARK: - Preferences
 
-    @Published var theme: AppTheme = .system
+    @Published var theme: AppTheme = .light
     /// Name of the active accent color preset. Persisted to UserDefaults key "accentColorName".
     @Published var accentColorName: String = "indigo"
     /// When `true`, views should suppress or minimise decorative animations.
@@ -55,6 +55,7 @@ class AppState: ObservableObject {
     @Published var notificationsEnabled = true
     @Published var launchAtLogin = true
     @Published var density: String = "Spacious"      // "Compact", "Comfortable", "Spacious"
+    @Published var classificationOverrides: [String: AppCategory] = [:]
 
     // MARK: - UI State
 
@@ -92,6 +93,7 @@ class AppState: ObservableObject {
         static let hasOnboarded      = "drift_has_onboarded"
         static let pastSessions      = "drift_past_sessions"
         static let density           = "drift_density"
+        static let classificationOverrides = "drift_classification_overrides"
         // Legacy keys used only during the one-time keychain migration.
         static let legacyAccessToken  = "drift_access_token"
         static let legacyRefreshToken = "drift_refresh_token"
@@ -155,6 +157,11 @@ class AppState: ObservableObject {
         hasOnboarded         = defaults.bool(forKey: DefaultsKey.hasOnboarded)
 
         if let saved = defaults.string(forKey: DefaultsKey.density) { density = saved }
+
+        if let data = defaults.data(forKey: DefaultsKey.classificationOverrides),
+           let savedOverrides = try? JSONDecoder().decode([String: AppCategory].self, from: data) {
+            classificationOverrides = savedOverrides
+        }
     }
 
     /// Moves any tokens still sitting in `UserDefaults` into the Keychain.
@@ -230,6 +237,24 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(value, forKey: DefaultsKey.density)
     }
 
+    func classificationOverride(for key: String) -> AppCategory? {
+        classificationOverrides[key.lowercased()]
+    }
+
+    func setClassificationOverride(_ category: AppCategory, for key: String) {
+        classificationOverrides[key.lowercased()] = category
+        if let data = try? JSONEncoder().encode(classificationOverrides) {
+            UserDefaults.standard.set(data, forKey: DefaultsKey.classificationOverrides)
+        }
+    }
+
+    func removeClassificationOverride(for key: String) {
+        classificationOverrides.removeValue(forKey: key.lowercased())
+        if let data = try? JSONEncoder().encode(classificationOverrides) {
+            UserDefaults.standard.set(data, forKey: DefaultsKey.classificationOverrides)
+        }
+    }
+
     /// Resolved `Color` for the currently selected accent preset.
     var accentColor: Color {
         DriftDesign.accents.first { $0.name == accentColorName }?.color ?? Color.accent
@@ -265,6 +290,13 @@ class AppState: ObservableObject {
         if pastSessions.count > Self.maxPastSessions {
             pastSessions = Array(pastSessions.prefix(Self.maxPastSessions))
         }
+        savePastSessions()
+        computeStats()
+    }
+
+    func deleteHistory() {
+        pastSessions.removeAll()
+        session.reset()
         savePastSessions()
         computeStats()
     }
@@ -335,16 +367,18 @@ struct User: Codable, Identifiable {
 
 /// Main sidebar navigation tabs.
 enum Tab: String, CaseIterable, Identifiable {
-    case tracking = "Tracking"
-    case focus    = "Focus + Blocking"
+    case tracking = "Today"
+    case focus    = "Focus"
+    case history  = "History"
     case settings = "Settings"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .tracking: return "dot.radiowaves.left.and.right"
-        case .focus:    return "shield.lefthalf.filled"
+        case .tracking: return "sun.max"
+        case .focus:    return "scope"
+        case .history:  return "clock.arrow.circlepath"
         case .settings: return "gearshape"
         }
     }
@@ -546,7 +580,7 @@ struct PastSession: Identifiable, Codable {
 // MARK: - AppCategory
 
 /// Productivity classification for an application or web domain.
-enum AppCategory: String, Codable {
+enum AppCategory: String, Codable, CaseIterable {
     case productive, neutral, distraction
 
     var color: Color {
