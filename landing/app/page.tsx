@@ -7,8 +7,7 @@ const SCENE_HEIGHT = 2048;
 const SOURCE_IMAGE = "/art/drift-original-scene-2x.png";
 const SCENE_DROP = 118;
 const RELEASES_URL = "https://github.com/xingexu/Drift/releases";
-const MACOS_DOWNLOAD_URL = RELEASES_URL;
-const WINDOWS_DOWNLOAD_URL = RELEASES_URL;
+const MACOS_DOWNLOAD_URL = `${RELEASES_URL}/download/v1.0.0-dev.1/Drift-macOS-dev.zip`;
 
 type PixelContext = CanvasRenderingContext2D;
 
@@ -458,7 +457,9 @@ function InstallPicker() {
   const focusOption = (index: number) => {
     requestAnimationFrame(() => {
       const options = Array.from(
-        menuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? [],
+        menuRef.current?.querySelectorAll<HTMLElement>(
+          '[role="menuitem"]:not([aria-disabled="true"])',
+        ) ?? [],
       );
       options.at(index)?.focus();
     });
@@ -476,9 +477,11 @@ function InstallPicker() {
 
     event.preventDefault();
     const options = Array.from(
-      menuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? [],
+      menuRef.current?.querySelectorAll<HTMLElement>(
+        '[role="menuitem"]:not([aria-disabled="true"])',
+      ) ?? [],
     );
-    const activeIndex = options.indexOf(document.activeElement as HTMLAnchorElement);
+    const activeIndex = options.indexOf(document.activeElement as HTMLElement);
 
     if (event.key === "Home") {
       options[0]?.focus();
@@ -555,19 +558,16 @@ function InstallPicker() {
             </span>
             <span>macOS / Linux</span>
           </a>
-          <a
-            className="install-picker__option"
-            href={WINDOWS_DOWNLOAD_URL}
-            onClick={() => setIsOpen(false)}
-            rel="noreferrer"
+          <span
+            aria-disabled="true"
+            className="install-picker__option is-disabled"
             role="menuitem"
-            target="_blank"
           >
             <span className="install-picker__icon install-picker__icon--windows">
               <PlatformLogo mark="windows" />
             </span>
-            <span>Windows</span>
-          </a>
+            <span>Windows — coming soon</span>
+          </span>
         </div>
       ) : null}
     </div>
@@ -691,7 +691,7 @@ export default function Home() {
       </main>
 
       <footer className="scene-footer" aria-label="Copyright">
-        <span className="scene-footer__copy">© 2026 xinge xu</span>
+        <span className="scene-footer__copy">© 2026 XINGE XU</span>
         <span className="scene-footer__icons">
           <a
             aria-label="GitHub"
