@@ -8,6 +8,8 @@ const SOURCE_IMAGE = "/art/drift-original-scene-2x.png";
 const SCENE_DROP = 118;
 const RELEASES_URL = "https://github.com/xingexu/Drift/releases";
 const MACOS_DOWNLOAD_URL = `${RELEASES_URL}/download/v1.0.0-dev.1/Drift-macOS-dev.zip`;
+const EMAIL_COMPOSE_URL =
+  "https://mail.google.com/mail/?view=cm&fs=1&to=xingexu1107%40gmail.com";
 
 type PixelContext = CanvasRenderingContext2D;
 
@@ -695,9 +697,11 @@ export default function Home() {
             <BrandLogo mark="linkedin" />
           </a>
           <a
-            aria-label="Email"
+            aria-label="Email Xinge Xu"
             className="scene-footer__icon scene-footer__icon--mail"
-            href="mailto:xingexu1107@gmail.com"
+            href={EMAIL_COMPOSE_URL}
+            rel="noreferrer"
+            target="_blank"
           >
             <PixelLogo mark="mail" />
           </a>
