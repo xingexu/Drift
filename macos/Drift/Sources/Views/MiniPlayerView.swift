@@ -41,7 +41,7 @@ struct MiniPlayerView: View {
 
                     // Centred time value
                     Text(formattedTime)
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(Color.primary)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
@@ -53,14 +53,14 @@ struct MiniPlayerView: View {
                 // Info column
                 VStack(alignment: .leading, spacing: 1) {
                     Text(timerLabel)
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .font(TypeScale.monoSm)
                         .foregroundStyle(Color.primary)
                         .lineLimit(1)
                         .contentTransition(.numericText())
                         .animation(Anim.count, value: viewModel.timeRemaining)
 
                     Text(subtitleLabel)
-                        .font(.system(size: 9, weight: .regular, design: .default))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(Color.secondary)
                         .tracking(2)
                         .lineLimit(1)

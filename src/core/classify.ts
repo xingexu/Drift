@@ -195,7 +195,6 @@ const PRODUCTIVE_DOMAINS: Set<string> = new Set([
 
 const DISTRACTION_DOMAINS: Set<string> = new Set([
   // --- Social media ---
-  "youtube.com",
   "twitter.com",
   "x.com",
   "instagram.com",
@@ -276,6 +275,98 @@ const DISTRACTION_DOMAINS: Set<string> = new Set([
   "tmz.com",
 ]);
 
+const CONTEXT_DEPENDENT_DOMAINS: Set<string> = new Set([
+  "youtube.com",
+  "youtu.be",
+  "linkedin.com",
+  "reddit.com",
+]);
+
+const PRODUCTIVE_SIGNALS: Array<[string, number]> = [
+  ["tutorial", 3],
+  ["lecture", 3],
+  ["lesson", 3],
+  ["course", 3],
+  ["study", 2],
+  ["learn", 2],
+  ["explained", 2],
+  ["walkthrough", 2],
+  ["research", 3],
+  ["case study", 2],
+  ["khan academy", 4],
+  ["crash course", 3],
+  ["freecodecamp", 4],
+  ["programming", 3],
+  ["coding", 3],
+  ["software engineering", 3],
+  ["swift", 2],
+  ["python", 2],
+  ["javascript", 2],
+  ["typescript", 2],
+  ["react", 2],
+  ["math", 2],
+  ["calculus", 2],
+  ["engineering", 3],
+  ["interview prep", 3],
+  ["portfolio", 2],
+  ["resume", 3],
+  ["job", 2],
+  ["jobs", 2],
+  ["career", 2],
+  ["hiring", 2],
+  ["recruiter", 2],
+  ["certification", 3],
+];
+
+const DISTRACTION_SIGNALS: Array<[string, number]> = [
+  ["shorts", 5],
+  ["meme", 3],
+  ["memes", 3],
+  ["prank", 3],
+  ["reaction", 2],
+  ["drama", 3],
+  ["gossip", 4],
+  ["celebrity", 3],
+  ["vlog", 3],
+  ["haul", 3],
+  ["challenge", 2],
+  ["compilation", 2],
+  ["fails", 3],
+  ["music video", 4],
+  ["trailer", 3],
+  ["highlights", 2],
+  ["gameplay", 3],
+  ["stream", 2],
+  ["fortnite", 4],
+  ["minecraft", 3],
+  ["valorant", 4],
+  ["league of legends", 4],
+  ["tiktok", 4],
+  ["funny", 3],
+  ["comedy", 3],
+  ["viral", 3],
+  ["feed", 2],
+  ["notifications", 2],
+];
+
+const PRODUCTIVE_SUBREDDIT_SIGNALS = [
+  "learnprogramming",
+  "programming",
+  "swift",
+  "iosprogramming",
+  "webdev",
+  "javascript",
+  "typescript",
+  "machinelearning",
+  "science",
+  "askscience",
+  "askacademia",
+  "productivity",
+  "cscareerquestions",
+  "design",
+  "userexperience",
+];
+
 // ---------------------------------------------------------------------------
 // Pre-built suffix list for O(1) exact + O(k) suffix matching
 // ---------------------------------------------------------------------------
@@ -317,6 +408,120 @@ function matchesDomainSet(
     if (domain.endsWith(`.${d}`)) return true;
   }
   return false;
+}
+
+function normalizeText(value: string | undefined): string {
+  if (!value) return "";
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    // Keep the original text if it contains malformed escape sequences.
+  }
+  return value.toLowerCase().replace(/[+_-]/g, " ");
+}
+
+function signalScore(text: string, signals: ReadonlyArray<[string, number]>): number {
+  return signals.reduce((total, [phrase, weight]) => {
+    return text.includes(phrase) ? total + weight : total;
+  }, 0);
+}
+
+function parseEventUrl(event: BrowsingEvent): URL | null {
+  const candidates = [event.rawUrl, event.normalizedUrl].filter(Boolean);
+  for (const candidate of candidates) {
+    try {
+      return new URL(candidate);
+    } catch {
+      try {
+        return new URL(`https://${candidate}`);
+      } catch {
+        // Try the next representation.
+      }
+    }
+  }
+  return null;
+}
+
+function pathStarts(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function classifyContextDependentEvent(event: BrowsingEvent): Category | null {
+  const domain = event.domain.toLowerCase().replace(/^www\./, "");
+  const isContextDependent =
+    CONTEXT_DEPENDENT_DOMAINS.has(domain) ||
+    [...CONTEXT_DEPENDENT_DOMAINS].some((d) => domain.endsWith(`.${d}`));
+
+  if (!isContextDependent) return null;
+
+  const url = parseEventUrl(event);
+  const path = normalizeText(event.path ?? url?.pathname ?? "");
+  const query = normalizeText(url?.search ?? "");
+  const text = [event.title, event.rawUrl, path, query].map(normalizeText).join(" ");
+  const productive = signalScore(text, PRODUCTIVE_SIGNALS);
+  const distraction = signalScore(text, DISTRACTION_SIGNALS);
+
+  if (domain === "music.youtube.com") {
+    return productive >= 4 && productive > distraction ? "productive" : "distraction";
+  }
+
+  if (domain === "youtube.com" || domain.endsWith(".youtube.com") || domain === "youtu.be") {
+    if (
+      pathStarts(path, "/shorts") ||
+      pathStarts(path, "/feed/trending") ||
+      pathStarts(path, "/gaming") ||
+      pathStarts(path, "/music")
+    ) {
+      return productive >= 4 && productive > distraction ? "productive" : "distraction";
+    }
+
+    if (pathStarts(path, "/watch") || domain === "youtu.be") {
+      if (productive >= Math.max(3, distraction + 1)) return "productive";
+      if (distraction >= Math.max(3, productive + 1)) return "distraction";
+      return "neutral";
+    }
+
+    if (pathStarts(path, "/results")) {
+      if (productive >= 3 && productive > distraction) return "productive";
+      if (distraction >= 3 && distraction > productive) return "distraction";
+      return "neutral";
+    }
+
+    return "neutral";
+  }
+
+  if (domain === "linkedin.com" || domain.endsWith(".linkedin.com")) {
+    if (
+      pathStarts(path, "/learning") ||
+      pathStarts(path, "/jobs") ||
+      pathStarts(path, "/in") ||
+      pathStarts(path, "/company") ||
+      pathStarts(path, "/school") ||
+      pathStarts(path, "/sales")
+    ) {
+      return "productive";
+    }
+
+    if (pathStarts(path, "/feed") || pathStarts(path, "/notifications") || pathStarts(path, "/games")) {
+      return productive >= 4 && productive > distraction ? "productive" : "distraction";
+    }
+
+    if (productive >= 3 && productive > distraction) return "productive";
+    if (distraction >= 3 && distraction > productive) return "distraction";
+    return "neutral";
+  }
+
+  if (domain === "reddit.com" || domain.endsWith(".reddit.com")) {
+    if (pathStarts(path, "/r/all") || pathStarts(path, "/r/popular")) return "distraction";
+    if (PRODUCTIVE_SUBREDDIT_SIGNALS.some((subreddit) => path.includes(`/r/${subreddit}`))) {
+      return distraction >= productive + 2 ? "neutral" : "productive";
+    }
+    if (productive >= 3 && productive > distraction) return "productive";
+    if (distraction >= 3 && distraction > productive) return "distraction";
+    return "neutral";
+  }
+
+  return "neutral";
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +572,15 @@ export function classifyEvent(event: BrowsingEvent): Classification {
         source: "user_override",
       };
     }
+  }
+
+  const contextualCategory = classifyContextDependentEvent(event);
+  if (contextualCategory) {
+    return {
+      category: contextualCategory,
+      reason: "matched context-sensitive URL and title rules",
+      source: "rule_engine",
+    };
   }
 
   if (matchesDomainSet(domain, PRODUCTIVE_DOMAINS, productiveSuffixList)) {

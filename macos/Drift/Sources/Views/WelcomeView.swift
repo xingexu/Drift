@@ -82,7 +82,7 @@ struct WelcomeView: View {
                 .animation(Anim.appear.delay(0.10), value: appeared)
 
                 Text("Track attention, protect focus time, and review the day without extra ceremony.")
-                    .font(.system(size: 15))
+                    .font(TypeScale.bodyMd)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
@@ -253,7 +253,7 @@ struct WelcomeView: View {
                     .fill(Color.accent.opacity(0.3))
                     .frame(width: 14, height: 14)
                 Text("Drift")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(TypeScale.bodySm)
                     .foregroundStyle(.secondary)
             }
             .padding(.bottom, Space.xxs)
@@ -265,7 +265,7 @@ struct WelcomeView: View {
                         .fill(isActive ? Color.accent.opacity(0.8) : Color.clear)
                         .frame(width: 4, height: 4)
                     Text(label)
-                        .font(.system(size: 9, weight: isActive ? .semibold : .regular))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(isActive ? Color.accent : Color(.secondaryLabelColor))
                 }
             }
@@ -344,11 +344,11 @@ struct WelcomeView: View {
                 .fill(isDistraction ? Color.distraction : Color.productive)
                 .frame(width: 4, height: 4)
             Text(name)
-                .font(.system(size: 9, weight: .medium))
+                .font(TypeScale.tiny)
                 .foregroundStyle(.secondary)
             Spacer()
             Text(duration)
-                .font(.system(size: 8, design: .monospaced))
+                .font(TypeScale.tiny)
                 .foregroundStyle(.tertiary)
         }
     }
@@ -629,7 +629,7 @@ private struct WelcomeMockStat: View {
                 .fontWeight(.bold)
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: 7, weight: .medium))
+                .font(TypeScale.tiny)
                 .foregroundStyle(.tertiary)
                 .textCase(.uppercase)
         }

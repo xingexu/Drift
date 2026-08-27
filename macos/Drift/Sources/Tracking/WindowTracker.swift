@@ -44,6 +44,10 @@ class WindowTracker: ObservableObject {
     private var lastEventTimestamp = Date()
     private var previousApp: String = ""
     private var previousBundleId: String?
+    private var previousTitle: String = ""
+    private var previousURL: String = ""
+    private var previousCategory: AppCategory = .neutral
+    private var previousIsBrowser = false
 
     /// True only when the current pause was triggered automatically by idle
     /// detection (vs. a manual user pause). Manual pauses must NOT auto-resume.
@@ -88,6 +92,7 @@ class WindowTracker: ObservableObject {
             AppState.shared.session.startTime = Date()
             pausedAccumulatedMs = 0
             pauseStartedAt = nil
+            clearPreviousContext()
         } else if let pausedAt = pauseStartedAt {
             // Resuming a paused session — bank the paused span so it's excluded
             // from elapsed time.
@@ -110,6 +115,8 @@ class WindowTracker: ObservableObject {
     /// running so an idle-triggered pause can later auto-resume.
     func pause() {
         guard isTracking, !isPaused else { return }
+        flushCurrentEvent()
+        clearPreviousContext()
         isPaused = true
         pauseStartedAt = Date()
         stopTimers()
@@ -117,18 +124,22 @@ class WindowTracker: ObservableObject {
 
     /// Fully stops tracking and tears down all observers.
     func stop() {
+        if isTracking, !isPaused {
+            flushCurrentEvent()
+        }
         isTracking = false
         isPaused = false
         pausedDueToIdle = false
         stopTimers()
         stopIdleTimer()
         removeWorkspaceObserver()
+        clearPreviousContext()
     }
 
     /// Saves the current session to history and resets for a fresh run.
     func resetSession() {
-        AppState.shared.saveCurrentSession()
         stop()
+        AppState.shared.saveCurrentSession()
         AppState.shared.session.reset()
         pausedAccumulatedMs = 0
         pauseStartedAt = nil
@@ -138,9 +149,11 @@ class WindowTracker: ObservableObject {
     /// any in-progress session data before the process exits.
     func persistBeforeExit() {
         if isTracking {
+            stop()
             AppState.shared.saveCurrentSession()
+        } else {
+            stop()
         }
-        stop()
     }
 
     // MARK: - NSWorkspace Notification
@@ -202,7 +215,7 @@ class WindowTracker: ObservableObject {
             newTitle: title,
             newURL: resolvedURL,
             newCategory: category,
-            isBrowser: isBrowser
+            newIsBrowser: isBrowser
         )
     }
 
@@ -286,23 +299,54 @@ class WindowTracker: ObservableObject {
             )
         }
 
-        // Always update the displayed state.
-        activeTitle = title
-        activeURL = resolvedURL ?? ""
-        activeCategory = category
+        let currentURL = resolvedURL ?? ""
 
-        // Only record a switch if the app actually changed and the
-        // notification path did not already handle it.
-        if appName != previousApp {
+        if shouldRecordContextChange(
+            appName: appName,
+            bundleId: bundleId,
+            title: title,
+            url: currentURL,
+            category: category,
+            isBrowser: isBrowser
+        ) {
             recordAppSwitch(
                 newApp: appName,
                 newBundleId: bundleId,
                 newTitle: title,
                 newURL: resolvedURL,
                 newCategory: category,
-                isBrowser: isBrowser
+                newIsBrowser: isBrowser
             )
+        } else {
+            activeTitle = title
+            activeURL = currentURL
+            activeCategory = category
         }
+    }
+
+    /// Returns true when the current foreground context should become a new
+    /// session segment. Browser URL/title/category changes matter because one
+    /// browser app can contain both focused and distracting work.
+    private func shouldRecordContextChange(
+        appName: String,
+        bundleId: String?,
+        title: String,
+        url: String,
+        category: AppCategory,
+        isBrowser: Bool
+    ) -> Bool {
+        if previousApp.isEmpty { return true }
+        if appName != previousApp { return true }
+        if bundleId != previousBundleId { return true }
+        if isBrowser != previousIsBrowser { return true }
+        if category != previousCategory { return true }
+
+        if isBrowser {
+            if !url.isEmpty, url != previousURL { return true }
+            if url.isEmpty, title != previousTitle { return true }
+        }
+
+        return false
     }
 
     /// Accounts for time spent in the previous app and transitions to the new one.
@@ -312,7 +356,7 @@ class WindowTracker: ObservableObject {
         newTitle: String,
         newURL: String? = nil,
         newCategory: AppCategory,
-        isBrowser: Bool
+        newIsBrowser: Bool
     ) {
         let now = Date()
         let durationMs = now.timeIntervalSince(lastEventTimestamp) * 1000
@@ -322,14 +366,12 @@ class WindowTracker: ObservableObject {
         // by updateSessionTime(), so we do NOT add durationMs to category counters
         // here — that would double-count.
         if !previousApp.isEmpty, durationMs >= minimumEventDurationMs {
-            let prevCategory = AppState.shared.session.currentCategory
-
             let event = AppEvent(
                 owner: previousApp,
-                title: activeTitle,
-                isBrowser: isBrowser,
-                url: activeURL.isEmpty ? nil : activeURL,
-                category: prevCategory,
+                title: previousTitle.isEmpty ? previousApp : previousTitle,
+                isBrowser: previousIsBrowser,
+                url: previousURL.isEmpty ? nil : previousURL,
+                category: previousCategory,
                 timestamp: lastEventTimestamp,
                 durationMs: durationMs
             )
@@ -343,6 +385,10 @@ class WindowTracker: ObservableObject {
 
         previousApp = newApp
         previousBundleId = newBundleId
+        previousTitle = newTitle
+        previousURL = newURL ?? ""
+        previousCategory = newCategory
+        previousIsBrowser = newIsBrowser
         lastEventTimestamp = now
         activeApp = newApp
         activeTitle = newTitle
@@ -350,6 +396,41 @@ class WindowTracker: ObservableObject {
         activeCategory = newCategory
         AppState.shared.session.currentApp = newApp
         AppState.shared.session.currentCategory = newCategory
+    }
+
+    /// Persists the currently active segment when tracking pauses/stops, since
+    /// otherwise it would only be written after a later app or tab switch.
+    private func flushCurrentEvent() {
+        guard !previousApp.isEmpty else { return }
+
+        let now = Date()
+        let durationMs = now.timeIntervalSince(lastEventTimestamp) * 1000
+        guard durationMs >= minimumEventDurationMs else { return }
+
+        AppState.shared.session.events.append(AppEvent(
+            owner: previousApp,
+            title: previousTitle.isEmpty ? previousApp : previousTitle,
+            isBrowser: previousIsBrowser,
+            url: previousURL.isEmpty ? nil : previousURL,
+            category: previousCategory,
+            timestamp: lastEventTimestamp,
+            durationMs: durationMs
+        ))
+
+        if AppState.shared.session.events.count > 200 {
+            AppState.shared.session.events.removeFirst()
+        }
+
+        lastEventTimestamp = now
+    }
+
+    private func clearPreviousContext() {
+        previousApp = ""
+        previousBundleId = nil
+        previousTitle = ""
+        previousURL = ""
+        previousCategory = .neutral
+        previousIsBrowser = false
     }
 
     private func updateSessionTime() {

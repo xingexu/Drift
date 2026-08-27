@@ -12,6 +12,16 @@ import Foundation
 /// penalised for software the classifier has not seen before.
 struct AppClassifier {
 
+    private static let overrideDefaultsKey = "drift_classification_overrides"
+
+    private static func savedOverride(for key: String) -> AppCategory? {
+        guard let data = UserDefaults.standard.data(forKey: overrideDefaultsKey),
+              let overrides = try? JSONDecoder().decode([String: AppCategory].self, from: data) else {
+            return nil
+        }
+        return overrides[key.lowercased()]
+    }
+
     // MARK: - Bundle-ID Classification
 
     /// Maps known bundle identifiers to their productivity category.
@@ -198,6 +208,13 @@ struct AppClassifier {
     ///   - bundleId: The application's `CFBundleIdentifier`, if known.
     /// - Returns: The inferred ``AppCategory``.
     static func classify(appName: String, bundleId: String? = nil) -> AppCategory {
+        if let id = bundleId?.lowercased(), let category = savedOverride(for: "bundle:\(id)") {
+            return category
+        }
+        if let category = savedOverride(for: "app:\(appName.lowercased())") {
+            return category
+        }
+
         // 1. Try bundle identifier (most reliable).
         if let id = bundleId?.lowercased(), let category = bundleCategories[id] {
             return category
@@ -272,27 +289,46 @@ struct AppClassifier {
     /// Domains where the page title/query matters more than the domain.
     private static let contextDependentDomains: Set<String> = [
         "youtube.com", "youtu.be",
+        "linkedin.com",
         "reddit.com",
         "twitter.com", "x.com",
         "instagram.com", "facebook.com", "tiktok.com",
     ]
 
-    private static let educationalSignals: [String] = [
-        "tutorial", "lecture", "lesson", "course", "study", "learn",
-        "explained", "walkthrough", "documentary", "research", "paper",
-        "university", "mit ", "stanford", "harvard", "khan academy",
-        "crash course", "programming", "coding", "swift", "python",
-        "javascript", "typescript", "math", "calculus", "physics",
-        "chemistry", "biology", "history", "economics", "design",
-        "engineering", "conference", "keynote", "interview",
+    private static let productiveSignals: [(phrase: String, weight: Int)] = [
+        ("tutorial", 3), ("lecture", 3), ("lesson", 3), ("course", 3),
+        ("study", 2), ("learn", 2), ("explained", 2), ("walkthrough", 2),
+        ("documentary", 2), ("research", 3), ("paper", 2), ("case study", 2),
+        ("university", 2), ("mit ", 2), ("stanford", 2), ("harvard", 2),
+        ("khan academy", 4), ("crash course", 3), ("freecodecamp", 4),
+        ("programming", 3), ("coding", 3), ("software engineering", 3),
+        ("swift", 2), ("python", 2), ("javascript", 2), ("typescript", 2),
+        ("react", 2), ("xcode", 2), ("api", 2), ("debug", 2),
+        ("math", 2), ("calculus", 2), ("physics", 2), ("chemistry", 2),
+        ("biology", 2), ("history", 1), ("economics", 2), ("design", 2),
+        ("engineering", 3), ("conference", 2), ("keynote", 1),
+        ("interview prep", 3), ("portfolio", 2), ("resume", 3),
+        ("job", 2), ("jobs", 2), ("career", 2), ("hiring", 2),
+        ("recruiter", 2), ("certification", 3),
     ]
 
-    private static let distractionSignals: [String] = [
-        "shorts", "meme", "memes", "prank", "reaction", "drama", "gossip",
-        "celebrity", "vlog", "haul", "challenge", "compilation", "fails",
-        "music video", "official video", "trailer", "highlights", "gameplay",
-        "stream", "fortnite", "minecraft", "valorant", "league of legends",
-        "tiktok", "funny", "comedy", "shopping",
+    private static let distractionSignals: [(phrase: String, weight: Int)] = [
+        ("shorts", 5), ("meme", 3), ("memes", 3), ("prank", 3),
+        ("reaction", 2), ("drama", 3), ("gossip", 4), ("celebrity", 3),
+        ("vlog", 3), ("haul", 3), ("challenge", 2), ("compilation", 2),
+        ("fails", 3), ("music video", 4), ("official video", 2),
+        ("trailer", 3), ("highlights", 2), ("gameplay", 3), ("stream", 2),
+        ("fortnite", 4), ("minecraft", 3), ("valorant", 4),
+        ("league of legends", 4), ("tiktok", 4), ("funny", 3),
+        ("comedy", 3), ("shopping", 2), ("sale", 2), ("viral", 3),
+        ("feed", 2), ("notifications", 2),
+    ]
+
+    private static let productiveSubredditSignals: [String] = [
+        "learnprogramming", "programming", "swift", "iosprogramming",
+        "webdev", "javascript", "typescript", "machinelearning",
+        "science", "askscience", "askacademia", "productivity",
+        "cscareerquestions", "design", "userexperience",
     ]
 
     /// Classifies a URL or bare domain into a productivity category.
@@ -306,9 +342,11 @@ struct AppClassifier {
     static func classifyDomain(_ urlString: String) -> AppCategory {
         guard let host = extractHost(from: urlString) else { return .neutral }
 
-        let domain = host
-            .lowercased()
-            .replacingOccurrences(of: "www.", with: "")
+        let domain = normalizeHost(host)
+
+        if let category = savedOverride(for: "domain:\(domain)") {
+            return category
+        }
 
         // Exact match.
         if productiveDomains.contains(domain) { return .productive }
@@ -331,28 +369,31 @@ struct AppClassifier {
     /// distractions. Their page title, URL path, and query decide whether the
     /// activity looks educational/productive, distracting, or neutral.
     static func classifyWebContext(urlString: String?, title: String, fallback: AppCategory = .neutral) -> AppCategory {
-        let context = [
-            title,
-            urlString ?? ""
-        ]
-        .joined(separator: " ")
-        .lowercased()
-        .replacingOccurrences(of: "%20", with: " ")
-        .replacingOccurrences(of: "+", with: " ")
+        let context = WebContext(urlString: urlString, title: title)
 
-        let hasEducationalSignal = educationalSignals.contains { context.contains($0) }
-        let hasDistractionSignal = distractionSignals.contains { context.contains($0) }
-
-        if let urlString,
-           let host = extractHost(from: urlString)?.lowercased().replacingOccurrences(of: "www.", with: ""),
-           isContextDependentDomain(host) {
-            if hasEducationalSignal && !hasDistractionSignal { return .productive }
-            if hasDistractionSignal && !hasEducationalSignal { return .distraction }
-            return .neutral
+        if let domain = context.domain,
+           let category = savedOverride(for: "domain:\(normalizeHost(domain))") {
+            return category
         }
 
-        if hasEducationalSignal && !hasDistractionSignal { return .productive }
-        if hasDistractionSignal && !hasEducationalSignal { return .distraction }
+        let productiveScore = signalScore(in: context.searchableText, signals: productiveSignals)
+        let distractionScore = signalScore(in: context.searchableText, signals: distractionSignals)
+
+        if let domain = context.domain, isContextDependentDomain(domain) {
+            if domain == "youtube.com" || domain.hasSuffix(".youtube.com") || domain == "youtu.be" {
+                return classifyYouTube(context, productiveScore: productiveScore, distractionScore: distractionScore)
+            }
+            if domain == "linkedin.com" || domain.hasSuffix(".linkedin.com") {
+                return classifyLinkedIn(context, productiveScore: productiveScore, distractionScore: distractionScore)
+            }
+            if domain == "reddit.com" || domain.hasSuffix(".reddit.com") {
+                return classifyReddit(context, productiveScore: productiveScore, distractionScore: distractionScore)
+            }
+            return classifyAmbiguousSocial(context, productiveScore: productiveScore, distractionScore: distractionScore)
+        }
+
+        if productiveScore >= 3 && productiveScore > distractionScore { return .productive }
+        if distractionScore >= 3 && distractionScore > productiveScore { return .distraction }
 
         if let urlString {
             let domainCategory = classifyDomain(urlString)
@@ -364,18 +405,187 @@ struct AppClassifier {
 
     // MARK: - Helpers
 
+    private struct WebContext {
+        let domain: String?
+        let path: String
+        let query: String
+        let title: String
+        let searchableText: String
+
+        init(urlString: String?, title: String) {
+            self.title = AppClassifier.normalizedText(title)
+
+            guard let urlString, let url = AppClassifier.parseURL(urlString) else {
+                self.domain = nil
+                self.path = ""
+                self.query = ""
+                self.searchableText = AppClassifier.normalizedText(title)
+                return
+            }
+
+            self.domain = url.host.map(AppClassifier.normalizeHost)
+            self.path = AppClassifier.normalizedText(url.path)
+            self.query = AppClassifier.normalizedText(url.query ?? "")
+            self.searchableText = [title, url.path, url.query ?? "", urlString]
+                .map(AppClassifier.normalizedText)
+                .joined(separator: " ")
+        }
+
+        func pathStarts(with prefix: String) -> Bool {
+            path == prefix || path.hasPrefix(prefix + "/")
+        }
+
+        func pathContains(_ fragment: String) -> Bool {
+            path.contains(fragment)
+        }
+    }
+
+    private static func classifyYouTube(
+        _ context: WebContext,
+        productiveScore: Int,
+        distractionScore: Int
+    ) -> AppCategory {
+        if context.domain == "music.youtube.com" {
+            return productiveScore >= 4 && productiveScore > distractionScore ? .productive : .distraction
+        }
+
+        if context.pathStarts(with: "/shorts")
+            || context.pathStarts(with: "/feed/trending")
+            || context.pathStarts(with: "/gaming")
+            || context.pathStarts(with: "/music") {
+            return productiveScore >= 4 && productiveScore > distractionScore ? .productive : .distraction
+        }
+
+        if context.pathStarts(with: "/results") {
+            if productiveScore >= 3 && productiveScore > distractionScore { return .productive }
+            if distractionScore >= 3 && distractionScore > productiveScore { return .distraction }
+            return .neutral
+        }
+
+        if context.pathStarts(with: "/watch") || context.domain == "youtu.be" {
+            if productiveScore >= max(3, distractionScore + 1) { return .productive }
+            if distractionScore >= max(3, productiveScore + 1) { return .distraction }
+            return .neutral
+        }
+
+        if context.pathStarts(with: "/@")
+            || context.pathStarts(with: "/channel")
+            || context.pathStarts(with: "/c") {
+            if productiveScore >= 3 && productiveScore >= distractionScore { return .productive }
+            if distractionScore >= 3 && distractionScore > productiveScore { return .distraction }
+        }
+
+        return .neutral
+    }
+
+    private static func classifyLinkedIn(
+        _ context: WebContext,
+        productiveScore: Int,
+        distractionScore: Int
+    ) -> AppCategory {
+        if context.pathStarts(with: "/learning")
+            || context.pathStarts(with: "/jobs")
+            || context.pathStarts(with: "/in")
+            || context.pathStarts(with: "/company")
+            || context.pathStarts(with: "/school")
+            || context.pathStarts(with: "/sales") {
+            return .productive
+        }
+
+        if context.pathStarts(with: "/feed")
+            || context.pathStarts(with: "/notifications")
+            || context.pathStarts(with: "/games") {
+            return productiveScore >= 4 && productiveScore > distractionScore ? .productive : .distraction
+        }
+
+        if productiveScore >= 3 && productiveScore > distractionScore { return .productive }
+        if distractionScore >= 3 && distractionScore > productiveScore { return .distraction }
+        return .neutral
+    }
+
+    private static func classifyReddit(
+        _ context: WebContext,
+        productiveScore: Int,
+        distractionScore: Int
+    ) -> AppCategory {
+        if context.pathStarts(with: "/r/all") || context.pathStarts(with: "/r/popular") {
+            return .distraction
+        }
+
+        if productiveSubredditSignals.contains(where: { context.pathContains("/r/\($0)") }) {
+            return distractionScore >= productiveScore + 2 ? .neutral : .productive
+        }
+
+        if productiveScore >= 3 && productiveScore > distractionScore { return .productive }
+        if distractionScore >= 3 && distractionScore > productiveScore { return .distraction }
+        return .neutral
+    }
+
+    private static func classifyAmbiguousSocial(
+        _ context: WebContext,
+        productiveScore: Int,
+        distractionScore: Int
+    ) -> AppCategory {
+        if context.pathStarts(with: "/feed")
+            || context.pathStarts(with: "/explore")
+            || context.pathStarts(with: "/reels")
+            || context.pathStarts(with: "/notifications")
+            || context.pathStarts(with: "/home") {
+            return productiveScore >= 4 && productiveScore > distractionScore ? .productive : .distraction
+        }
+
+        if productiveScore >= 4 && productiveScore > distractionScore { return .productive }
+        if distractionScore >= 3 && distractionScore >= productiveScore { return .distraction }
+        return .neutral
+    }
+
+    private static func signalScore(in text: String, signals: [(phrase: String, weight: Int)]) -> Int {
+        signals.reduce(0) { total, signal in
+            text.contains(signal.phrase) ? total + signal.weight : total
+        }
+    }
+
     /// Extracts the host component from a URL string or bare domain.
     private static func extractHost(from urlString: String) -> String? {
-        // Try standard URL parsing first.
-        if let url = URL(string: urlString), let host = url.host {
+        if let url = parseURL(urlString), let host = url.host {
             return host
         }
-        // Treat bare domain-like strings (contains a dot, no spaces).
+
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.contains(".") && !trimmed.contains(" ") {
-            return trimmed
+        guard trimmed.contains("."), !trimmed.contains(" ") else { return nil }
+
+        let end = trimmed.firstIndex(where: { ["/", "?", "#"].contains($0) }) ?? trimmed.endIndex
+        let host = String(trimmed[..<end])
+        return host.isEmpty ? nil : host
+    }
+
+    private static func parseURL(_ value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed), url.host != nil {
+            return url
         }
+
+        if !trimmed.contains(" "), let url = URL(string: "https://" + trimmed), url.host != nil {
+            return url
+        }
+
         return nil
+    }
+
+    private static func normalizeHost(_ host: String) -> String {
+        let lowercased = host.lowercased()
+        return lowercased.hasPrefix("www.") ? String(lowercased.dropFirst(4)) : lowercased
+    }
+
+    private static func normalizedText(_ value: String) -> String {
+        let decoded = value.removingPercentEncoding ?? value
+        return decoded
+            .lowercased()
+            .replacingOccurrences(of: "+", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
     }
 
     private static func isContextDependentDomain(_ domain: String) -> Bool {

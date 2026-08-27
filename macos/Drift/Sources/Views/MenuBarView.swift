@@ -249,7 +249,7 @@ private struct MenuBarButton: View {
 
                 if let hint = shortcutHint {
                     Text(hint)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(.quaternary)
                         .padding(.horizontal, Space.xxs)
                         .padding(.vertical, 1)

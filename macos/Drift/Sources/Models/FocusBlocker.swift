@@ -32,6 +32,7 @@ class FocusBlocker: ObservableObject {
     @Published private(set) var blockedAttempts: Int = 0
     @Published private(set) var lastBlockedSite: String?
     @Published var blockedSites: [String] = []
+    @Published private(set) var disabledSites: Set<String> = []
 
     // MARK: - Configuration
 
@@ -135,11 +136,13 @@ class FocusBlocker: ObservableObject {
             blockedSites = Self.defaultBlockedSites
             saveBlockedSites()
         }
+        disabledSites = Set(UserDefaults.standard.stringArray(forKey: "drift_disabled_blocked_sites") ?? [])
     }
 
     /// Persists the current blocked-site list.
     func saveBlockedSites() {
         UserDefaults.standard.set(blockedSites, forKey: "drift_blocked_sites")
+        UserDefaults.standard.set(Array(disabledSites), forKey: "drift_disabled_blocked_sites")
     }
 
     /// Adds a new domain to the block list after sanitisation.
@@ -161,12 +164,27 @@ class FocusBlocker: ObservableObject {
     /// Removes a domain from the block list.
     func removeSite(_ site: String) {
         blockedSites.removeAll { $0 == site }
+        disabledSites.remove(site)
+        saveBlockedSites()
+    }
+
+    func isSiteEnabled(_ site: String) -> Bool {
+        !disabledSites.contains(site)
+    }
+
+    func setSite(_ site: String, enabled: Bool) {
+        if enabled {
+            disabledSites.remove(site)
+        } else {
+            disabledSites.insert(site)
+        }
         saveBlockedSites()
     }
 
     /// Resets the block list to the factory defaults.
     func resetToDefaults() {
         blockedSites = Self.defaultBlockedSites
+        disabledSites.removeAll()
         saveBlockedSites()
     }
 
@@ -373,7 +391,7 @@ class FocusBlocker: ObservableObject {
         // Try to get the actual URL from the browser tab.
         let detectedURL = getActiveTabURL(browser: app)?.lowercased() ?? ""
 
-        for site in blockedSites {
+        for site in blockedSites where isSiteEnabled(site) {
             let domain = site.lowercased()
             let siteName = domain.components(separatedBy: ".").first ?? domain
 

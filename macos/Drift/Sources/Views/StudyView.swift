@@ -6,73 +6,56 @@ import Combine
 // MARK: - Study View
 
 struct StudyView: View {
+    @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel = StudyViewModel()
     @StateObject private var blocker = FocusBlocker.shared
 
     @State private var showMiniPlayer = false
+    @State private var showBlockingList = false
+    @State private var showBlockingDetails = false
+    @State private var customizeHovered = false
     private let miniPlayerPanel = MiniPlayerPanel()
 
     // MARK: - Body
 
     var body: some View {
         ZStack {
-            Color.clear
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: Space.xxl) {
-
-                    // Blocked banner
-                    if viewModel.showBlockedBanner {
-                        BlockedBanner(
-                            isVisible: $viewModel.showBlockedBanner,
-                            site: blocker.lastBlockedSite
-                        )
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-
-                    // Page header
-                    HStack(alignment: .top, spacing: Space.md) {
-                        StudyPageIcon(color: Color.accent)
-                            .frame(width: 30, height: 30)
-                            .padding(.top, 1)
-                        VStack(alignment: .leading, spacing: Space.xs) {
-                            Text("FOCUS + BLOCKING")
-                                .font(TypeScale.h1)
-                            Text("Set one task, start the timer, block distractions.")
-                                .font(TypeScale.bodyMd)
-                                .foregroundStyle(Color.driftMuted)
-                        }
-                        Spacer()
-                    }
-
-                    // Main card — two column
-                    mainCard
-
-                    // Site blocker (idle) or active blocker badge (focus)
-                    if viewModel.mode == .idle {
-                        FocusBlockerSection(blocker: blocker)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    } else if blocker.isBlocking {
-                        activeBlockerBadge
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    }
-                }
-                .frame(maxWidth: 1320, alignment: .topLeading)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .padding(.horizontal, 28)
-                .padding(.top, 26)
-                .padding(.bottom, 32)
+            if viewModel.mode == .idle {
+                idleFocusSetup
+                    .transition(
+                        appState.reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.98))
+                    )
+            } else {
+                activeFocusJourney
+                    .transition(
+                        appState.reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .offset(y: 6))
+                    )
             }
 
-            // Completion flash overlay
+            if viewModel.showBlockedBanner {
+                VStack {
+                    BlockedBanner(
+                        isVisible: $viewModel.showBlockedBanner,
+                        site: blocker.lastBlockedSite
+                    )
+                    .padding(.top, 20)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             if viewModel.showCompletion {
                 CompletionOverlay()
                     .transition(.opacity)
                     .allowsHitTesting(false)
             }
         }
-        .animation(Anim.appear, value: viewModel.mode)
-        .animation(Anim.appear, value: viewModel.showCompletion)
+        .animation(appState.reduceMotion ? nil : .easeOut(duration: 0.22), value: viewModel.mode)
+        .animation(appState.reduceMotion ? nil : Anim.appear, value: viewModel.showCompletion)
         .onChange(of: viewModel.focusDuration) { _, v in
             if viewModel.mode == .idle { viewModel.timeRemaining = v * 60 }
         }
@@ -83,17 +66,305 @@ struct StudyView: View {
                 withAnimation(Anim.quick) { viewModel.showBlockedBanner = false }
             }
         }
-        .onAppear { viewModel.onAppear() }
+        .onAppear {
+            viewModel.onAppear()
+#if DEBUG
+            if ProcessInfo.processInfo.environment["DRIFT_SNAPSHOT_FOCUS"] == "active",
+               viewModel.mode == .idle {
+                viewModel.subject = "Finish the launch narrative"
+                viewModel.blockDistractingSites = false
+                viewModel.startFocus()
+            }
+#endif
+        }
         .onDisappear { viewModel.onDisappear() }
         .focusable()
         .onKeyPress(.space) {
-            viewModel.togglePlayPause()
+            if viewModel.mode == .idle {
+                viewModel.startFocus()
+            } else if !viewModel.showResult {
+                viewModel.togglePause()
+            }
             return .handled
         }
         .onKeyPress(.escape) {
-            if viewModel.mode != .idle { viewModel.showStopConfirmation = true }
+            if viewModel.mode != .idle && !viewModel.showResult { viewModel.showStopConfirmation = true }
             return .handled
         }
+        .sheet(isPresented: $showBlockingList) {
+            ZStack {
+                Color.driftCanvas.ignoresSafeArea()
+                FocusBlockerSection(blocker: blocker)
+                    .frame(maxWidth: 620)
+                    .padding(28)
+            }
+            .frame(width: 680, height: 620)
+            .preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $showBlockingDetails) {
+            ZStack {
+                Color.driftCanvas.ignoresSafeArea()
+                FocusBlockerSection(blocker: blocker)
+                    .frame(maxWidth: 620)
+                    .padding(28)
+            }
+            .frame(width: 680, height: 620)
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    private var idleFocusSetup: some View {
+        ZStack {
+            Color.black.opacity(0.08)
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Focus")
+                            .font(TypeScale.h1)
+                            .foregroundStyle(Color.cream)
+                        Text("Choose one thing. Drift will keep the rest quiet.")
+                            .font(TypeScale.bodyMd)
+                            .foregroundStyle(Color.creamMuted)
+                    }
+
+                    FunctionalGlassPanel(padding: 28, cornerRadius: DriftSurfaceRadius.major) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("What do you want to finish?")
+                                    .font(TypeScale.heading)
+                                    .foregroundStyle(Color.cream)
+                                TaskInputField(taskName: $viewModel.subject)
+                            }
+
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("FOCUS DURATION").sectionLabel()
+                                SegmentedControl(
+                                    options: [25, 45, 60],
+                                    selection: $viewModel.focusDuration,
+                                    title: { "\($0)m" }
+                                )
+                            }
+
+                            VStack(spacing: 0) {
+                                SettingsRow(
+                                    title: "Add a break",
+                                    explanation: "Choose a short reset after this focus block."
+                                ) {
+                                    Toggle("Add a break", isOn: $viewModel.includeBreak)
+                                        .labelsHidden()
+                                        .toggleStyle(.switch)
+                                        .tint(Color.sand)
+                                }
+
+                                if viewModel.includeBreak {
+                                    HStack {
+                                        Text("BREAK DURATION")
+                                            .sectionLabel()
+                                        Spacer()
+                                        SegmentedControl(
+                                            options: [5, 10, 15],
+                                            selection: $viewModel.breakDuration,
+                                            title: { "\($0)m" }
+                                        )
+                                    }
+                                    .padding(.horizontal, Space.lg)
+                                    .padding(.vertical, Space.md)
+                                    .transition(.opacity)
+                                }
+
+                                SettingsRow(
+                                    title: "Block \(blocker.blockedSites.count) distracting sites",
+                                    explanation: "Keep the sites in your blocking list quiet."
+                                ) {
+                                    Toggle("Block distracting sites", isOn: $viewModel.blockDistractingSites)
+                                        .labelsHidden()
+                                        .toggleStyle(.switch)
+                                        .tint(Color.sand)
+                                }
+
+                                Button {
+                                    showBlockingList = true
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "slider.horizontal.3")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .frame(width: 20)
+                                        Text("Customize")
+                                            .font(TypeScale.bodyMd)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Color.creamMuted)
+                                            .offset(x: customizeHovered ? 2 : 0)
+                                    }
+                                    .foregroundStyle(Color.cream)
+                                    .padding(.horizontal, Space.lg)
+                                    .frame(height: 56)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(DriftButtonStyle(variant: .ghost))
+                                .onHover { customizeHovered = $0 }
+                                .animation(Anim.quick, value: customizeHovered)
+                                .help("Customize blocked websites")
+                                .accessibilityLabel("Customize blocked websites")
+                            }
+                            .driftInsetSurface()
+
+                            PrimaryPillButton(
+                                title: "Begin \(viewModel.focusDuration)-minute focus",
+                                icon: "play.fill",
+                                isFullWidth: true
+                            ) {
+                                viewModel.startFocus()
+                            }
+                            .keyboardShortcut(.defaultAction)
+                        }
+                    }
+                    .frame(width: 680)
+                }
+                .frame(maxWidth: 1180, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.horizontal, 32)
+                .padding(.top, 30)
+                .padding(.bottom, 48)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func durationSetting(
+        title: String,
+        values: [Int],
+        selection: Binding<Int>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).sectionLabel()
+            HStack(spacing: 8) {
+                ForEach(values, id: \.self) { minutes in
+                    DurationChip(label: "\(minutes)m", isSelected: selection.wrappedValue == minutes) {
+                        selection.wrappedValue = minutes
+                    }
+                }
+            }
+        }
+    }
+
+    private var activeFocusJourney: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Color.black.opacity(0.10)
+
+                if viewModel.showResult {
+                    focusResult
+                } else {
+                    VStack(spacing: 24) {
+                        Text(viewModel.subject.isEmpty ? "Focus session" : viewModel.subject)
+                            .font(TypeScale.bodyMd)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.cream.opacity(0.82))
+                            .lineLimit(1)
+
+                        Text(formatCountdown(viewModel.timeRemaining))
+                            .font(PixelFont.font(68))
+                            .foregroundStyle(Color.cream)
+                            .monospacedDigit()
+
+                        Text("\(formatStudyTime(viewModel.elapsedFocusSeconds)) focused")
+                            .font(TypeScale.monoSm)
+                            .foregroundStyle(Color.creamMuted)
+
+                        HStack(spacing: 12) {
+                            SecondaryPillButton(
+                                title: viewModel.isPaused ? "Resume" : "Pause",
+                                icon: viewModel.isPaused ? "play.fill" : "pause.fill"
+                            ) {
+                                viewModel.togglePause()
+                            }
+
+                            SecondaryPillButton(title: "Finish", icon: "stop.fill") {
+                                viewModel.showStopConfirmation = true
+                            }
+
+                            SecondaryPillButton(
+                                title: blocker.isBlocking
+                                    ? "Blocking \(blocker.blockedSites.count) sites"
+                                    : "Blocking off",
+                                icon: blocker.isBlocking ? "shield.fill" : "shield.slash"
+                            ) {
+                                showBlockingDetails = true
+                            }
+                        }
+                    }
+                    .padding(.bottom, 92)
+                }
+
+                TravelerJourney(
+                    progress: viewModel.progress,
+                    isPaused: viewModel.isPaused,
+                    reduceMotion: appState.reduceMotion
+                )
+                    .frame(width: min(proxy.size.width - 120, 920), height: 82)
+                    .position(x: proxy.size.width / 2, y: proxy.size.height - 72)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .alert("Finish focus session?", isPresented: $viewModel.showStopConfirmation) {
+            Button("Keep focusing", role: .cancel) {}
+            Button("Finish", role: .destructive) { viewModel.finishSession() }
+        } message: {
+            Text("Your focused time so far will be saved in this result.")
+        }
+    }
+
+    private var focusResult: some View {
+        TactilePanel(padding: 28, density: .popover) {
+            VStack(alignment: .leading, spacing: 22) {
+                Text("Focus complete")
+                    .font(PixelFont.font(15))
+                    .foregroundStyle(Color.cream)
+
+                HStack(spacing: 0) {
+                    MetricCell(
+                        label: "Focused time",
+                        value: formatStudyTime(viewModel.resultFocusedSeconds),
+                        color: .productive
+                    )
+                    Rectangle().fill(Color.cream.opacity(0.12)).frame(width: 1, height: 54)
+                    MetricCell(
+                        label: "Switches",
+                        value: "\(viewModel.resultSwitches)",
+                        color: .sand
+                    )
+                    .padding(.leading, 18)
+                    Rectangle().fill(Color.cream.opacity(0.12)).frame(width: 1, height: 54)
+                    MetricCell(
+                        label: "Blocked",
+                        value: "\(viewModel.resultBlockedAttempts)",
+                        comparison: "distractions",
+                        color: .distraction
+                    )
+                    .padding(.leading, 18)
+                }
+
+                HStack(spacing: 12) {
+                    PrimaryPillButton(title: "Done", icon: "checkmark") {
+                        viewModel.dismissResult()
+                    }
+                    SecondaryPillButton(title: "Start another", icon: "arrow.clockwise") {
+                        viewModel.startAnother()
+                    }
+                }
+            }
+            .frame(width: 560, alignment: .leading)
+        }
+        .padding(.bottom, 70)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Focus session complete")
+    }
+
+    private func focusControl(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        SecondaryPillButton(title: title, icon: icon, action: action)
     }
 
     // MARK: - Main Card (two-column)
@@ -102,11 +373,11 @@ struct StudyView: View {
     private var mainCard: some View {
         HStack(alignment: .top, spacing: 12) {
             ringTimerPanel
-                .frame(minWidth: 330, maxWidth: 360, minHeight: 353)
+                .frame(minWidth: 430, maxWidth: 500, minHeight: 430)
                 .pixelPanel()
 
             controlsPanel
-                .frame(maxWidth: .infinity, minHeight: 353, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 430, alignment: .leading)
                 .pixelPanel()
         }
         .alert("End Focus Session?", isPresented: $viewModel.showStopConfirmation) {
@@ -136,7 +407,7 @@ struct StudyView: View {
                     .foregroundStyle(Color.streak)
                     .padding(.bottom, 18)
                 Text(formatCountdown(viewModel.timeRemaining))
-                    .font(PixelFont.font(56))
+                    .font(PixelFont.font(72))
                     .contentTransition(.numericText())
                     .animation(Anim.count, value: viewModel.timeRemaining)
                     .minimumScaleFactor(0.5)
@@ -163,7 +434,7 @@ struct StudyView: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 280)
-        .padding(35)
+        .padding(44)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(viewModel.modeLabel) timer. \(viewModel.timeRemaining / 60) minutes and \(viewModel.timeRemaining % 60) seconds remaining")
     }
@@ -358,6 +629,70 @@ struct StudyView: View {
     }
 }
 
+private struct TravelerJourney: View {
+    let progress: CGFloat
+    let isPaused: Bool
+    let reduceMotion: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let clampedProgress = min(max(progress, 0), 1)
+            let travelWidth = max(proxy.size.width - 64, 1)
+
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.20))
+                    .frame(height: 2)
+                    .offset(y: 20)
+
+                HStack(spacing: 4) {
+                    ForEach(0..<18, id: \.self) { index in
+                        Rectangle()
+                            .fill(index < Int(clampedProgress * 18) ? Color.streak : Color.white.opacity(0.18))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 4)
+                    }
+                }
+                .padding(.horizontal, 28)
+                .offset(y: 20)
+
+                PixelTraveler()
+                    .frame(width: 34, height: 44)
+                    .offset(x: clampedProgress * travelWidth)
+                    .animation(reduceMotion || isPaused ? nil : .linear(duration: 0.9), value: clampedProgress)
+
+                PixelCampfire()
+                    .frame(width: 34, height: 44)
+                    .offset(x: proxy.size.width - 34)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Journey \(Int(progress * 100)) percent complete")
+    }
+}
+
+private struct PixelTraveler: View {
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle().fill(Color.black.opacity(0.34)).frame(width: 28, height: 4)
+            Rectangle().fill(Color.streak).frame(width: 12, height: 18).offset(y: -5)
+            Rectangle().fill(Color.white).frame(width: 12, height: 10).offset(y: -24)
+            Rectangle().fill(Color.accentDeep).frame(width: 5, height: 7).offset(x: -8, y: -10)
+        }
+    }
+}
+
+private struct PixelCampfire: View {
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle().fill(Color.black.opacity(0.34)).frame(width: 32, height: 4)
+            Rectangle().fill(Color.distraction).frame(width: 18, height: 10).offset(y: -5)
+            Rectangle().fill(Color.streak).frame(width: 10, height: 16).offset(y: -8)
+            Rectangle().fill(Color.white.opacity(0.88)).frame(width: 4, height: 7).offset(y: -12)
+        }
+    }
+}
+
 private struct StudyPageIcon: View {
     let color: Color
 
@@ -416,24 +751,23 @@ private struct TaskInputField: View {
         HStack(spacing: Space.sm) {
             Image(systemName: "pencil")
                 .font(.system(size: 12))
-                .foregroundStyle(isFocused ? Color.accent.opacity(0.6) : Color.primary.opacity(0.28))
+                .foregroundStyle(isFocused ? Color.sand : Color.creamMuted)
                 .animation(Anim.quick, value: isFocused)
-            TextField("What are you working on?", text: $taskName)
+            TextField("Draft the proposal, finish the edit…", text: $taskName)
                 .textFieldStyle(.plain)
                 .font(TypeScale.body)
+                .foregroundStyle(Color.cream)
                 .focused($isFocused)
                 .accessibilityLabel("Focus task name")
         }
-        .padding(Space.md)
-        .background(
-            Rectangle()
-                .fill(Color(.quaternaryLabelColor).opacity(0.10))
-                .overlay(
-                    Rectangle()
-                        .strokeBorder(
-                            isFocused ? Color.accent.opacity(0.65) : Color.driftBorder.opacity(0.42),
-                            lineWidth: isFocused ? 2 : 1
-                        )
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .driftInsetSurface()
+        .overlay(
+            RoundedRectangle(cornerRadius: DriftSurfaceRadius.input, style: .continuous)
+                .strokeBorder(
+                    isFocused ? Color.cream.opacity(0.78) : Color.clear,
+                    lineWidth: isFocused ? 2 : 1
                 )
         )
         .animation(Anim.quick, value: isFocused)
@@ -453,15 +787,29 @@ final class StudyViewModel: ObservableObject {
     @Published var subject: String = ""
     @Published var focusDuration: Int = 25
     @Published var breakDuration: Int = 5
+    @Published var includeBreak = false
     @Published var showStopConfirmation = false
     @Published var showBlockedBanner = false
     @Published var showCompletion = false
     @Published var completionRingFlash = false
+    @Published var blockDistractingSites = true
+    @Published var isPaused = false
+    @Published var showResult = false
+    @Published var resultFocusedSeconds = 0
+    @Published var resultSwitches = 0
+    @Published var resultBlockedAttempts = 0
 
     private var timerCancellable: AnyCancellable?
     private var phaseEndDate: Date?
     private var phaseTotalSeconds: Int = 0
     private var lastAnnouncedMinute: Int = -1
+    private var startingEventCount = 0
+    private var startingBlockedAttempts = 0
+
+    var elapsedFocusSeconds: Int {
+        if mode == .rest { return resultFocusedSeconds }
+        return max(0, focusDuration * 60 - timeRemaining)
+    }
 
     var progress: CGFloat {
         switch mode {
@@ -517,29 +865,71 @@ final class StudyViewModel: ObservableObject {
 
     func startFocus() {
         mode = .focus
+        showResult = false
+        isPaused = false
+        resultFocusedSeconds = 0
+        resultSwitches = 0
+        resultBlockedAttempts = 0
         phaseTotalSeconds = focusDuration * 60
         timeRemaining = phaseTotalSeconds
         phaseEndDate = Date().addingTimeInterval(TimeInterval(phaseTotalSeconds))
+        startingEventCount = AppState.shared.session.events.count
+        startingBlockedAttempts = FocusBlocker.shared.blockedAttempts
         if !WindowTracker.shared.isTracking && AXIsProcessTrusted() {
             WindowTracker.shared.start()
         }
         AppState.shared.focusModeActive = true
         let blocker = FocusBlocker.shared
-        if !blocker.isBlocking {
+        if blockDistractingSites && !blocker.isBlocking {
             blocker.startBlocking(durationMinutes: focusDuration, password: nil)
         }
         startTimer()
     }
 
     func stopStudy() {
+        finishSession()
+    }
+
+    func finishSession() {
+        guard mode != .idle, !showResult else { return }
+        if mode == .focus {
+            captureFocusResult()
+        }
         stopTimer()
-        if mode == .focus { totalFocusTime += (focusDuration * 60 - timeRemaining) }
+        phaseEndDate = nil
+        isPaused = false
+        showResult = true
+        if FocusBlocker.shared.isBlocking {
+            _ = FocusBlocker.shared.stopBlocking(password: nil)
+        }
+        sendNotification(title: "Focus session complete", body: "\(resultFocusedSeconds / 60) focused minutes")
+    }
+
+    func dismissResult() {
         mode = .idle
         timeRemaining = focusDuration * 60
         phaseEndDate = nil
+        showResult = false
+        isPaused = false
         AppState.shared.focusModeActive = false
-        let blocker = FocusBlocker.shared
-        if blocker.isBlocking { let _ = blocker.stopBlocking(password: nil) }
+    }
+
+    func startAnother() {
+        dismissResult()
+        startFocus()
+    }
+
+    func togglePause() {
+        guard mode != .idle, !showResult else { return }
+        if isPaused {
+            phaseEndDate = Date().addingTimeInterval(TimeInterval(timeRemaining))
+            isPaused = false
+            startTimer()
+        } else {
+            stopTimer()
+            phaseEndDate = nil
+            isPaused = true
+        }
     }
 
     func skipPhase() {
@@ -554,7 +944,7 @@ final class StudyViewModel: ObservableObject {
     }
 
     func togglePlayPause() {
-        if mode == .idle { startFocus() }
+        if mode == .idle { startFocus() } else { togglePause() }
     }
 
     private func startBreak() {
@@ -589,15 +979,31 @@ final class StudyViewModel: ObservableObject {
         triggerCompletionAnimation()
         if mode == .focus {
             sessionCount += 1
-            totalFocusTime += phaseTotalSeconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-                self?.startBreak()
+                guard let self else { return }
+                self.captureFocusResult()
+                if self.includeBreak {
+                    self.startBreak()
+                } else {
+                    self.finishSession()
+                }
             }
         } else {
             sendNotification(title: "Break over!", body: "Time to focus again.")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-                self?.startFocus()
+                self?.finishSession()
             }
+        }
+    }
+
+    private func captureFocusResult() {
+        guard resultFocusedSeconds == 0 else { return }
+        resultFocusedSeconds = elapsedFocusSeconds
+        resultSwitches = max(AppState.shared.session.events.count - startingEventCount - 1, 0)
+        resultBlockedAttempts = max(FocusBlocker.shared.blockedAttempts - startingBlockedAttempts, 0)
+        totalFocusTime += resultFocusedSeconds
+        if FocusBlocker.shared.isBlocking {
+            _ = FocusBlocker.shared.stopBlocking(password: nil)
         }
     }
 
@@ -707,15 +1113,14 @@ private struct CompletionOverlay: View {
                 .animation(Anim.appear.delay(0.18), value: appeared)
         }
         .padding(Space.xxxl)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                .fill(Color.driftPanel.opacity(0.95))
-                .shadow(color: Color.productive.opacity(0.28), radius: 0, x: 6, y: 6)
-                .overlay(
+        .background {
+            DriftGlassSurface(density: .popover, cornerRadius: Radius.xl)
+                .overlay {
                     RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                         .strokeBorder(Color.productive.opacity(0.20), lineWidth: 0.5)
-                )
-        )
+                }
+        }
+        .shadow(color: Color.productive.opacity(0.20), radius: 16, y: 8)
         .onAppear { appeared = true }
     }
 }
@@ -740,7 +1145,7 @@ private struct BlockedBanner: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Site Blocked")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(TypeScale.caption)
                         .foregroundStyle(Color.distraction)
                     Text(site)
                         .font(TypeScale.caption)
@@ -764,14 +1169,13 @@ private struct BlockedBanner: View {
             }
             .padding(.horizontal, Space.md)
             .padding(.vertical, Space.sm)
-            .background(
-                Rectangle()
-                    .fill(Color.driftPanel)
-                    .overlay(
-                        Rectangle().strokeBorder(Color.distraction.opacity(0.42), lineWidth: 1)
-                    )
-                    .shadow(color: Color.driftShadow, radius: 0, x: 4, y: 4)
-            )
+            .background {
+                DriftGlassSurface(density: .popover, cornerRadius: Radius.md)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .strokeBorder(Color.distraction.opacity(0.42), lineWidth: 1)
+                    }
+            }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(site) was blocked")
         }
@@ -804,10 +1208,9 @@ private struct FocusBlockerSection: View {
         }
         .padding(Space.xl)
         .background {
-            Rectangle()
-                .fill(Color.driftPanel)
+            DriftGlassSurface(density: .popover, cornerRadius: Radius.lg)
                 .overlay {
-                    Rectangle()
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
                         .strokeBorder(
                             blocker.isBlocking
                                 ? Color.distraction.opacity(0.42)
@@ -815,11 +1218,12 @@ private struct FocusBlockerSection: View {
                             lineWidth: 1
                         )
                 }
-                .shadow(
-                    color: blocker.isBlocking ? Color.distraction.opacity(0.22) : Color.driftShadow,
-                    radius: 0, x: 3, y: 3
-                )
         }
+        .shadow(
+            color: blocker.isBlocking ? Color.distraction.opacity(0.16) : Color.clear,
+            radius: 16,
+            y: 8
+        )
         .onAppear { startTick() }
         .onDisappear { tickCancellable?.cancel() }
         .animation(Anim.appear, value: blocker.isBlocking)
@@ -861,7 +1265,7 @@ private struct FocusBlockerSection: View {
                 HStack(spacing: Space.xxs) {
                     StatusDot(status: .tracking)
                     Text("Live")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(Color.distraction)
                         .tracking(0.5)
                 }
@@ -935,7 +1339,7 @@ private struct FocusBlockerSection: View {
                         Image(systemName: blocker.passwordRequired ? "lock.fill" : "xmark.circle.fill")
                             .font(.system(size: 12, weight: .semibold))
                         Text(blocker.passwordRequired ? "Unlock to Stop" : "Stop Blocking")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(TypeScale.caption)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.md)
@@ -979,7 +1383,7 @@ private struct FocusBlockerSection: View {
                         Image(systemName: "shield.checkered")
                             .font(.system(size: 13, weight: .semibold))
                         Text("Activate Site Blocker")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(TypeScale.caption)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.md)
@@ -1109,7 +1513,7 @@ private struct FocusBlockerSection: View {
                     }
                 } label: {
                     Text("Cancel")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(TypeScale.caption)
                         .padding(.horizontal, Space.lg)
                         .padding(.vertical, Space.sm)
                         .background(
@@ -1130,7 +1534,7 @@ private struct FocusBlockerSection: View {
                         Image(systemName: "shield.fill")
                             .font(.system(size: 12, weight: .semibold))
                         Text("Start Blocking")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(TypeScale.caption)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.sm)
@@ -1204,12 +1608,12 @@ private struct BlockerCountdown: View {
 
                 VStack(spacing: 0) {
                     Text(blocker.timeRemainingFormatted)
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .font(TypeScale.monoSm)
                         .foregroundStyle(Color.distraction)
                         .contentTransition(.numericText())
                         .animation(Anim.count, value: blocker.timeRemainingFormatted)
                     Text("LEFT")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(TypeScale.tiny)
                         .foregroundStyle(Color.distraction.opacity(0.5))
                         .tracking(1.2)
                 }
@@ -1219,7 +1623,7 @@ private struct BlockerCountdown: View {
 
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text("Shield is active")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(TypeScale.caption)
                     .foregroundStyle(Color(.labelColor))
                 Text("Distracting sites blocked.\nStay in the zone.")
                     .font(TypeScale.caption)

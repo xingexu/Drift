@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main
 struct DriftApp: App {
@@ -40,12 +41,14 @@ struct DriftApp: App {
             CommandGroup(replacing: .newItem) {}
 
             CommandMenu("Go") {
-                Button("Tracking") { AppState.shared.currentTab = .tracking }
+                Button("Today") { AppState.shared.currentTab = .tracking }
                     .keyboardShortcut("1", modifiers: .command)
-                Button("Focus + Blocking") { AppState.shared.currentTab = .focus }
+                Button("Focus") { AppState.shared.currentTab = .focus }
                     .keyboardShortcut("2", modifiers: .command)
-                Button("Settings") { AppState.shared.currentTab = .settings }
+                Button("History") { AppState.shared.currentTab = .history }
                     .keyboardShortcut("3", modifiers: .command)
+                Button("Settings") { AppState.shared.currentTab = .settings }
+                    .keyboardShortcut("4", modifiers: .command)
             }
 
             CommandMenu("Tracking") {
@@ -97,6 +100,12 @@ struct DriftApp: App {
 
             if let window = NSApp.windows.first(where: { $0.canBecomeMain && !($0 is NSPanel) }) {
                 window.collectionBehavior.insert(.fullScreenPrimary)
+                window.isOpaque = true
+                window.backgroundColor = NSColor(red: 0.030, green: 0.024, blue: 0.052, alpha: 1)
+                window.styleMask.insert(.fullSizeContentView)
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.titlebarSeparatorStyle = .none
                 window.title = "Drift"
                 window.makeKeyAndOrderFront(nil)
             }
@@ -136,6 +145,8 @@ struct DriftApp: App {
             appState.currentTab = .settings
         case "focus":
             appState.currentTab = .focus
+        case "history":
+            appState.currentTab = .history
         default:
             break
         }
