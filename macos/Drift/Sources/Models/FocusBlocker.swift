@@ -11,8 +11,8 @@ import CryptoKit
 /// window every second. When a blocked domain is detected the tab is
 /// redirected to a local "blocked" page and Drift is brought to front.
 ///
-/// Sessions survive app restarts via `UserDefaults` and are protected
-/// by an optional SHA-256 hashed password.
+/// Sessions survive app restarts via `UserDefaults`. The optional focus-lock
+/// verifier is kept in the macOS Keychain rather than the preferences plist.
 ///
 /// **Safety invariants**
 /// - ``forceStopForEmergency()`` is always available and cannot deadlock.
@@ -197,6 +197,21 @@ class FocusBlocker: ObservableObject {
         }
         // Strip trailing path.
         if let slash = s.firstIndex(of: "/") { s = String(s[..<slash]) }
+        if let colon = s.firstIndex(of: ":") { s = String(s[..<colon]) }
+        s = s.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+
+        guard !s.isEmpty,
+              s.count <= 253,
+              !s.contains(".."),
+              s.unicodeScalars.allSatisfy({
+                  CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "."
+              }),
+              s.split(separator: ".").allSatisfy({ label in
+                  !label.isEmpty && label.count <= 63 &&
+                  label.first != "-" && label.last != "-"
+              }) else {
+            return ""
+        }
         return s
     }
 
@@ -209,7 +224,9 @@ class FocusBlocker: ObservableObject {
             defaults.set(end.timeIntervalSince1970, forKey: "drift_focus_block_end")
         }
         if let hash = passwordHash {
-            defaults.set(hash, forKey: "drift_focus_block_pw_hash")
+            LocalCredentialStore.save(hash, for: LocalCredentialStore.focusPasswordHashKey)
+        } else {
+            LocalCredentialStore.delete(LocalCredentialStore.focusPasswordHashKey)
         }
         defaults.set(totalSessionDuration, forKey: "drift_focus_block_duration")
         defaults.set(blockedAttempts, forKey: "drift_focus_block_attempts")
@@ -230,7 +247,12 @@ class FocusBlocker: ObservableObject {
         }
 
         endTime = restoredEnd
-        passwordHash = defaults.string(forKey: "drift_focus_block_pw_hash")
+        // One-time migration from the old preferences plist into Keychain.
+        if let legacyHash = defaults.string(forKey: "drift_focus_block_pw_hash") {
+            LocalCredentialStore.save(legacyHash, for: LocalCredentialStore.focusPasswordHashKey)
+            defaults.removeObject(forKey: "drift_focus_block_pw_hash")
+        }
+        passwordHash = LocalCredentialStore.read(LocalCredentialStore.focusPasswordHashKey)
         totalSessionDuration = defaults.double(forKey: "drift_focus_block_duration")
         blockedAttempts = defaults.integer(forKey: "drift_focus_block_attempts")
         isBlocking = true
@@ -254,6 +276,7 @@ class FocusBlocker: ObservableObject {
         ] {
             defaults.removeObject(forKey: key)
         }
+        LocalCredentialStore.delete(LocalCredentialStore.focusPasswordHashKey)
     }
 
     // MARK: - Start / Stop
@@ -603,8 +626,10 @@ class FocusBlocker: ObservableObject {
         guard let script = NSAppleScript(source: source) else { return nil }
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
-        if let error = error {
-            print("[FocusBlocker] AppleScript error: \(error)")
+        if error != nil {
+#if DEBUG
+            print("[FocusBlocker] AppleScript execution failed")
+#endif
             return nil
         }
         return result.stringValue

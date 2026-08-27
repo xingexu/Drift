@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import NextImage from "next/image";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 const SCENE_WIDTH = 3072;
 const SCENE_HEIGHT = 2048;
 const SOURCE_IMAGE = "/art/drift-original-scene-2x.png";
 const SCENE_DROP = 118;
 const RELEASES_URL = "https://github.com/xingexu/Drift/releases";
+const MACOS_DOWNLOAD_URL = RELEASES_URL;
+const WINDOWS_DOWNLOAD_URL = RELEASES_URL;
 
 type PixelContext = CanvasRenderingContext2D;
 
@@ -57,6 +58,7 @@ const pixelMarks = {
 
 type PixelMark = keyof typeof pixelMarks;
 type BrandMark = "github" | "linkedin";
+type PlatformMark = "apple" | "windows";
 
 const pixelStars = Array.from({ length: 170 }, (_, index) => {
   const seed = (index + 3) * 9301 + 49297;
@@ -402,6 +404,176 @@ function BrandLogo({ mark }: { mark: BrandMark }) {
   );
 }
 
+function PlatformLogo({ mark }: { mark: PlatformMark }) {
+  const path =
+    mark === "apple"
+      ? "M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+      : "M0 0h11.377v11.372H0V0Zm12.623 0H24v11.372H12.623V0ZM0 12.623h11.377V24H0V12.623Zm12.623 0H24V24H12.623V12.623Z";
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={`platform-mark platform-mark--${mark}`}
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d={path} fill="currentColor" />
+    </svg>
+  );
+}
+
+function InstallPicker() {
+  const [isOpen, setIsOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("pointerdown", closeOnOutsidePress);
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePress);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  const focusOption = (index: number) => {
+    requestAnimationFrame(() => {
+      const options = Array.from(
+        menuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? [],
+      );
+      options.at(index)?.focus();
+    });
+  };
+
+  const openAndFocusFirstOption = () => {
+    setIsOpen(true);
+    focusOption(0);
+  };
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    const options = Array.from(
+      menuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? [],
+    );
+    const activeIndex = options.indexOf(document.activeElement as HTMLAnchorElement);
+
+    if (event.key === "Home") {
+      options[0]?.focus();
+      return;
+    }
+
+    if (event.key === "End") {
+      options.at(-1)?.focus();
+      return;
+    }
+
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = (activeIndex + direction + options.length) % options.length;
+    options[nextIndex]?.focus();
+  };
+
+  return (
+    <div className="install-picker" ref={pickerRef}>
+      <span className="install-picker__load-sparkles" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+      </span>
+      <button
+        aria-controls={isOpen ? "install-platform-menu" : undefined}
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        className="install-picker__trigger"
+        data-open={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            openAndFocusFirstOption();
+          }
+        }}
+        ref={triggerRef}
+        type="button"
+      >
+        <span>Install command</span>
+        <svg aria-hidden="true" className="install-picker__chevron" focusable="false" viewBox="0 0 16 16">
+          <path d="m3.5 6 4.5 4 4.5-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+        </svg>
+      </button>
+
+      {isOpen ? (
+        <div
+          aria-label="Choose your platform"
+          className="install-picker__menu"
+          id="install-platform-menu"
+          onKeyDown={handleMenuKeyDown}
+          ref={menuRef}
+          role="menu"
+        >
+          <a
+            className="install-picker__option"
+            href={MACOS_DOWNLOAD_URL}
+            onClick={() => setIsOpen(false)}
+            rel="noreferrer"
+            role="menuitem"
+            target="_blank"
+          >
+            <span className="install-picker__icon install-picker__icon--apple">
+              <PlatformLogo mark="apple" />
+            </span>
+            <span>macOS / Linux</span>
+          </a>
+          <a
+            className="install-picker__option"
+            href={WINDOWS_DOWNLOAD_URL}
+            onClick={() => setIsOpen(false)}
+            rel="noreferrer"
+            role="menuitem"
+            target="_blank"
+          >
+            <span className="install-picker__icon install-picker__icon--windows">
+              <PlatformLogo mark="windows" />
+            </span>
+            <span>Windows</span>
+          </a>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -496,47 +668,25 @@ export default function Home() {
         <canvas ref={canvasRef} className="scene-canvas" aria-hidden="true" />
 
         <section className="scene-ui" aria-label="Drift downloads">
-          <h1 className="scene-title" id="drift-title">
-            DRIFT
+          <h1 aria-label="DRIFT" className="scene-title" id="drift-title">
+            <span className="scene-title__label">
+              <span>D</span>
+              <span>R</span>
+              <span>I</span>
+              <span>F</span>
+              <span>T</span>
+            </span>
+            <span className="scene-title__sparkles" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </span>
           </h1>
 
-          <div className="download-actions">
-            <a
-              aria-label="Download Drift for macOS"
-              className="scene-download"
-              href={RELEASES_URL}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <NextImage
-                alt=""
-                aria-hidden="true"
-                className="platform-mark platform-mark--apple"
-                height="72"
-                src="/icons/apple-mark-pixel.png"
-                width="60"
-              />
-              <span>DOWNLOAD FOR MACOS</span>
-            </a>
-
-            <a
-              aria-label="Download Drift for Windows"
-              className="scene-download"
-              href={RELEASES_URL}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <NextImage
-                alt=""
-                aria-hidden="true"
-                className="platform-mark platform-mark--windows"
-                height="68"
-                src="/icons/windows-mark-pixel.png"
-                width="68"
-              />
-              <span>DOWNLOAD FOR WINDOWS</span>
-            </a>
-          </div>
+          <InstallPicker />
         </section>
       </main>
 

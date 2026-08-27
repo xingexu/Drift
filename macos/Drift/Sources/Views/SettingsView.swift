@@ -666,7 +666,9 @@ struct SettingsView: View {
         let domain = Bundle.main.bundleIdentifier ?? "com.drift.app"
         defaults.removePersistentDomain(forName: domain)
         defaults.synchronize()
-        appState.logout()
+        appState.purgeRetiredCloudState()
+        blocker.forceStopForEmergency()
+        blocker.resetToDefaults()
         appState.session.reset()
         appState.pastSessions.removeAll()
         appState.classificationOverrides.removeAll()

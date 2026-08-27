@@ -19,6 +19,7 @@ import cors from "cors";
 import helmet from "helmet";
 import crypto from "crypto";
 import cron from "node-cron";
+import { z } from "zod";
 
 import { getEnv, isDev, isProd } from "./config/env.js";
 import authRoutes from "./routes/auth.js";
@@ -62,8 +63,12 @@ app.use(
 // ---------------------------------------------------------------------------
 
 app.use((req, res, next) => {
+  const suppliedRequestId = req.headers["x-request-id"];
   const requestId =
-    (req.headers["x-request-id"] as string) ?? crypto.randomUUID();
+    typeof suppliedRequestId === "string" &&
+    /^[A-Za-z0-9._:-]{1,128}$/.test(suppliedRequestId)
+      ? suppliedRequestId
+      : crypto.randomUUID();
   req.headers["x-request-id"] = requestId;
   res.setHeader("X-Request-Id", requestId);
   next();
@@ -90,9 +95,6 @@ function buildCorsOrigins(): (string | RegExp)[] {
     origins.push(env.FRONTEND_URL);
   }
 
-  // Electron / Tauri app origins
-  origins.push("file://", `${env.APP_SCHEME}://`);
-
   // Extra origins from CORS_ORIGINS env var
   if (env.CORS_ORIGINS) {
     for (const o of env.CORS_ORIGINS.split(",")) {
@@ -107,7 +109,8 @@ function buildCorsOrigins(): (string | RegExp)[] {
 app.use(
   cors({
     origin: buildCorsOrigins(),
-    credentials: true,
+    // Authentication uses explicit Bearer tokens; cookies are not accepted.
+    credentials: false,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
@@ -138,7 +141,9 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     const method = req.method;
-    const url = req.originalUrl;
+    // Never log query strings; reset links and third-party callbacks may carry
+    // sensitive values in them. `baseUrl + path` preserves route context only.
+    const url = `${req.baseUrl}${req.path}`;
     const status = res.statusCode;
 
     // Redact sensitive headers
@@ -180,8 +185,12 @@ app.use((req, res, next) => {
 // 5. Body parsing
 // ---------------------------------------------------------------------------
 
-// Raw body for Stripe webhooks (must be before express.json())
-app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
+// Raw body for Stripe webhooks (must be before express.json()). Keep this path
+// aligned with the billing router mount below or signature verification fails.
+app.use(
+  "/api/billing/webhooks/stripe",
+  express.raw({ type: "application/json", limit: "256kb" }),
+);
 
 // JSON body for everything else -- 1 MB limit prevents abuse
 app.use(express.json({ limit: "1mb" }));
@@ -209,6 +218,14 @@ app.get("/api/health", async (_req, res) => {
       supabase.status === "ok" &&
       (redis.status === "ok" || redis.status === "not_configured");
 
+    if (isProd()) {
+      res.status(isHealthy ? 200 : 503).json({
+        status: isHealthy ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? "ok" : "degraded",
       version: "1.1.0",
@@ -233,7 +250,6 @@ app.get("/api/health", async (_req, res) => {
     console.error("[Health] Check failed:", msg);
     res.status(503).json({
       status: "error",
-      version: "1.1.0",
       timestamp: new Date().toISOString(),
       error: isDev() ? msg : "Health check failed",
     });
@@ -267,7 +283,7 @@ app.get(
       const sb = getSupabaseAdmin();
       const { data: profile } = await sb
         .from("user_profiles")
-        .select("*")
+        .select("name, email_digest_enabled, onboarded_at, created_at")
         .eq("user_id", authReq.userId)
         .single();
 
@@ -294,16 +310,48 @@ app.get(
 // 9. Auth webhook (Supabase triggers this on new user)
 // ---------------------------------------------------------------------------
 
+const authWebhookSchema = z.object({
+  type: z.literal("INSERT"),
+  record: z.object({
+    id: z.string().uuid(),
+    email: z.string().email().max(320),
+  }).passthrough(),
+}).passthrough();
+
+function requireAuthWebhookSecret(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+): void {
+  const provided = req.get("X-Drift-Webhook-Secret") ?? "";
+  const expected = getEnv().API_SECRET;
+  const providedBuffer = Buffer.from(provided, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+
+  if (
+    providedBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
+    res.status(401).json({ error: "Unauthorized webhook" });
+    return;
+  }
+
+  next();
+}
+
 app.post(
   "/api/webhooks/auth",
+  requireAuthWebhookSecret,
   rateLimit("webhook"),
   async (req, res) => {
     try {
-      const { type, record } = req.body ?? {};
-
-      if (type === "INSERT" && record?.id && record?.email) {
-        await onboardNewUser(record.id, record.email);
+      const parsed = authWebhookSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid webhook payload" });
+        return;
       }
+
+      await onboardNewUser(parsed.data.record.id, parsed.data.record.email);
 
       res.json({ received: true });
     } catch (err: unknown) {
@@ -425,7 +473,7 @@ app.use(
   ) => {
     const requestId = req.headers["x-request-id"] as string | undefined;
     console.error(
-      `[Unhandled Error] ${req.method} ${req.originalUrl}` +
+      `[Unhandled Error] ${req.method} ${req.baseUrl}${req.path}` +
         (requestId ? ` rid=${requestId}` : "") +
         `: ${err.message}`,
     );

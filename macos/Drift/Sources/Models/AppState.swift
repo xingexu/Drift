@@ -5,24 +5,17 @@ import Combine
 
 /// Central observable model for the Drift application.
 ///
-/// Owns authentication state, user preferences, the active tracking session,
-/// and session history. All properties are `@Published` so SwiftUI views
-/// react to changes automatically.
+/// Owns user preferences, the active tracking session, and local session
+/// history. All properties are `@Published` so SwiftUI views react to changes
+/// automatically.
 ///
-/// Persistence is split between `UserDefaults` (preferences, session history)
-/// and the system Keychain (authentication tokens). The singleton is created
-/// lazily on first access and restores its last-known state from disk.
+/// Drift has no account or cloud-sync state. Preferences and privacy-scrubbed
+/// history are stored only in this macOS user's `UserDefaults` domain.
 @MainActor
 class AppState: ObservableObject {
 
     /// Shared singleton accessed throughout the app.
     static let shared = AppState()
-
-    // MARK: - Auth
-
-    @Published var isLoggedIn: Bool = false
-    @Published var user: User?
-    @Published var accessToken: String?
 
     // MARK: - Navigation
 
@@ -81,7 +74,6 @@ class AppState: ObservableObject {
     /// Centralised string constants for every `UserDefaults` key the app
     /// touches. Prevents typo-induced bugs and makes auditing easy.
     private enum DefaultsKey {
-        static let user              = "drift_user"
         static let theme             = "drift_theme"
         static let accentColorName   = "accentColorName"
         static let reduceMotion      = "drift_reduce_motion"
@@ -94,20 +86,16 @@ class AppState: ObservableObject {
         static let pastSessions      = "drift_past_sessions"
         static let density           = "drift_density"
         static let classificationOverrides = "drift_classification_overrides"
-        // Legacy keys used only during the one-time keychain migration.
-        static let legacyAccessToken  = "drift_access_token"
-        static let legacyRefreshToken = "drift_refresh_token"
-    }
-
-    /// Keychain item identifiers for authentication tokens.
-    private enum KeychainKey {
-        static let accessToken  = "drift_access_token"
-        static let refreshToken = "drift_refresh_token"
+        // Retired account/sync keys, removed during upgrade cleanup.
+        static let retiredUser         = "drift_user"
+        static let retiredAccessToken  = "drift_access_token"
+        static let retiredRefreshToken = "drift_refresh_token"
     }
 
     // MARK: - Init
 
     private init() {
+        purgeRetiredCloudState()
         loadFromDefaults()
         loadPastSessions()
         computeStats()
@@ -115,22 +103,9 @@ class AppState: ObservableObject {
 
     // MARK: - Persistence
 
-    /// Restores all persisted properties from `UserDefaults` and Keychain.
+    /// Restores local preferences from `UserDefaults`.
     func loadFromDefaults() {
         let defaults = UserDefaults.standard
-
-        // One-time migration: move tokens from UserDefaults into Keychain and
-        // remove the plaintext copies from the plist.
-        migrateTokensToKeychainIfNeeded()
-
-        // Load tokens from Keychain.
-        accessToken = KeychainHelper.read(key: KeychainKey.accessToken)
-        isLoggedIn = accessToken != nil
-
-        if let userData = defaults.data(forKey: DefaultsKey.user),
-           let decoded = try? JSONDecoder().decode(User.self, from: userData) {
-            user = decoded
-        }
 
         if let themeRaw = defaults.string(forKey: DefaultsKey.theme),
            let decoded = AppTheme(rawValue: themeRaw) {
@@ -164,53 +139,24 @@ class AppState: ObservableObject {
         }
     }
 
-    /// Moves any tokens still sitting in `UserDefaults` into the Keychain.
-    ///
-    /// This runs on every launch but is effectively a no-op once the legacy
-    /// keys have been deleted.
-    private func migrateTokensToKeychainIfNeeded() {
+    /// Removes credentials and queued network payloads left by account-enabled
+    /// builds. This is intentionally idempotent so retired secrets cannot
+    /// reappear after a preferences restore.
+    func purgeRetiredCloudState() {
         let defaults = UserDefaults.standard
-        if let access = defaults.string(forKey: DefaultsKey.legacyAccessToken) {
-            KeychainHelper.save(key: KeychainKey.accessToken, value: access)
-            defaults.removeObject(forKey: DefaultsKey.legacyAccessToken)
+        defaults.removeObject(forKey: DefaultsKey.retiredUser)
+        defaults.removeObject(forKey: DefaultsKey.retiredAccessToken)
+        defaults.removeObject(forKey: DefaultsKey.retiredRefreshToken)
+        LocalCredentialStore.purgeRetiredCloudCredentials()
+
+        let queueURL = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?
+            .appendingPathComponent("net.drift.app", isDirectory: true)
+            .appendingPathComponent("offline_queue.json")
+        if let queueURL {
+            try? FileManager.default.removeItem(at: queueURL)
         }
-        if let refresh = defaults.string(forKey: DefaultsKey.legacyRefreshToken) {
-            KeychainHelper.save(key: KeychainKey.refreshToken, value: refresh)
-            defaults.removeObject(forKey: DefaultsKey.legacyRefreshToken)
-        }
-    }
-
-    /// Persists new authentication tokens to the Keychain.
-    func saveTokens(access: String, refresh: String) {
-        KeychainHelper.save(key: KeychainKey.accessToken, value: access)
-        KeychainHelper.save(key: KeychainKey.refreshToken, value: refresh)
-        accessToken = access
-        isLoggedIn = true
-    }
-
-    /// Called by `APIClient` or `AppDelegate` after a successful silent
-    /// token refresh to persist the rotated credentials.
-    func handleTokenRefresh(accessToken: String, refreshToken: String) {
-        saveTokens(access: accessToken, refresh: refreshToken)
-    }
-
-    /// Persists the user profile to `UserDefaults`.
-    func saveUser(_ user: User) {
-        self.user = user
-        if let data = try? JSONEncoder().encode(user) {
-            UserDefaults.standard.set(data, forKey: DefaultsKey.user)
-        }
-    }
-
-    /// Clears all authentication state and removes persisted credentials
-    /// from both the Keychain and `UserDefaults`.
-    func logout() {
-        KeychainHelper.delete(key: KeychainKey.accessToken)
-        KeychainHelper.delete(key: KeychainKey.refreshToken)
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.user)
-        accessToken = nil
-        user = nil
-        isLoggedIn = false
     }
 
     /// Updates and persists the selected appearance theme.
@@ -283,7 +229,7 @@ class AppState: ObservableObject {
             driftScore: session.driftScore,
             appCount: session.uniqueApps,
             topApps: session.topApps,
-            events: session.events
+            events: session.events.map { $0.privacySanitized() }
         )
 
         pastSessions.insert(past, at: 0)
@@ -310,7 +256,14 @@ class AppState: ObservableObject {
     private func loadPastSessions() {
         if let data = UserDefaults.standard.data(forKey: DefaultsKey.pastSessions),
            let decoded = try? JSONDecoder().decode([PastSession].self, from: data) {
-            pastSessions = decoded
+            pastSessions = decoded.map { $0.privacySanitized() }
+
+            // Rewrite older history once so full URLs and window titles from
+            // retired builds are no longer retained on disk.
+            if let sanitizedData = try? JSONEncoder().encode(pastSessions),
+               sanitizedData != data {
+                UserDefaults.standard.set(sanitizedData, forKey: DefaultsKey.pastSessions)
+            }
         }
     }
 
@@ -332,34 +285,6 @@ class AppState: ObservableObject {
             checkDate = previous
         }
         currentStreak = streak
-    }
-}
-
-// MARK: - User
-
-/// Represents an authenticated Drift user.
-struct User: Codable, Identifiable {
-    let userId: String
-    let email: String
-    var name: String?
-    var plan: String
-
-    var id: String { userId }
-
-    /// Best-effort display name derived from the user's name or email prefix.
-    var displayName: String {
-        name ?? email.components(separatedBy: "@").first ?? email
-    }
-
-    /// Two-character uppercase initials for avatar placeholders.
-    var initials: String {
-        let parts = displayName
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-        if parts.count >= 2 {
-            return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
-        }
-        return String(displayName.prefix(2)).uppercased()
     }
 }
 
@@ -519,12 +444,36 @@ struct AppEvent: Identifiable, Codable {
     ) {
         self.id = id
         self.owner = owner
-        self.title = title
         self.isBrowser = isBrowser
-        self.url = url
+        let safeDomain = Self.domainOnly(from: url)
+        self.title = isBrowser ? (safeDomain ?? owner) : owner
+        self.url = safeDomain
         self.category = category
         self.timestamp = timestamp
         self.durationMs = durationMs
+    }
+
+    /// Returns an event safe for local persistence and export. Window titles,
+    /// URL paths, query strings, fragments, usernames, and ports are discarded.
+    func privacySanitized() -> AppEvent {
+        AppEvent(
+            id: id,
+            owner: owner,
+            title: title,
+            isBrowser: isBrowser,
+            url: url,
+            category: category,
+            timestamp: timestamp,
+            durationMs: durationMs
+        )
+    }
+
+    private static func domainOnly(from value: String?) -> String? {
+        guard let value, !value.isEmpty else { return nil }
+        let candidate = value.contains("://") ? value : "https://\(value)"
+        guard let host = URLComponents(string: candidate)?.host?.lowercased(),
+              !host.isEmpty else { return nil }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 }
 
@@ -545,6 +494,7 @@ struct PastSession: Identifiable, Codable {
     let events: [AppEvent]?
 
     init(
+        id: UUID = UUID(),
         date: Date,
         totalMs: TimeInterval,
         productiveMs: TimeInterval,
@@ -556,7 +506,7 @@ struct PastSession: Identifiable, Codable {
         topApps: [String] = [],
         events: [AppEvent]? = nil
     ) {
-        self.id = UUID()
+        self.id = id
         self.date = date
         self.totalMs = totalMs
         self.productiveMs = productiveMs
@@ -567,6 +517,22 @@ struct PastSession: Identifiable, Codable {
         self.appCount = appCount
         self.topApps = topApps
         self.events = events
+    }
+
+    func privacySanitized() -> PastSession {
+        PastSession(
+            id: id,
+            date: date,
+            totalMs: totalMs,
+            productiveMs: productiveMs,
+            neutralMs: neutralMs,
+            distractionMs: distractionMs,
+            focusPercent: focusPercent,
+            driftScore: driftScore,
+            appCount: appCount,
+            topApps: topApps,
+            events: events?.map { $0.privacySanitized() }
+        )
     }
 
     var efficiencyScore: Int {

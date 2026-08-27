@@ -384,7 +384,19 @@ private struct SidebarView: View {
 
     private var sidebarHeader: some View {
         HStack(spacing: 12) {
-            PixelDLogo(size: 40, background: .sand, isHighlighted: brandHovered)
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 40, height: 40)
+                .scaleEffect(brandHovered && !appState.reduceMotion ? 1.04 : 1)
+                .shadow(
+                    color: Color.drift.opacity(brandHovered ? 0.34 : 0.18),
+                    radius: brandHovered ? 10 : 6,
+                    y: 3
+                )
+                .animation(appState.reduceMotion ? nil : Anim.quick, value: brandHovered)
+                .accessibilityHidden(true)
 
             Text("Drift")
                 .font(PixelFont.font(22))

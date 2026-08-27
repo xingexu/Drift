@@ -166,7 +166,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- ---------------------------------------------------------------------------
 -- Trigger: auto-update daily aggregates timestamp
@@ -176,3 +176,8 @@ DROP TRIGGER IF EXISTS update_daily_agg_timestamp ON daily_aggregates;
 CREATE TRIGGER update_daily_agg_timestamp
   BEFORE UPDATE ON daily_aggregates
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+REVOKE ALL ON TABLE app_sessions, app_events, app_rules, study_sessions,
+  daily_aggregates, user_preferences FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
