@@ -135,6 +135,7 @@ CREATE INDEX IF NOT EXISTS idx_focus_user_time ON focus_sessions (user_id, start
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_coaching_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_classification_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_invites ENABLE ROW LEVEL SECURITY;
@@ -144,8 +145,6 @@ ALTER TABLE focus_sessions ENABLE ROW LEVEL SECURITY;
 -- user_profiles
 CREATE POLICY "Users read own profile" ON user_profiles
   FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users update own profile" ON user_profiles
-  FOR UPDATE USING (auth.uid() = user_id);
 
 -- ai_coaching_history
 CREATE POLICY "Users read own coaching" ON ai_coaching_history
@@ -190,7 +189,7 @@ BEGIN
   ON CONFLICT (user_id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -210,3 +209,7 @@ DROP TRIGGER IF EXISTS update_profile_timestamp ON user_profiles;
 CREATE TRIGGER update_profile_timestamp
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;

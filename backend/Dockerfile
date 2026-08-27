@@ -9,12 +9,14 @@ RUN npx tsc
 FROM node:22-alpine
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
-COPY --from=builder /app/dist ./dist
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=builder --chown=node:node /app/dist ./dist
 
 ENV NODE_ENV=production
 ENV PORT=3001
 EXPOSE 3001
+
+USER node
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3001/api/health || exit 1
 

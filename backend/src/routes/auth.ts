@@ -113,7 +113,18 @@ const updatePasswordSchema = z.object({
 });
 
 const oauthSchema = z.object({
-  redirectTo: z.string().url().max(2000).optional(),
+  redirectTo: z
+    .string()
+    .url()
+    .max(2000)
+    .refine((value) => {
+      try {
+        return new URL(value).origin === new URL(getEnv().FRONTEND_URL).origin;
+      } catch {
+        return false;
+      }
+    }, "redirectTo must use the configured frontend origin")
+    .optional(),
 });
 
 const callbackSchema = z.object({

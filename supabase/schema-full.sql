@@ -205,6 +205,7 @@ ALTER TABLE drift_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE session_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_coaching_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_classification_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_invites ENABLE ROW LEVEL SECURITY;
@@ -239,7 +240,8 @@ CREATE POLICY "Users delete own history" ON session_history FOR DELETE USING (au
 
 -- V2 RLS policies
 CREATE POLICY "Users read own profile" ON user_profiles FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users update own profile" ON user_profiles FOR UPDATE USING (auth.uid() = user_id);
+-- Profile and billing mutations go through the authenticated backend. Direct
+-- client updates would let a user attempt to change protected plan fields.
 CREATE POLICY "Users read own coaching" ON ai_coaching_history FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Team members read team" ON teams FOR SELECT USING (id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()));
 CREATE POLICY "Owners manage team" ON teams FOR ALL USING (owner_id = auth.uid());
@@ -260,7 +262,7 @@ BEGIN
   ON CONFLICT (user_id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -279,3 +281,9 @@ DROP TRIGGER IF EXISTS update_profile_timestamp ON user_profiles;
 CREATE TRIGGER update_profile_timestamp
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+-- All product data is backend-only. The service_role used by the API retains
+-- access; browser/desktop clients cannot bypass API authorization via PostgREST.
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;

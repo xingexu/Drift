@@ -63,6 +63,8 @@ async function verifyToken(
         algorithms: ["HS256"],
         // Validate audience -- Supabase sets this to "authenticated"
         audience: "authenticated",
+        // Prevent a valid token from another Supabase project being accepted.
+        issuer: `${env.SUPABASE_URL.replace(/\/$/, "")}/auth/v1`,
       }) as SupabaseJwtPayload;
 
       if (!payload.sub) {

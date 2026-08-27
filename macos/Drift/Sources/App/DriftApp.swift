@@ -7,7 +7,6 @@ struct DriftApp: App {
     @StateObject private var appState = AppState.shared
     @StateObject private var tracker = WindowTracker.shared
     @StateObject private var focusBlocker = FocusBlocker.shared
-    @StateObject private var networkMonitor = NetworkMonitor.shared
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -21,7 +20,6 @@ struct DriftApp: App {
                 .environmentObject(appState)
                 .environmentObject(tracker)
                 .environmentObject(focusBlocker)
-                .environmentObject(networkMonitor)
                 .frame(minWidth: 860, minHeight: 560)
                 .background(Color.driftBackground)
                 .font(TypeScale.bodyMd)
@@ -117,12 +115,7 @@ struct DriftApp: App {
     private func handleScenePhaseChange(_ phase: ScenePhase) {
         switch phase {
         case .active:
-            // Drain queued offline requests when the app returns to foreground
-            Task {
-                if networkMonitor.isConnected {
-                    await APIClient.shared.drainOfflineQueue()
-                }
-            }
+            break
         case .background:
             // Persist any unsaved session data when entering background
             appState.saveCurrentSession()

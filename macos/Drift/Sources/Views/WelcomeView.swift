@@ -494,7 +494,7 @@ struct WelcomeView: View {
             PrimaryButton("Start Locally", icon: "bolt.fill", isFullWidth: true, action: onGetStarted)
                 .accessibilityLabel("Start Drift locally")
 
-            Text("No account required  \u{2022}  Works offline  \u{2022}  Native macOS")
+            Text("Private by design  \u{2022}  Works offline  \u{2022}  Native macOS")
                 .font(TypeScale.caption)
                 .foregroundStyle(.tertiary)
         }

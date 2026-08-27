@@ -18,7 +18,7 @@ const envSchema = z.object({
     .default("development"),
   API_SECRET: z
     .string()
-    .min(16, "API_SECRET must be at least 16 characters"),
+    .min(32, "API_SECRET must be at least 32 characters"),
 
   // -- Supabase ---------------------------------------------------------------
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
@@ -37,8 +37,7 @@ const envSchema = z.object({
     .startsWith("sk_", "STRIPE_SECRET_KEY must start with sk_"),
   STRIPE_WEBHOOK_SECRET: z
     .string()
-    .startsWith("whsec_", "STRIPE_WEBHOOK_SECRET must start with whsec_")
-    .default("whsec_dev_placeholder"),
+    .startsWith("whsec_", "STRIPE_WEBHOOK_SECRET must start with whsec_"),
   STRIPE_PRICE_PRO_MONTHLY: z
     .string()
     .min(1, "STRIPE_PRICE_PRO_MONTHLY is required"),
@@ -76,6 +75,34 @@ const envSchema = z.object({
     .string()
     .optional()
     .describe("Comma-separated list of extra allowed CORS origins"),
+}).superRefine((env, ctx) => {
+  if (env.NODE_ENV !== "production") return;
+
+  const rejectPlaceholder = (key: keyof typeof env, value: string) => {
+    if (/placeholder|your-|_test_/i.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `${key} must not use a development or placeholder value in production`,
+      });
+    }
+  };
+
+  rejectPlaceholder("API_SECRET", env.API_SECRET);
+  rejectPlaceholder("SUPABASE_SERVICE_ROLE_KEY", env.SUPABASE_SERVICE_ROLE_KEY);
+  rejectPlaceholder("SUPABASE_ANON_KEY", env.SUPABASE_ANON_KEY);
+  rejectPlaceholder("STRIPE_SECRET_KEY", env.STRIPE_SECRET_KEY);
+  rejectPlaceholder("STRIPE_WEBHOOK_SECRET", env.STRIPE_WEBHOOK_SECRET);
+  rejectPlaceholder("ANTHROPIC_API_KEY", env.ANTHROPIC_API_KEY);
+  rejectPlaceholder("SMTP_PASS", env.SMTP_PASS);
+
+  if (!env.FRONTEND_URL.startsWith("https://")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["FRONTEND_URL"],
+      message: "FRONTEND_URL must use HTTPS in production",
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
