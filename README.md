@@ -4,23 +4,31 @@ Drift is a private, local-only focus tracker for macOS. It has no account system
 
 ## Try it locally
 
-Drift currently supports macOS 14 or newer on Apple silicon. Install Xcode Command Line Tools, then run:
+Drift currently supports macOS 14 or newer on Apple silicon.
+
+1. Install Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+2. Clone the public repository:
 
 ```bash
 git clone https://github.com/xingexu/Drift.git
 cd Drift/macos/Drift
+```
+
+3. Build and open Drift:
+
+```bash
 ./build-app.sh
 open /Applications/Drift.app
 ```
 
-If you already cloned the repository, run:
+If you already cloned the repository, start from its `macos/Drift` directory and run step 3.
 
-```bash
-cd macos/Drift
-./build-app.sh
-```
-
-The script builds the Swift package, creates the application bundle, and installs it at `/Applications/Drift.app`.
+The build script creates the application bundle and installs it at `/Applications/Drift.app`.
 
 ## Developer preview
 
