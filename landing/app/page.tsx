@@ -7,6 +7,7 @@ const SCENE_HEIGHT = 2048;
 const SOURCE_IMAGE = "/art/drift-original-scene-2x.png";
 const SCENE_DROP = 118;
 const GITHUB_REPOSITORY_URL = "https://github.com/xingexu/Drift";
+const TRY_IT_URL = `${GITHUB_REPOSITORY_URL}#try-it-locally`;
 const EMAIL_COMPOSE_URL =
   "https://mail.google.com/mail/?view=cm&fs=1&to=xingexu1107%40gmail.com";
 
@@ -421,13 +422,18 @@ function TryItLink() {
         <span />
       </span>
       <a
+        aria-label="Open Drift's local setup guide on GitHub"
         className="install-picker__trigger"
-        href={GITHUB_REPOSITORY_URL}
+        href={TRY_IT_URL}
         rel="noreferrer"
         target="_blank"
       >
-        <span>Try it</span>
+        <span>Try it now</span>
+        <svg aria-hidden="true" className="install-picker__arrow" focusable="false" viewBox="0 0 16 16">
+          <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        </svg>
       </a>
+      <p className="install-picker__helper">Follow the quick local setup on GitHub</p>
     </div>
   );
 }
