@@ -335,6 +335,7 @@ body {
   font-weight: 600;
   letter-spacing: -.025em;
   line-height: 1;
+  text-decoration: none;
   padding: 0 clamp(11px, .8vw, 14px);
   cursor: pointer;
   outline-offset: 6px;
@@ -408,120 +409,6 @@ body {
   transform: scale(.97);
 }
 
-.install-picker__chevron {
-  position: relative;
-  z-index: 1;
-  grid-column: 3;
-  width: 15px;
-  height: 15px;
-  justify-self: center;
-  transform: rotate(0deg);
-  transform-origin: center;
-  transition:
-    color 160ms ease,
-    transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.install-picker__trigger[data-open="true"] .install-picker__chevron {
-  transform: rotate(180deg);
-}
-
-.install-picker__menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 100%;
-  overflow: hidden;
-  color: rgba(255, 255, 255, .94);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .015)),
-    rgba(13, 8, 22, .86);
-  border: 1px solid rgba(255, 255, 255, .18);
-  border-radius: 15px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .1),
-    0 24px 64px rgba(4, 1, 18, .4),
-    0 4px 14px rgba(4, 1, 18, .28);
-  -webkit-backdrop-filter: blur(28px) saturate(145%);
-  backdrop-filter: blur(28px) saturate(145%);
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transform-origin: 50% 0;
-  transition:
-    opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
-    transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
-
-  @starting-style {
-    opacity: 0;
-    transform: translateY(-6px) scale(.97);
-  }
-}
-
-.install-picker__option {
-  min-height: 44px;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  color: inherit;
-  font-size: clamp(13px, .8vw, 14px);
-  font-weight: 560;
-  letter-spacing: -.02em;
-  text-decoration: none;
-  padding: 0 12px;
-  outline: none;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.install-picker__option > span:last-child {
-  color: transparent;
-  background: linear-gradient(
-    105deg,
-    rgba(255, 255, 255, .94) 0%,
-    rgba(255, 255, 255, .94) 38%,
-    #ffe7aa 48%,
-    #ffffff 53%,
-    rgba(255, 255, 255, .94) 64%,
-    rgba(255, 255, 255, .94) 100%
-  );
-  background-position: 120% 50%;
-  background-size: 260% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: interface-letter-shimmer 760ms cubic-bezier(.16, 1, .3, 1) both;
-}
-
-.install-picker__option:focus-visible {
-  background: rgba(255, 255, 255, .105);
-  box-shadow: inset 0 0 0 2px rgba(99, 181, 255, .68);
-}
-
-.install-picker__option:active {
-  transform: scale(.985);
-}
-
-.install-picker__icon {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, .88);
-}
-
-.platform-mark {
-  display: block;
-  width: 15px;
-  height: 15px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .3));
-}
-
-.platform-mark--apple {
-  width: 14px;
-  height: 17px;
-}
 
 @keyframes scene-title-enter {
   from {
@@ -655,10 +542,6 @@ body {
     transform: translateY(0) scale(.97);
   }
 
-  .install-picker__option:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, .085);
-  }
 }
 
 .scene-footer {
@@ -813,16 +696,6 @@ body {
     padding-inline: 10px;
   }
 
-  .install-picker__menu {
-    border-radius: 15px;
-  }
-
-  .install-picker__option {
-    min-height: 46px;
-    font-size: 14px;
-    padding-inline: 12px;
-  }
-
   .scene-footer {
     min-height: 64px;
     font-size: 8px;
@@ -908,9 +781,6 @@ body {
     background: rgba(171, 130, 121, .94);
   }
 
-  .install-picker__menu {
-    background: rgba(13, 8, 22, .96);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -918,7 +788,6 @@ body {
   .scene-title__label > span,
   .install-picker,
   .install-picker__trigger > span,
-  .install-picker__option > span:last-child,
   .scene-footer__copy,
   .install-picker__load-sparkles > span {
     animation: none;
@@ -933,16 +802,12 @@ body {
   }
 
   .install-picker__trigger,
-  .install-picker__chevron,
-  .install-picker__menu,
-  .install-picker__option,
   .scene-footer__icon {
     transition-duration: 0ms;
   }
 
   .install-picker__trigger:hover,
-  .install-picker__trigger:active,
-  .install-picker__option:active {
+  .install-picker__trigger:active {
     transform: none;
   }
 }
