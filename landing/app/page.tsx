@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef } from "react";
 
 const SCENE_WIDTH = 3072;
 const SCENE_HEIGHT = 2048;
 const SOURCE_IMAGE = "/art/drift-original-scene-2x.png";
 const SCENE_DROP = 118;
-const RELEASES_URL = "https://github.com/xingexu/Drift/releases";
-const MACOS_DOWNLOAD_URL = `${RELEASES_URL}/download/v1.0.0-dev.1/Drift-macOS-dev.zip`;
+const GITHUB_REPOSITORY_URL = "https://github.com/xingexu/Drift";
 const EMAIL_COMPOSE_URL =
   "https://mail.google.com/mail/?view=cm&fs=1&to=xingexu1107%40gmail.com";
 
@@ -404,97 +403,9 @@ function BrandLogo({ mark }: { mark: BrandMark }) {
   );
 }
 
-function AppleLogo() {
+function TryItLink() {
   return (
-    <svg
-      aria-hidden="true"
-      className="platform-mark platform-mark--apple"
-      focusable="false"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function InstallPicker() {
-  const [isOpen, setIsOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!pickerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-
-    window.addEventListener("pointerdown", closeOnOutsidePress);
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      window.removeEventListener("pointerdown", closeOnOutsidePress);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [isOpen]);
-
-  const focusOption = (index: number) => {
-    requestAnimationFrame(() => {
-      const options = Array.from(
-        menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
-      );
-      options.at(index)?.focus();
-    });
-  };
-
-  const openAndFocusFirstOption = () => {
-    setIsOpen(true);
-    focusOption(0);
-  };
-
-  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      return;
-    }
-
-    event.preventDefault();
-    const options = Array.from(
-      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
-    );
-    const activeIndex = options.indexOf(document.activeElement as HTMLElement);
-
-    if (event.key === "Home") {
-      options[0]?.focus();
-      return;
-    }
-
-    if (event.key === "End") {
-      options.at(-1)?.focus();
-      return;
-    }
-
-    const direction = event.key === "ArrowDown" ? 1 : -1;
-    const nextIndex = (activeIndex + direction + options.length) % options.length;
-    options[nextIndex]?.focus();
-  };
-
-  return (
-    <div className="install-picker" ref={pickerRef}>
+    <div className="install-picker">
       <span className="install-picker__load-sparkles" aria-hidden="true">
         <span />
         <span />
@@ -509,52 +420,14 @@ function InstallPicker() {
         <span />
         <span />
       </span>
-      <button
-        aria-controls={isOpen ? "install-platform-menu" : undefined}
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
+      <a
         className="install-picker__trigger"
-        data-open={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            openAndFocusFirstOption();
-          }
-        }}
-        ref={triggerRef}
-        type="button"
+        href={GITHUB_REPOSITORY_URL}
+        rel="noreferrer"
+        target="_blank"
       >
-        <span>Install command</span>
-        <svg aria-hidden="true" className="install-picker__chevron" focusable="false" viewBox="0 0 16 16">
-          <path d="m3.5 6 4.5 4 4.5-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-        </svg>
-      </button>
-
-      {isOpen ? (
-        <div
-          aria-label="Choose your platform"
-          className="install-picker__menu"
-          id="install-platform-menu"
-          onKeyDown={handleMenuKeyDown}
-          ref={menuRef}
-          role="menu"
-        >
-          <a
-            className="install-picker__option"
-            href={MACOS_DOWNLOAD_URL}
-            onClick={() => setIsOpen(false)}
-            rel="noreferrer"
-            role="menuitem"
-            target="_blank"
-          >
-            <span className="install-picker__icon install-picker__icon--apple">
-              <AppleLogo />
-            </span>
-            <span>Download for macOS</span>
-          </a>
-        </div>
-      ) : null}
+        <span>Try it</span>
+      </a>
     </div>
   );
 }
@@ -652,7 +525,7 @@ export default function Home() {
       <main className="scene" aria-labelledby="drift-title">
         <canvas ref={canvasRef} className="scene-canvas" aria-hidden="true" />
 
-        <section className="scene-ui" aria-label="Drift downloads">
+        <section className="scene-ui" aria-label="Try Drift">
           <h1 aria-label="DRIFT" className="scene-title" id="drift-title">
             <span className="scene-title__label">
               <span>D</span>
@@ -671,7 +544,7 @@ export default function Home() {
             </span>
           </h1>
 
-          <InstallPicker />
+          <TryItLink />
         </section>
       </main>
 
@@ -681,7 +554,7 @@ export default function Home() {
           <a
             aria-label="GitHub"
             className="scene-footer__icon scene-footer__icon--github"
-            href="https://github.com/xingexu"
+            href={GITHUB_REPOSITORY_URL}
             rel="noreferrer"
             target="_blank"
           >
