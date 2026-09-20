@@ -107,8 +107,9 @@ body {
   overflow: visible;
   transform: skewX(-10deg);
   filter:
-    drop-shadow(0 0 2px rgba(255, 246, 241, .65))
-    drop-shadow(0 0 14px rgba(255, 179, 201, .28));
+    drop-shadow(0 0 2px rgba(255, 255, 255, .85))
+    drop-shadow(0 0 14px rgba(255, 255, 255, .55))
+    drop-shadow(0 0 32px rgba(255, 255, 255, .28));
 }
 
 .pixel-wordmark__type {
@@ -117,21 +118,9 @@ body {
   font-weight: 700;
 }
 
-.pixel-wordmark__pixels > rect {
-  opacity: .3;
-  animation: wordmark-pixel-light 5s steps(3, end) infinite;
-}
-
 .pixel-wordmark__sweep {
   opacity: 0;
   animation: wordmark-pixel-sweep 7s cubic-bezier(.4, 0, .2, 1) infinite;
-}
-
-@keyframes wordmark-pixel-light {
-  0%, 100% { opacity: .16; }
-  35% { opacity: .36; }
-  50%, 60% { opacity: .8; }
-  80% { opacity: .26; }
 }
 
 @keyframes wordmark-pixel-sweep {
@@ -144,6 +133,46 @@ body {
 .sky-stars {
   position: absolute;
   inset: 0;
+}
+
+.sky-meteors {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  shape-rendering: crispEdges;
+  /* Match the background's cover crop so meteors pass behind the mountains. */
+  mask-image: url("/art/drift-sky-mask.svg");
+  mask-size: cover;
+  mask-position: center;
+  mask-repeat: no-repeat;
+}
+
+.sky-meteor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  filter: drop-shadow(0 0 5px rgba(255, 245, 220, .55));
+  animation: pixel-meteor-flight linear both;
+}
+
+.sky-meteor__sprite {
+  position: absolute;
+  top: -180px;
+  left: -180px;
+  width: 200px;
+  height: 200px;
+  overflow: visible;
+  shape-rendering: crispEdges;
+}
+
+@keyframes pixel-meteor-flight {
+  from { transform: translate(var(--meteor-start-x), var(--meteor-start-y)); }
+  to { transform: translate(var(--meteor-end-x), var(--meteor-end-y)); }
 }
 
 .sky-star {
@@ -862,12 +891,16 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sky-meteors {
+    display: none;
+  }
+
   .scene-background--video {
     display: none;
   }
 
   .scene-title,
-  .pixel-wordmark__pixels > rect,
+  .sky-meteor,
   .pixel-wordmark__sweep,
   .sky-star,
   .sky-star::before,

@@ -2,6 +2,7 @@ import Image from "next/image";
 import SceneVideo from "./scene-video";
 import PixelWordmark from "./pixel-wordmark";
 import SkyStars from "./sky-stars";
+import ShootingStars from "./shooting-stars";
 
 const GITHUB_REPOSITORY_URL = "https://github.com/xingexu/Drift";
 const TRY_IT_URL = `${GITHUB_REPOSITORY_URL}#try-it-locally`;
@@ -129,6 +130,8 @@ export default function Home() {
           <SkyStars />
           <div className="scene-sun-glow" />
         </div>
+
+        <ShootingStars />
 
         <section className="scene-ui" aria-label="Try Drift">
           <h1 aria-label="DRIFT" className="scene-title" id="drift-title">
