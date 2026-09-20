@@ -20,7 +20,7 @@
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^4.6.0",
-    "nodemailer": "^9.0.6",
+    "nodemailer": "^9.1.1",
     "rate-limiter-flexible": "^5.0.4",
     "stripe": "^17.4.0",
     "zod": "^3.23.8"
