@@ -649,37 +649,71 @@ class FocusBlocker: ObservableObject {
             .replacingOccurrences(of: "\"", with: "&quot;")
 
         let html = """
-        <!DOCTYPE html><html><head><meta charset="utf-8"><title>Blocked - Drift Focus Mode</title><style>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Stay focused — Drift</title>
+        <style>
+        :root{color-scheme:dark;--canvas:#111016;--cocoa:#241a16;--raised:#30231d;--cream:#fff3df;--muted:#b8a99d;--sand:#e8c7a7;--green:#52a96b;--red:#e66c5c;--line:rgba(255,243,223,.16)}
         *{margin:0;padding:0;box-sizing:border-box}
-        body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a12;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;color:#fff;overflow:hidden}
-        .bg{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 20%,rgba(99,102,241,.12) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(139,92,246,.1) 0%,transparent 50%)}
-        .orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.18;animation:drift 12s ease-in-out infinite}
-        .o1{width:500px;height:500px;background:linear-gradient(135deg,#6366f1,#8b5cf6);top:-150px;left:-100px}
-        .o2{width:350px;height:350px;background:linear-gradient(135deg,#8b5cf6,#a78bfa);bottom:-100px;right:-80px;animation-delay:6s}
-        .o3{width:200px;height:200px;background:#6366f1;top:50%;left:50%;animation-delay:3s}
-        @keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,30px) scale(.95)}}
-        .card{position:relative;z-index:1;text-align:center;padding:60px 48px;max-width:480px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:24px;backdrop-filter:blur(20px);box-shadow:0 25px 50px rgba(0,0,0,.4)}
-        .shield{width:72px;height:72px;margin:0 auto 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(99,102,241,.35);animation:pulse 2.5s ease-in-out infinite}
-        @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 40px rgba(99,102,241,.35)}50%{transform:scale(1.06);box-shadow:0 0 60px rgba(99,102,241,.5)}}
-        .shield svg{width:36px;height:36px;fill:white}
-        h1{font-size:36px;font-weight:800;letter-spacing:6px;margin-bottom:6px;background:linear-gradient(135deg,#a5b4fc,#c4b5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .site-name{font-size:15px;color:rgba(255,255,255,.35);letter-spacing:1px;margin-bottom:28px;font-weight:500}
-        .msg{font-size:15px;color:rgba(255,255,255,.55);line-height:1.7;margin-bottom:36px}
-        .msg strong{color:rgba(255,255,255,.8)}
-        .btn{display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .3s;letter-spacing:.5px}
-        .btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(99,102,241,.4)}
-        .glow-line{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:60%;height:1px;background:linear-gradient(90deg,transparent,#6366f1,transparent)}
-        </style></head><body>
-        <div class="bg"></div><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
-        <div class="card">
-        <div class="shield"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 16l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg></div>
-        <h1>BLOCKED</h1>
-        <p class="site-name">\(escapedSite)</p>
-        <p class="msg"><strong>You're in Focus Mode.</strong><br>This site is blocked to help you stay on track.<br>Get back to what matters.</p>
-        <a class="btn" href="about:blank">&larr; Return to Safety</a>
-        <div class="glow-line"></div>
+        body{min-height:100vh;display:grid;place-items:center;padding:32px;background:var(--canvas);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;color:var(--cream);overflow:hidden}
+        .sky{position:fixed;inset:0;background:linear-gradient(180deg,#070719 0%,#17102c 50%,#48213a 76%,#a74831 100%)}
+        .stars{position:absolute;inset:0;opacity:.72;background-image:radial-gradient(circle at 7% 16%,#ffe38f 0 1px,transparent 2px),radial-gradient(circle at 18% 31%,#fff3df 0 1px,transparent 2px),radial-gradient(circle at 31% 11%,#ffe38f 0 2px,transparent 3px),radial-gradient(circle at 46% 25%,#fff3df 0 1px,transparent 2px),radial-gradient(circle at 61% 13%,#ffe38f 0 1px,transparent 2px),radial-gradient(circle at 72% 34%,#fff3df 0 2px,transparent 3px),radial-gradient(circle at 86% 18%,#ffe38f 0 1px,transparent 2px),radial-gradient(circle at 94% 41%,#fff3df 0 1px,transparent 2px)}
+        .mesa{position:absolute;right:-5%;bottom:-5%;left:-5%;height:31%;background:#54243a;clip-path:polygon(0 65%,10% 38%,18% 58%,29% 29%,42% 66%,55% 44%,70% 62%,82% 26%,92% 52%,100% 34%,100% 100%,0 100%)}
+        .mesa::after{position:absolute;inset:34% 0 0;background:#8e382f;clip-path:polygon(0 57%,14% 34%,25% 62%,39% 42%,55% 70%,69% 36%,84% 61%,100% 28%,100% 100%,0 100%);content:""}
+        .brand{position:fixed;top:28px;left:32px;z-index:2;display:flex;align-items:center;gap:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:800;letter-spacing:.14em;color:var(--cream)}
+        .brand-mark{width:31px;height:31px;display:grid;place-items:center;background:var(--sand);border:1px solid rgba(255,243,223,.58);color:var(--cocoa);box-shadow:4px 4px 0 rgba(7,4,13,.42);font-size:14px;letter-spacing:0}
+        .focus-state{position:fixed;top:30px;right:32px;z-index:2;display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(82,169,107,.34);background:rgba(17,16,22,.64);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--cream)}
+        .focus-state::before{width:7px;height:7px;background:var(--green);box-shadow:0 0 0 3px rgba(82,169,107,.12);content:""}
+        .panel{position:relative;z-index:1;width:min(570px,100%);padding:46px;background:rgba(36,26,22,.94);border:1px solid var(--line);border-radius:18px;box-shadow:9px 9px 0 rgba(7,4,13,.42),0 28px 80px rgba(4,2,10,.32);animation:panel-in 180ms cubic-bezier(.23,1,.32,1) both}
+        .header{display:flex;align-items:flex-start;gap:20px}
+        .shield{width:68px;height:68px;flex:0 0 auto;display:grid;place-items:center;background:rgba(232,199,167,.11);border:1px solid rgba(232,199,167,.28);box-shadow:5px 5px 0 rgba(7,4,13,.36)}
+        .shield svg{width:34px;height:34px;fill:var(--sand)}
+        .eyebrow{margin-bottom:9px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:800;letter-spacing:.13em;color:var(--red)}
+        h1{font-size:34px;line-height:1.1;letter-spacing:-.035em;color:var(--cream)}
+        .message{margin:24px 0 26px;color:var(--muted);font-size:15px;line-height:1.65}
+        .message strong{color:var(--cream);font-weight:650}
+        .site{display:flex;align-items:center;gap:13px;padding:15px 17px;background:rgba(17,16,22,.62);border:1px solid var(--line);border-radius:12px}
+        .site-icon{width:30px;height:30px;display:grid;place-items:center;background:rgba(230,108,92,.10);color:var(--red);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:900}
+        .site-copy{min-width:0;flex:1}
+        .site-label{margin-bottom:3px;font-size:10px;font-weight:750;letter-spacing:.1em;color:var(--muted)}
+        .site-name{overflow:hidden;color:var(--cream);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+        .session{display:flex;align-items:center;gap:9px;margin:16px 0 28px;color:var(--muted);font-size:12px}
+        .session-dot{width:6px;height:6px;background:var(--green)}
+        .actions{display:flex;align-items:center;gap:18px}
+        .button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 24px;background:var(--sand);border:1px solid rgba(255,243,223,.62);border-radius:999px;color:var(--cocoa);font-size:14px;font-weight:750;text-decoration:none;box-shadow:0 8px 24px rgba(7,4,13,.24);transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease,box-shadow 140ms cubic-bezier(.23,1,.32,1)}
+        .button:hover{background:#f1d8bd;transform:translateY(-1px);box-shadow:0 11px 28px rgba(7,4,13,.30)}
+        .button:active{transform:scale(.97)}
+        .privacy{color:var(--muted);font-size:11px;line-height:1.45}
+        @keyframes panel-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @media(max-width:640px){body{padding:20px}.brand{top:20px;left:20px}.focus-state{top:22px;right:20px}.panel{padding:32px 26px}.header{gap:16px}.shield{width:58px;height:58px}h1{font-size:28px}.actions{align-items:flex-start;flex-direction:column;gap:13px}}
+        @media(prefers-reduced-motion:reduce){.panel{animation:none}.button{transition-duration:0ms}}
+        </style>
+        </head>
+        <body>
+        <div class="sky" aria-hidden="true"><div class="stars"></div><div class="mesa"></div></div>
+        <div class="brand"><span class="brand-mark">D</span><span>DRIFT</span></div>
+        <div class="focus-state">FOCUS ACTIVE</div>
+        <main class="panel">
+        <div class="header">
+        <div class="shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v5.3c0 5.1 3.4 9.8 8 11.2 4.6-1.4 8-6.1 8-11.2V5.5L12 2Zm-1.1 14.3-3.5-3.5 1.3-1.3 2.2 2.2 4.7-4.7 1.3 1.3-6 6Z"/></svg></div>
+        <div><p class="eyebrow">DISTRACTION INTERCEPTED</p><h1>Stay in the zone.</h1></div>
         </div>
-        </body></html>
+        <p class="message"><strong>Drift blocked this page while Focus is active.</strong><br>Your session is still moving. Return to the work you chose.</p>
+        <div class="site">
+        <span class="site-icon" aria-hidden="true">×</span>
+        <div class="site-copy"><p class="site-label">BLOCKED WEBSITE</p><p class="site-name">\(escapedSite)</p></div>
+        </div>
+        <div class="session"><span class="session-dot" aria-hidden="true"></span><span>Focus protection is running on this Mac</span></div>
+        <div class="actions">
+        <a class="button" href="about:blank">Return to focus&nbsp; →</a>
+        <p class="privacy">Private by design.<br>Nothing was uploaded.</p>
+        </div>
+        </main>
+        </body>
+        </html>
         """
 
         guard let data = html.data(using: .utf8) else { return nil }

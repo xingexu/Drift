@@ -18,9 +18,6 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            DriftAmbientBackground(accent: Color.accent, reduceMotion: false)
-                .ignoresSafeArea()
-
             VStack(spacing: 0) {
                 // Top progress area
                 VStack(spacing: Space.md) {
