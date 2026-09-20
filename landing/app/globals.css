@@ -101,31 +101,44 @@ body {
 }
 
 .pixel-wordmark {
-  display: flex;
-  font-family: "Silkscreen", monospace;
+  display: block;
+  width: 4em;
+  height: auto;
+  overflow: visible;
   transform: skewX(-10deg);
   filter:
-    drop-shadow(0 0 1px rgba(255, 255, 255, .95))
-    drop-shadow(0 0 8px rgba(255, 255, 255, .6))
-    drop-shadow(0 0 22px rgba(215, 235, 255, .35));
+    drop-shadow(0 0 2px rgba(255, 246, 241, .65))
+    drop-shadow(0 0 14px rgba(255, 179, 201, .28));
 }
 
-.pixel-wordmark__letter {
-  position: relative;
-  display: block;
-  color: #122b4d;
-  -webkit-text-stroke: 1.5px #edf7ff;
-  paint-order: stroke fill;
+.pixel-wordmark__type {
+  font-family: "Silkscreen", monospace;
+  font-size: 128px;
+  font-weight: 700;
 }
 
-.pixel-wordmark__letter::after {
-  position: absolute;
-  inset: 0;
-  content: attr(data-letter);
-  color: #a7cbed;
+.pixel-wordmark__pixels > rect {
+  opacity: .3;
+  animation: wordmark-pixel-light 5s steps(3, end) infinite;
+}
+
+.pixel-wordmark__sweep {
   opacity: 0;
-  animation: title-letter-glint 6s ease-in-out infinite;
-  animation-delay: inherit;
+  animation: wordmark-pixel-sweep 7s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+
+@keyframes wordmark-pixel-light {
+  0%, 100% { opacity: .16; }
+  35% { opacity: .36; }
+  50%, 60% { opacity: .8; }
+  80% { opacity: .26; }
+}
+
+@keyframes wordmark-pixel-sweep {
+  0%, 12% { transform: translateX(-70px); opacity: 0; }
+  18% { opacity: .65; }
+  40% { opacity: .65; }
+  48%, 100% { transform: translateX(540px); opacity: 0; }
 }
 
 .sky-stars {
@@ -529,16 +542,6 @@ body {
   }
 }
 
-@keyframes title-letter-glint {
-  0%, 30%, 100% {
-    opacity: 0;
-  }
-
-  10%, 15% {
-    opacity: .4;
-  }
-}
-
 @keyframes interface-letter-shimmer {
   from {
     background-position: 120% 50%;
@@ -864,7 +867,8 @@ body {
   }
 
   .scene-title,
-  .pixel-wordmark__letter::after,
+  .pixel-wordmark__pixels > rect,
+  .pixel-wordmark__sweep,
   .sky-star,
   .sky-star::before,
   .sky-star::after,
