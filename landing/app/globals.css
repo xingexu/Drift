@@ -1,4 +1,20 @@
 @font-face {
+  font-family: "Silkscreen";
+  src: url("/fonts/Silkscreen-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Silkscreen";
+  src: url("/fonts/Silkscreen-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Press Start 2P";
   src: url("/fonts/PressStart2P.ttf") format("truetype");
   font-weight: 400;
@@ -26,7 +42,7 @@ html {
 
 body {
   min-height: 100vh;
-  font-family: "Press Start 2P", monospace;
+  font-family: "Silkscreen", monospace;
   -webkit-font-smoothing: none;
   text-rendering: geometricPrecision;
 }
@@ -34,18 +50,20 @@ body {
 .scene {
   position: relative;
   width: 100vw;
-  height: var(--scene-height, 100dvh);
-  min-height: 100vh;
+  height: 100svh;
+  min-height: 480px;
   overflow: hidden;
   background: #0b0720;
 }
 
-.scene-canvas {
+.scene-background {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  object-position: center;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   user-select: none;
@@ -62,67 +80,135 @@ body {
   pointer-events: none;
 }
 
+.scene-background--video {
+  pointer-events: none;
+}
+
+.scene-background--video[hidden] {
+  display: none;
+}
+
 .scene-title {
   position: relative;
   display: inline-block;
   color: #fff0a5;
-  font-size: clamp(56px, 6.5vw, 142px);
-  font-weight: 400;
+  font-size: clamp(80px, 10vw, 176px);
+  font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
   text-align: center;
   animation: scene-title-enter 560ms cubic-bezier(.16, 1, .3, 1) 60ms both;
 }
 
-.scene-title__label {
+.pixel-wordmark {
   display: flex;
-  color: transparent;
-  text-shadow:
-    0 .09em 0 #b56c35,
-    0 .17em 0 #8f4d30,
-    0 .25em 0 #4b2544;
+  font-family: "Silkscreen", monospace;
+  transform: skewX(-10deg);
+  filter:
+    drop-shadow(0 0 1px rgba(255, 255, 255, .95))
+    drop-shadow(0 0 8px rgba(255, 255, 255, .6))
+    drop-shadow(0 0 22px rgba(215, 235, 255, .35));
 }
 
-.scene-title__label > span {
-  display: inline-block;
-  color: transparent;
-  background: linear-gradient(
-    105deg,
-    #fff0a5 0%,
-    #fff0a5 38%,
-    #fffdf0 46%,
-    #ffd66b 51%,
-    #fffdf0 56%,
-    #fff0a5 64%,
-    #fff0a5 100%
-  );
-  background-position: 120% 50%;
-  background-size: 260% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: title-letter-shimmer 820ms cubic-bezier(.4, 0, .2, 1) 120ms both;
+.pixel-wordmark__letter {
+  position: relative;
+  display: block;
+  color: #122b4d;
+  -webkit-text-stroke: 1.5px #edf7ff;
+  paint-order: stroke fill;
 }
 
-.scene-title__label > span:nth-child(2) {
-  animation-delay: 190ms;
+.pixel-wordmark__letter::after {
+  position: absolute;
+  inset: 0;
+  content: attr(data-letter);
+  color: #a7cbed;
+  opacity: 0;
+  animation: title-letter-glint 6s ease-in-out infinite;
+  animation-delay: inherit;
 }
 
-.scene-title__label > span:nth-child(3) {
-  animation-delay: 260ms;
+.sky-stars {
+  position: absolute;
+  inset: 0;
 }
 
-.scene-title__label > span:nth-child(4) {
-  animation-delay: 330ms;
+.sky-star {
+  position: absolute;
+  background: #f8f3ff;
+  opacity: .42;
+  animation: sky-star-shimmer ease-in-out infinite;
 }
 
-.scene-title__label > span:nth-child(5) {
-  animation-delay: 400ms;
+.sky-star:nth-child(3n) { background: #ffe5ad; }
+.sky-star:nth-child(5n) { background: #c5c5fa; }
+
+.sky-star--sparkle::before,
+.sky-star--sparkle::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 2px;
+  content: "";
+  background: #ffffff;
+  box-shadow: 0 0 5px rgba(255, 255, 255, .8);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: sky-star-glint ease-in-out infinite;
+  animation-duration: inherit;
+  animation-delay: inherit;
+}
+
+.sky-star--sparkle::after { width: 2px; height: 9px; }
+
+@keyframes sky-star-shimmer {
+  0%, 74%, 94%, 100% { opacity: .42; }
+  84% { opacity: 1; }
+  88% { opacity: .6; }
+}
+
+@keyframes sky-star-glint {
+  0%, 78%, 92%, 100% { opacity: 0; }
+  84% { opacity: 1; }
+}
+
+.scene-lighting {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100vw, 177.777778svh, 853.333333px);
+  height: max(56.25vw, 100svh, 480px);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.scene-sun-glow {
+  position: absolute;
+  left: 91.2%;
+  top: 15.45%;
+  width: 19%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle,
+    rgba(255, 249, 206, .48) 0%,
+    rgba(255, 224, 122, .38) 16%,
+    rgba(255, 194, 72, .22) 25%,
+    rgba(243, 159, 69, .1) 43%,
+    transparent 70%);
+  mix-blend-mode: screen;
+  animation: sun-glow 5s ease-in-out infinite alternate;
+}
+
+@keyframes sun-glow {
+  from { opacity: .7; }
+  to { opacity: 1; }
 }
 
 .scene-title__sparkles {
   position: absolute;
   inset: -18% -8%;
-  color: #fff0a5;
+  color: #ffffff;
   pointer-events: none;
 }
 
@@ -130,12 +216,12 @@ body {
   position: absolute;
   width: 3px;
   height: 15px;
-  border-radius: 999px;
+  border-radius: 0;
   background: currentColor;
   opacity: 0;
-  filter: drop-shadow(0 0 8px rgba(255, 224, 126, .92));
-  transform: scale(.35) rotate(-12deg);
-  animation: title-star-burst 940ms cubic-bezier(.16, 1, .3, 1) 180ms both;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, .92));
+  transform: scale(1);
+  animation: title-pixel-sparkle 4s steps(1, end) 180ms infinite;
 }
 
 .scene-title__sparkles > span::after {
@@ -190,7 +276,7 @@ body {
   width: clamp(196px, 15.25vw, 232px);
   margin-top: clamp(30px, 3.8vh, 44px);
   pointer-events: auto;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   animation: install-picker-enter 580ms cubic-bezier(.16, 1, .3, 1) 130ms both;
 }
@@ -419,20 +505,6 @@ body {
   transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.install-picker__helper {
-  width: min(310px, calc(100vw - 40px));
-  margin: 10px 0 0 50%;
-  color: rgba(255, 241, 218, .88);
-  font-size: clamp(10.5px, .66vw, 12px);
-  font-weight: 600;
-  letter-spacing: .01em;
-  line-height: 1.4;
-  text-align: center;
-  text-shadow: 0 2px 8px rgba(7, 2, 20, .72);
-  transform: translateX(-50%);
-}
-
-
 @keyframes scene-title-enter {
   from {
     opacity: 0;
@@ -457,21 +529,13 @@ body {
   }
 }
 
-@keyframes title-letter-shimmer {
-  from {
-    background-position: 120% 50%;
-    filter: brightness(1);
+@keyframes title-letter-glint {
+  0%, 30%, 100% {
+    opacity: 0;
   }
 
-  48% {
-    filter:
-      brightness(1.42)
-      drop-shadow(0 0 7px rgba(255, 227, 132, .64));
-  }
-
-  to {
-    background-position: -28% 50%;
-    filter: brightness(1);
+  10%, 15% {
+    opacity: .4;
   }
 }
 
@@ -485,26 +549,10 @@ body {
   }
 }
 
-@keyframes title-star-burst {
-  0% {
-    opacity: 0;
-    transform: scale(.35) rotate(-12deg);
-  }
-
-  38% {
-    opacity: 1;
-    transform: scale(1.08) rotate(4deg);
-  }
-
-  62% {
-    opacity: .82;
-    transform: scale(.88) rotate(11deg);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(.42) rotate(22deg);
-  }
+@keyframes title-pixel-sparkle {
+  0%, 26%, 100% { opacity: 0; }
+  8%, 20% { opacity: .6; }
+  12% { opacity: 1; }
 }
 
 @keyframes install-picker-load-sparkle {
@@ -709,7 +757,7 @@ body {
   }
 
   .scene-title {
-    font-size: clamp(48px, 14vw, 82px);
+    font-size: clamp(64px, 18vw, 112px);
   }
 
   .install-picker {
@@ -811,8 +859,16 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .scene-background--video {
+    display: none;
+  }
+
   .scene-title,
-  .scene-title__label > span,
+  .pixel-wordmark__letter::after,
+  .sky-star,
+  .sky-star::before,
+  .sky-star::after,
+  .scene-sun-glow,
   .install-picker,
   .install-picker__trigger > span,
   .scene-footer__copy,
