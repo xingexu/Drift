@@ -448,7 +448,7 @@ body {
   color: rgba(255, 255, 255, .96);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .025) 48%, rgba(255, 255, 255, .08)),
-    transparent;
+    rgba(255, 255, 255, .2);
   border: 1px solid rgba(255, 255, 255, .38);
   border-radius: 999px;
   box-shadow:
@@ -631,7 +631,7 @@ body {
 
 @media (hover: hover) and (pointer: fine) {
   .install-picker__trigger:hover {
-    background-color: rgba(255, 255, 255, .06);
+    background-color: rgba(255, 255, 255, .28);
     border-color: rgba(255, 255, 255, .58);
     transform: translateY(-1px);
     box-shadow:
