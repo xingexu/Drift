@@ -447,19 +447,22 @@ body {
   align-items: center;
   color: rgba(255, 255, 255, .96);
   background:
-    radial-gradient(ellipse at 50% 115%, rgba(255, 255, 255, .3), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, .04) 48%, rgba(16, 9, 35, .16) 76%, rgba(255, 255, 255, .12)),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, .38), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .025) 65%, rgba(255, 255, 255, .12)),
     rgba(255, 255, 255, .22);
   border: 1px solid rgba(255, 255, 255, .58);
   border-radius: 999px;
   --glass-depth:
-    inset 0 2px 1px rgba(255, 255, 255, .85),
-    inset 2px 0 3px rgba(255, 255, 255, .28),
-    inset -2px 0 3px rgba(255, 255, 255, .22),
-    inset 0 -2px 1px rgba(255, 255, 255, .4),
-    inset 0 -6px 10px rgba(16, 9, 35, .22),
-    0 3px 0 rgba(14, 7, 30, .3);
-  box-shadow: var(--glass-depth), 0 12px 28px rgba(4, 1, 18, .32);
+    inset 0 1px 2px rgba(255, 255, 255, .8),
+    inset 1px 0 4px rgba(255, 255, 255, .2),
+    inset -1px 0 4px rgba(255, 255, 255, .2),
+    inset 0 -1px 3px rgba(255, 255, 255, .35),
+    inset 0 -5px 12px rgba(16, 9, 35, .12);
+  --glass-glow:
+    0 0 12px rgba(239, 226, 255, .3),
+    0 0 30px rgba(212, 183, 255, .24),
+    0 0 54px rgba(185, 152, 255, .12);
+  box-shadow: var(--glass-depth), var(--glass-glow), 0 10px 24px rgba(4, 1, 18, .2);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   backdrop-filter: blur(12px) saturate(160%);
   font: inherit;
@@ -476,18 +479,6 @@ body {
     border-color 180ms cubic-bezier(0.23, 1, 0.32, 1),
     transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
     box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.install-picker__trigger::before {
-  position: absolute;
-  inset: 2px 8px auto;
-  z-index: 0;
-  height: 44%;
-  border-radius: 999px 999px 50% 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .03));
-  border-top: 1px solid rgba(255, 255, 255, .65);
-  pointer-events: none;
-  content: "";
 }
 
 .install-picker__trigger::after {
@@ -532,6 +523,7 @@ body {
   border-color: rgba(255, 255, 255, .72);
   box-shadow:
     var(--glass-depth),
+    var(--glass-glow),
     0 18px 48px rgba(4, 1, 18, .3),
     0 0 0 2px rgba(98, 180, 255, .78);
   outline: 2px solid rgba(231, 246, 255, .96);
@@ -641,6 +633,7 @@ body {
     transform: translateY(-1px);
     box-shadow:
       var(--glass-depth),
+      var(--glass-glow),
       0 22px 54px rgba(4, 1, 18, .32),
       0 2px 10px rgba(4, 1, 18, .2);
   }
