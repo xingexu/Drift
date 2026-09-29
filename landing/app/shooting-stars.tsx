@@ -28,25 +28,30 @@ export default function ShootingStars() {
     const launchBurst = () => {
       if (disposed || reducedMotion.matches || document.hidden) return;
       const { width, height } = layer.getBoundingClientRect();
-      const count = 1 + Math.floor(Math.random() * 3);
-      const stagger = 380 + Math.random() * 420;
+      const count = 3;
+      const stagger = 1100;
+      const slope = Math.tan(Math.PI / 6);
+      const padding = 180;
+      // Parallel, evenly spaced lanes cover the sky from top-right to bottom-left.
+      const firstLane = -width * slope * .75;
+      const lastLane = height * .38;
       const burst = Array.from({ length: count }, (_, index) => {
-        const fromTop = Math.random() < .3;
-        // The head starts outside the viewport; the whole tail exits before removal.
-        const startX = fromTop ? width * Math.random() * .25 : -180;
-        const startY = fromTop ? -180 : height * (.02 + Math.random() * .38);
-        const endX = width + 220;
-        const endY = height * (.72 + Math.random() * .28) + 100;
+        const intercept = firstLane + (lastLane - firstLane) * index / (count - 1);
+        // Enter from the top or left, keeping the head and tail offscreen initially.
+        const startX = Math.max(-padding, (-padding - intercept) / slope);
+        const startY = slope * startX + intercept;
+        const endX = Math.min(width + 220, (height + 220 - intercept) / slope);
+        const endY = slope * endX + intercept;
         const distance = Math.hypot(endX - startX, endY - startY);
         return {
           id: nextId++, startX, startY, endX, endY,
-          duration: Math.max(3200, distance / (310 + Math.random() * 120) * 1000),
+          duration: distance / 380 * 1000,
           delay: index * stagger,
         };
       });
       setMeteors((current) => [...current, ...burst]);
       const finish = Math.max(...burst.map((meteor) => meteor.duration + meteor.delay));
-      timer = setTimeout(launchBurst, finish + 1800 + Math.random() * 4200);
+      timer = setTimeout(launchBurst, finish + 2800);
     };
 
     const syncActivity = () => {
@@ -54,7 +59,7 @@ export default function ShootingStars() {
       if (reducedMotion.matches || document.hidden) {
         setMeteors([]);
       } else {
-        timer = setTimeout(launchBurst, 900 + Math.random() * 1100);
+        timer = setTimeout(launchBurst, 1200);
       }
     };
 
