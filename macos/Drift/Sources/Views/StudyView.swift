@@ -7,7 +7,7 @@ import Combine
 
 struct StudyView: View {
     @EnvironmentObject private var appState: AppState
-    @StateObject private var viewModel = StudyViewModel()
+    @ObservedObject var viewModel: StudyViewModel
     @StateObject private var blocker = FocusBlocker.shared
 
     @State private var showMiniPlayer = false
@@ -92,24 +92,10 @@ struct StudyView: View {
             return .handled
         }
         .sheet(isPresented: $showBlockingList) {
-            ZStack {
-                Color.driftCanvas.ignoresSafeArea()
-                FocusBlockerSection(blocker: blocker)
-                    .frame(maxWidth: 620)
-                    .padding(28)
-            }
-            .frame(width: 680, height: 620)
-            .preferredColorScheme(.dark)
+            BlockingSettingsSheet(blocker: blocker)
         }
         .sheet(isPresented: $showBlockingDetails) {
-            ZStack {
-                Color.driftCanvas.ignoresSafeArea()
-                FocusBlockerSection(blocker: blocker)
-                    .frame(maxWidth: 620)
-                    .padding(28)
-            }
-            .frame(width: 680, height: 620)
-            .preferredColorScheme(.dark)
+            BlockingSettingsSheet(blocker: blocker)
         }
     }
 
@@ -174,7 +160,7 @@ struct StudyView: View {
                                 }
 
                                 SettingsRow(
-                                    title: "Block \(blocker.blockedSites.count) distracting sites",
+                                    title: "Block \(blocker.enabledSiteCount) distracting sites",
                                     explanation: "Keep the sites in your blocking list quiet."
                                 ) {
                                     Toggle("Block distracting sites", isOn: $viewModel.blockDistractingSites)
@@ -288,7 +274,7 @@ struct StudyView: View {
 
                             SecondaryPillButton(
                                 title: blocker.isBlocking
-                                    ? "Blocking \(blocker.blockedSites.count) sites"
+                                    ? "Blocking \(blocker.enabledSiteCount) sites"
                                     : "Blocking off",
                                 icon: blocker.isBlocking ? "shield.fill" : "shield.slash"
                             ) {
@@ -778,6 +764,7 @@ private struct TaskInputField: View {
 
 @MainActor
 final class StudyViewModel: ObservableObject {
+    static let shared = StudyViewModel()
     enum StudyMode: Equatable { case idle, focus, rest }
 
     @Published var mode: StudyMode = .idle
@@ -803,6 +790,7 @@ final class StudyViewModel: ObservableObject {
     private var phaseEndDate: Date?
     private var phaseTotalSeconds: Int = 0
     private var lastAnnouncedMinute: Int = -1
+    private var ownsBlockingSession = false
     private var startingEventCount = 0
     private var startingBlockedAttempts = 0
 
@@ -861,7 +849,7 @@ final class StudyViewModel: ObservableObject {
     }
 
     func onAppear() {}
-    func onDisappear() { stopTimer() }
+    func onDisappear() {} // The parent owns the session; switching tabs must not stop it.
 
     func startFocus() {
         mode = .focus
@@ -874,7 +862,6 @@ final class StudyViewModel: ObservableObject {
         timeRemaining = phaseTotalSeconds
         phaseEndDate = Date().addingTimeInterval(TimeInterval(phaseTotalSeconds))
         startingEventCount = AppState.shared.session.events.count
-        startingBlockedAttempts = FocusBlocker.shared.blockedAttempts
         if !WindowTracker.shared.isTracking && AXIsProcessTrusted() {
             WindowTracker.shared.start()
         }
@@ -882,7 +869,9 @@ final class StudyViewModel: ObservableObject {
         let blocker = FocusBlocker.shared
         if blockDistractingSites && !blocker.isBlocking {
             blocker.startBlocking(durationMinutes: focusDuration, password: nil)
+            ownsBlockingSession = true
         }
+        startingBlockedAttempts = blocker.blockedAttempts
         startTimer()
     }
 
@@ -899,9 +888,11 @@ final class StudyViewModel: ObservableObject {
         phaseEndDate = nil
         isPaused = false
         showResult = true
-        if FocusBlocker.shared.isBlocking {
+        if ownsBlockingSession {
             _ = FocusBlocker.shared.stopBlocking(password: nil)
+            ownsBlockingSession = false
         }
+        AppState.shared.focusModeActive = FocusBlocker.shared.isBlocking
         sendNotification(title: "Focus session complete", body: "\(resultFocusedSeconds / 60) focused minutes")
     }
 
@@ -911,7 +902,7 @@ final class StudyViewModel: ObservableObject {
         phaseEndDate = nil
         showResult = false
         isPaused = false
-        AppState.shared.focusModeActive = false
+        AppState.shared.focusModeActive = FocusBlocker.shared.isBlocking
     }
 
     func startAnother() {
@@ -936,7 +927,7 @@ final class StudyViewModel: ObservableObject {
         stopTimer()
         if mode == .focus {
             sessionCount += 1
-            totalFocusTime += (focusDuration * 60 - timeRemaining)
+            captureFocusResult()
             startBreak()
         } else {
             startFocus()
@@ -949,6 +940,7 @@ final class StudyViewModel: ObservableObject {
 
     private func startBreak() {
         mode = .rest
+        isPaused = false
         phaseTotalSeconds = breakDuration * 60
         timeRemaining = phaseTotalSeconds
         phaseEndDate = Date().addingTimeInterval(TimeInterval(phaseTotalSeconds))
@@ -980,7 +972,7 @@ final class StudyViewModel: ObservableObject {
         if mode == .focus {
             sessionCount += 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-                guard let self else { return }
+                guard let self, self.mode == .focus, !self.showResult, self.timeRemaining == 0 else { return }
                 self.captureFocusResult()
                 if self.includeBreak {
                     self.startBreak()
@@ -991,7 +983,8 @@ final class StudyViewModel: ObservableObject {
         } else {
             sendNotification(title: "Break over!", body: "Time to focus again.")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-                self?.finishSession()
+                guard let self, self.mode == .rest, !self.showResult, self.timeRemaining == 0 else { return }
+                self.finishSession()
             }
         }
     }
@@ -1002,8 +995,9 @@ final class StudyViewModel: ObservableObject {
         resultSwitches = max(AppState.shared.session.events.count - startingEventCount - 1, 0)
         resultBlockedAttempts = max(FocusBlocker.shared.blockedAttempts - startingBlockedAttempts, 0)
         totalFocusTime += resultFocusedSeconds
-        if FocusBlocker.shared.isBlocking {
+        if ownsBlockingSession {
             _ = FocusBlocker.shared.stopBlocking(password: nil)
+            ownsBlockingSession = false
         }
     }
 
@@ -1035,6 +1029,7 @@ final class StudyViewModel: ObservableObject {
     }
 
     private func sendNotification(title: String, body: String) {
+        guard AppState.shared.notificationsEnabled else { return }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
@@ -1182,6 +1177,34 @@ private struct BlockedBanner: View {
     }
 }
 
+// A persistent header keeps dismissal available even with a long site list.
+private struct BlockingSettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var blocker: FocusBlocker
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Blocked websites").font(TypeScale.heading)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityLabel("Close blocked websites")
+            }
+            .padding(24)
+            .background(DriftGlassSurface(role: .functional, cornerRadius: 0))
+            ScrollView {
+                FocusBlockerSection(blocker: blocker)
+                    .padding(24)
+            }
+        }
+        .frame(width: 680, height: 620)
+        .background(.regularMaterial)
+        .preferredColorScheme(.dark)
+    }
+}
+
 // MARK: - Focus Blocker Section
 
 private struct FocusBlockerSection: View {
@@ -1199,6 +1222,13 @@ private struct FocusBlockerSection: View {
     var body: some View {
         VStack(spacing: Space.lg) {
             blockerHeader
+
+            if let warning = blocker.blockingWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(Color.distraction)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if blocker.isBlocking {
                 activeBlockingContent
@@ -1253,7 +1283,7 @@ private struct FocusBlockerSection: View {
                     .font(TypeScale.h2)
                     .foregroundStyle(Color.driftText)
                 Text(blocker.isBlocking
-                     ? "Protecting \(blocker.blockedSites.count) domains"
+                     ? "Protecting \(blocker.enabledSiteCount) domains"
                      : "Block distracting sites")
                     .font(TypeScale.caption)
                     .foregroundStyle(.secondary)
@@ -1754,6 +1784,7 @@ private struct BlockedSitesList: View {
     @Binding var newSite: String
     @State private var showList = false
     @State private var localNewSite: String = ""
+    @State private var addSiteError: String?
 
     var body: some View {
         VStack(spacing: Space.md) {
@@ -1820,6 +1851,12 @@ private struct BlockedSitesList: View {
                             )
                     )
 
+                    if let addSiteError {
+                        Text(addSiteError)
+                            .font(TypeScale.caption)
+                            .foregroundStyle(Color.distraction)
+                    }
+
                     LazyVGrid(columns: [
                         GridItem(.flexible(), spacing: Space.sm),
                         GridItem(.flexible(), spacing: Space.sm),
@@ -1863,7 +1900,12 @@ private struct BlockedSitesList: View {
     private func addSite() {
         let site = localNewSite.trimmingCharacters(in: .whitespaces)
         guard !site.isEmpty else { return }
-        withAnimation(Anim.quick) { blocker.addSite(site); localNewSite = "" }
+        if blocker.addSite(site) {
+            localNewSite = ""
+            addSiteError = nil
+        } else {
+            addSiteError = "Enter a valid, new domain. The list supports up to 200 sites."
+        }
     }
 }
 
@@ -1890,7 +1932,7 @@ struct BlockedSiteChip: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(removeHovered ? Color.distraction : Color.secondary.opacity(0.5))
-                    .frame(width: 16, height: 16)
+                    .frame(width: 28, height: 28)
                     .background(
                         Rectangle().fill(
                             removeHovered
@@ -1906,12 +1948,7 @@ struct BlockedSiteChip: View {
         .padding(.horizontal, Space.md)
         .padding(.vertical, Space.sm)
         .background(
-            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                .fill(isHovered ? Color.primary.opacity(0.05) : Color.primary.opacity(0.02))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                        .strokeBorder(Color.sep.opacity(isHovered ? 0.15 : 0.08), lineWidth: 0.5)
-                )
+            DriftGlassSurface(role: .functional, cornerRadius: Radius.sm, isHovered: isHovered)
         )
         .onHover { h in withAnimation(Anim.quick) { isHovered = h } }
         .accessibilityElement(children: .combine)

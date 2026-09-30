@@ -9,7 +9,7 @@ import CryptoKit
 ///
 /// During an active session the blocker monitors the frontmost browser
 /// window every second. When a blocked domain is detected the tab is
-/// redirected to a local "blocked" page and Drift is brought to front.
+/// redirected to a local "blocked" page without stealing keyboard focus.
 ///
 /// Sessions survive app restarts via `UserDefaults`. The optional focus-lock
 /// verifier is kept in the macOS Keychain rather than the preferences plist.
@@ -31,6 +31,7 @@ class FocusBlocker: ObservableObject {
     @Published private(set) var endTime: Date?
     @Published private(set) var blockedAttempts: Int = 0
     @Published private(set) var lastBlockedSite: String?
+    @Published private(set) var blockingWarning: String?
     @Published var blockedSites: [String] = []
     @Published private(set) var disabledSites: Set<String> = []
 
@@ -61,6 +62,7 @@ class FocusBlocker: ObservableObject {
 
     // MARK: - Internal State
 
+    private var lastInterception: (site: String, date: Date)?
     private var passwordHash: String?
     private var monitorTimer: Timer?
     private var totalSessionDuration: TimeInterval = 0
@@ -85,6 +87,8 @@ class FocusBlocker: ObservableObject {
         "safari", "chrome", "brave", "firefox", "edge",
         "arc", "opera", "vivaldi", "chromium", "orion",
     ]
+
+    var enabledSiteCount: Int { blockedSites.filter(isSiteEnabled).count }
 
     // MARK: - Computed Properties
 
@@ -152,13 +156,15 @@ class FocusBlocker: ObservableObject {
     /// size are silently ignored.
     ///
     /// - Parameter site: A URL or bare domain string.
-    func addSite(_ site: String) {
+    @discardableResult
+    func addSite(_ site: String) -> Bool {
         let cleaned = sanitiseDomain(site)
         guard !cleaned.isEmpty,
               !blockedSites.contains(cleaned),
-              blockedSites.count < Self.maximumBlockedSites else { return }
+              blockedSites.count < Self.maximumBlockedSites else { return false }
         blockedSites.append(cleaned)
         saveBlockedSites()
+        return true
     }
 
     /// Removes a domain from the block list.
@@ -295,6 +301,8 @@ class FocusBlocker: ObservableObject {
         totalSessionDuration = duration
         blockedAttempts = 0
         lastBlockedSite = nil
+        lastInterception = nil
+        blockingWarning = nil
 
         if let pw = password, !pw.isEmpty {
             passwordHash = hashPassword(pw)
@@ -318,7 +326,7 @@ class FocusBlocker: ObservableObject {
 
         sendNotification(
             title: "Focus Mode Activated",
-            body: "Blocking \(blockedSites.count) sites for \(clampedMinutes) minutes. Stay focused!"
+            body: "Blocking \(enabledSiteCount) sites for \(clampedMinutes) minutes. Stay focused!"
         )
     }
 
@@ -354,6 +362,8 @@ class FocusBlocker: ObservableObject {
         endTime = nil
         passwordHash = nil
         lastBlockedSite = nil
+        lastInterception = nil
+        blockingWarning = nil
         totalSessionDuration = 0
         clearSession()
 
@@ -372,8 +382,8 @@ class FocusBlocker: ObservableObject {
         monitorTimer?.invalidate()
         monitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.checkActiveWindow()
                 self?.checkExpiration()
+                self?.checkActiveWindow()
             }
         }
         // Fire during UI interactions (scrolling, dragging, resizing).
@@ -405,47 +415,57 @@ class FocusBlocker: ObservableObject {
         }
 
         let title = tracker.activeTitle.lowercased()
-        let app = tracker.activeApp
+        guard let frontmost = NSWorkspace.shared.frontmostApplication,
+              frontmost.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
+        let app = frontmost.localizedName ?? tracker.activeApp
 
         // Only check browser windows.
         let isBrowser = Self.browserNames.contains { app.lowercased().contains($0) }
         guard isBrowser else { return }
 
         // Try to get the actual URL from the browser tab.
-        let detectedURL = getActiveTabURL(browser: app)?.lowercased() ?? ""
+        let detectedURL = getActiveTabURL(browser: app) ?? ""
 
         for site in blockedSites where isSiteEnabled(site) {
             let domain = site.lowercased()
             let siteName = domain.components(separatedBy: ".").first ?? domain
 
             // 1. Match against actual URL (most reliable).
-            if !detectedURL.isEmpty, detectedURL.contains(domain) {
-                triggerBlock(site: site, browser: app)
+            if BlockedDomainMatcher.matches(url: detectedURL, domain: domain) {
+                triggerBlock(site: site, browser: app, expectedURL: detectedURL)
                 return
             }
 
+            // A known safe URL overrides an old or misleading window title.
+            guard detectedURL.isEmpty else { continue }
+
             // 2. Match against window title.
             if title.contains(domain) {
-                triggerBlock(site: site, browser: app)
+                triggerBlock(site: site, browser: app, expectedURL: detectedURL)
                 return
             }
 
             // 3. Match site name in title (skip very short names to reduce false positives).
             guard siteName.count >= 4 else { continue }
             if title.contains(siteName) {
-                triggerBlock(site: site, browser: app)
+                triggerBlock(site: site, browser: app, expectedURL: detectedURL)
                 return
             }
         }
     }
 
-    private func triggerBlock(site: String, browser: String) {
+    private func triggerBlock(site: String, browser: String, expectedURL: String) {
+        if let last = lastInterception, last.site == site,
+           Date().timeIntervalSince(last.date) < 5 { return }
+        lastInterception = (site, Date())
+        guard redirectBlockedTab(browser: browser, site: site, expectedURL: expectedURL) else {
+            blockingWarning = "Drift could not redirect this tab. Use Safari or a supported Chromium browser and allow browser automation in System Settings."
+            return
+        }
+        blockingWarning = nil
         blockedAttempts += 1
         lastBlockedSite = site
         saveSession()
-
-        // Redirect the tab to a blocked page and bring Drift to front.
-        redirectBlockedTab(browser: browser, site: site)
 
         sendNotification(
             title: "Site Blocked",
@@ -484,17 +504,10 @@ class FocusBlocker: ObservableObject {
 
     // MARK: - Tab Redirection
 
-    /// Brings Drift to the foreground and redirects matching browser tabs to
-    /// a local "blocked" page.
-    private func redirectBlockedTab(browser: String, site: String) {
-        // ALWAYS bring Drift to front first as the guaranteed block.
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.canBecomeMain && !($0 is NSPanel) }) {
-            window.makeKeyAndOrderFront(nil)
-        }
-
-        guard let dataURL = Self.blockedPageDataURL(for: site) else { return }
-        let safeSite = Self.sanitiseForAppleScript(site)
+    /// Redirects only the observed active browser tab to a local blocked page.
+    private func redirectBlockedTab(browser: String, site: String, expectedURL: String) -> Bool {
+        guard let dataURL = Self.blockedPageDataURL(for: site) else { return false }
+        let safeSite = Self.sanitiseForAppleScript(expectedURL)
         let safeDataURL = Self.sanitiseForAppleScript(dataURL)
 
         let script: String?
@@ -512,13 +525,12 @@ class FocusBlocker: ObservableObject {
         case browser.contains("Arc"):
             script = Self.arcRedirectScript(site: safeSite, dataURL: safeDataURL)
         default:
-            // Firefox and others: cannot redirect tabs; Drift is already in front.
+            // Unsupported browsers show a warning in Drift without stealing focus.
             script = nil
         }
 
-        if let source = script {
-            _ = executeAppleScript(source)
-        }
+        guard let source = script else { return false }
+        return executeAppleScript(source) == "blocked"
     }
 
     // MARK: - AppleScript Templates
@@ -570,16 +582,12 @@ class FocusBlocker: ObservableObject {
     private static func safariRedirectScript(site: String, dataURL: String) -> String {
         """
         tell application "Safari"
-            set windowList to every window
-            repeat with w in windowList
-                set tabList to every tab of w
-                repeat with t in tabList
-                    set tabURL to URL of t
-                    if tabURL contains "\(site)" then
-                        set URL of t to "\(dataURL)"
-                    end if
-                end repeat
-            end repeat
+            if (count of windows) > 0 then
+                if URL of current tab of front window is "\(site)" then
+                    set URL of current tab of front window to "\(dataURL)"
+                    return "blocked"
+                end if
+            end if
         end tell
         """
     }
@@ -587,35 +595,18 @@ class FocusBlocker: ObservableObject {
     private static func chromiumRedirectScript(appName: String, site: String, dataURL: String) -> String {
         """
         tell application "\(appName)"
-            set windowList to every window
-            repeat with w in windowList
-                set tabList to every tab of w
-                repeat with t in tabList
-                    set tabURL to URL of t
-                    if tabURL contains "\(site)" then
-                        set URL of t to "\(dataURL)"
-                    end if
-                end repeat
-            end repeat
+            if (count of windows) > 0 then
+                if URL of active tab of front window is "\(site)" then
+                    set URL of active tab of front window to "\(dataURL)"
+                    return "blocked"
+                end if
+            end if
         end tell
         """
     }
 
     private static func arcRedirectScript(site: String, dataURL: String) -> String {
-        """
-        tell application "Arc"
-            set windowList to every window
-            repeat with w in windowList
-                set tabList to every tab of w
-                repeat with t in tabList
-                    set tabURL to URL of t
-                    if tabURL contains "\(site)" then
-                        set URL of t to "\(dataURL)"
-                    end if
-                end repeat
-            end repeat
-        end tell
-        """
+        chromiumRedirectScript(appName: "Arc", site: site, dataURL: dataURL)
     }
 
     // MARK: - AppleScript Execution
@@ -623,7 +614,7 @@ class FocusBlocker: ObservableObject {
     /// Executes an AppleScript source string and returns its string result.
     @discardableResult
     private func executeAppleScript(_ source: String) -> String? {
-        guard let script = NSAppleScript(source: source) else { return nil }
+        guard let script = NSAppleScript(source: "with timeout of 2 seconds\n" + source + "\nend timeout") else { return nil }
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         if error != nil {
@@ -641,7 +632,7 @@ class FocusBlocker: ObservableObject {
     ///
     /// The site name is HTML-entity-escaped before embedding to prevent
     /// inadvertent script injection via a maliciously crafted domain name.
-    private static func blockedPageDataURL(for site: String) -> String? {
+    static func blockedPageDataURL(for site: String) -> String? {
         let escapedSite = site
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
@@ -658,7 +649,7 @@ class FocusBlocker: ObservableObject {
         <style>
         :root{color-scheme:dark;--canvas:#111016;--cocoa:#241a16;--raised:#30231d;--cream:#fff3df;--muted:#b8a99d;--sand:#e8c7a7;--green:#52a96b;--red:#e66c5c;--line:rgba(255,243,223,.16)}
         *{margin:0;padding:0;box-sizing:border-box}
-        body{min-height:100vh;display:grid;place-items:center;padding:32px;background:var(--canvas);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;color:var(--cream);overflow:hidden}
+        body{min-height:100vh;display:grid;place-items:center;padding:96px 32px 32px;background:var(--canvas);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;color:var(--cream);overflow-x:hidden;overflow-y:auto}
         .sky{position:fixed;inset:0;background:linear-gradient(180deg,#070719 0%,#17102c 50%,#48213a 76%,#a74831 100%)}
         .stars{position:absolute;inset:0;opacity:.72;background-image:radial-gradient(circle at 7% 16%,#ffe38f 0 1px,transparent 2px),radial-gradient(circle at 18% 31%,#fff3df 0 1px,transparent 2px),radial-gradient(circle at 31% 11%,#ffe38f 0 2px,transparent 3px),radial-gradient(circle at 46% 25%,#fff3df 0 1px,transparent 2px),radial-gradient(circle at 61% 13%,#ffe38f 0 1px,transparent 2px),radial-gradient(circle at 72% 34%,#fff3df 0 2px,transparent 3px),radial-gradient(circle at 86% 18%,#ffe38f 0 1px,transparent 2px),radial-gradient(circle at 94% 41%,#fff3df 0 1px,transparent 2px)}
         .mesa{position:absolute;right:-5%;bottom:-5%;left:-5%;height:31%;background:#54243a;clip-path:polygon(0 65%,10% 38%,18% 58%,29% 29%,42% 66%,55% 44%,70% 62%,82% 26%,92% 52%,100% 34%,100% 100%,0 100%)}
@@ -667,7 +658,7 @@ class FocusBlocker: ObservableObject {
         .brand-mark{width:31px;height:31px;display:grid;place-items:center;background:var(--sand);border:1px solid rgba(255,243,223,.58);color:var(--cocoa);box-shadow:4px 4px 0 rgba(7,4,13,.42);font-size:14px;letter-spacing:0}
         .focus-state{position:fixed;top:30px;right:32px;z-index:2;display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(82,169,107,.34);background:rgba(17,16,22,.64);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--cream)}
         .focus-state::before{width:7px;height:7px;background:var(--green);box-shadow:0 0 0 3px rgba(82,169,107,.12);content:""}
-        .panel{position:relative;z-index:1;width:min(570px,100%);padding:46px;background:rgba(36,26,22,.94);border:1px solid var(--line);border-radius:18px;box-shadow:9px 9px 0 rgba(7,4,13,.42),0 28px 80px rgba(4,2,10,.32);animation:panel-in 180ms cubic-bezier(.23,1,.32,1) both}
+        .panel{position:relative;z-index:1;width:min(570px,100%);padding:46px;background:rgba(36,26,22,.5);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);border:1px solid var(--line);border-radius:18px;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 28px 80px rgba(4,2,10,.32);animation:panel-in 180ms cubic-bezier(.23,1,.32,1) both}
         .header{display:flex;align-items:flex-start;gap:20px}
         .shield{width:68px;height:68px;flex:0 0 auto;display:grid;place-items:center;background:rgba(232,199,167,.11);border:1px solid rgba(232,199,167,.28);box-shadow:5px 5px 0 rgba(7,4,13,.36)}
         .shield svg{width:34px;height:34px;fill:var(--sand)}
@@ -682,13 +673,13 @@ class FocusBlocker: ObservableObject {
         .site-name{overflow:hidden;color:var(--cream);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
         .session{display:flex;align-items:center;gap:9px;margin:16px 0 28px;color:var(--muted);font-size:12px}
         .session-dot{width:6px;height:6px;background:var(--green)}
-        .actions{display:flex;align-items:center;gap:18px}
+        .actions{display:flex;flex-wrap:wrap;align-items:center;gap:18px}.button:focus-visible{outline:2px solid white;outline-offset:4px}.escape-hint{margin-top:18px;font-size:12px;color:var(--muted)}
         .button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 24px;background:var(--sand);border:1px solid rgba(255,243,223,.62);border-radius:999px;color:var(--cocoa);font-size:14px;font-weight:750;text-decoration:none;box-shadow:0 8px 24px rgba(7,4,13,.24);transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease,box-shadow 140ms cubic-bezier(.23,1,.32,1)}
         .button:hover{background:#f1d8bd;transform:translateY(-1px);box-shadow:0 11px 28px rgba(7,4,13,.30)}
         .button:active{transform:scale(.97)}
         .privacy{color:var(--muted);font-size:11px;line-height:1.45}
         @keyframes panel-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @media(max-width:640px){body{padding:20px}.brand{top:20px;left:20px}.focus-state{top:22px;right:20px}.panel{padding:32px 26px}.header{gap:16px}.shield{width:58px;height:58px}h1{font-size:28px}.actions{align-items:flex-start;flex-direction:column;gap:13px}}
+        @media(max-width:640px){body{padding:90px 20px 24px}.brand{top:20px;left:20px}.focus-state{top:22px;right:20px}.panel{padding:32px 26px}.header{gap:16px}.shield{width:58px;height:58px}h1{font-size:28px}.actions{align-items:flex-start;flex-direction:column;gap:13px}}
         @media(prefers-reduced-motion:reduce){.panel{animation:none}.button{transition-duration:0ms}}
         </style>
         </head>
@@ -708,9 +699,10 @@ class FocusBlocker: ObservableObject {
         </div>
         <div class="session"><span class="session-dot" aria-hidden="true"></span><span>Focus protection is running on this Mac</span></div>
         <div class="actions">
-        <a class="button" href="about:blank">Return to focus&nbsp; →</a>
+        <a class="button" href="about:blank">Leave this page</a>
         <p class="privacy">Private by design.<br>Nothing was uploaded.</p>
         </div>
+        <p class="escape-hint">You can also type another address, switch tabs, or close this tab with ⌘W. Manage your session in Drift’s Focus tab.</p>
         </main>
         </body>
         </html>
@@ -733,6 +725,7 @@ class FocusBlocker: ObservableObject {
     /// Requests notification authorization (once) and delivers a local
     /// notification.
     private func sendNotification(title: String, body: String) {
+        guard AppState.shared.notificationsEnabled else { return }
         let center = UNUserNotificationCenter.current()
 
         // Only request authorization once per app session.

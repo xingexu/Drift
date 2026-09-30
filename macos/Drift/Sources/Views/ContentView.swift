@@ -67,6 +67,7 @@ struct MainAppView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var tracker: WindowTracker
     @StateObject private var blocker = FocusBlocker.shared
+    @StateObject private var studyModel = StudyViewModel.shared
     @State private var lastDetectedApp: String = ""
     @State private var windowSwitchSignal: String?
     @State private var statusBarFlash = false
@@ -193,7 +194,7 @@ struct MainAppView: View {
                     .transition(pageTransition)
             }
             if appState.currentTab == .focus {
-                StudyView()
+                StudyView(viewModel: studyModel)
                     .transition(pageTransition)
             }
             if appState.currentTab == .history {

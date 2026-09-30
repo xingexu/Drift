@@ -3,9 +3,11 @@ import AppKit
 import os.log
 import UserNotifications
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
 
     private let logger = Logger(subsystem: "net.drift.app", category: "AppDelegate")
+    private static var recoveredMainWindow: NSWindow?
     private var accessibilityPollTask: Task<Void, Never>?
 
     // MARK: - Launch Lifecycle
@@ -161,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     // UNUserNotificationCenterDelegate -- show banners even when app is foreground
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
@@ -169,16 +171,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler([.banner, .sound])
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let deepLink = userInfo["deepLink"] as? String, let url = URL(string: deepLink) {
-            handleDeepLink(url)
-        } else {
-            Self.openMainWindow()
+        let deepLink = (userInfo["deepLink"] as? String).flatMap(URL.init(string:))
+        Task { @MainActor [weak self] in
+            if let deepLink {
+                self?.handleDeepLink(deepLink)
+            } else {
+                Self.openMainWindow()
+            }
         }
         completionHandler()
     }
@@ -193,13 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func ensureWindowVisible() {
-        if let window = findMainWindow() {
-            window.collectionBehavior.insert(.fullScreenPrimary)
-            if !window.isVisible {
-                window.makeKeyAndOrderFront(nil)
-            }
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        Self.openMainWindow()
     }
 
     private func findMainWindow() -> NSWindow? {
@@ -271,6 +270,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         if let window = mainWindow {
             window.makeKeyAndOrderFront(nil)
+            return
         }
+
+        // SwiftUI may restore a menu-bar-only launch after the main window closed.
+        // Recreate the same content instead of leaving the app running invisibly.
+        let content = ContentView()
+            .environmentObject(AppState.shared)
+            .environmentObject(WindowTracker.shared)
+            .environmentObject(FocusBlocker.shared)
+            .frame(minWidth: 860, minHeight: 560)
+            .font(TypeScale.bodyMd)
+            .foregroundStyle(Color.driftText)
+            .tint(AppState.shared.accentColor)
+        let window = NSWindow(contentViewController: NSHostingController(rootView: content))
+        window.title = "Drift"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 960, height: 680))
+        window.center()
+        recoveredMainWindow = window
+        window.makeKeyAndOrderFront(nil)
     }
 }
