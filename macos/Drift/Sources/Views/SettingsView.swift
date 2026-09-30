@@ -765,10 +765,11 @@ struct SettingsToggleRow: View {
 
 private struct PixelToggle: View {
     @Binding var isOn: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
-            withAnimation(Anim.tap) { isOn.toggle() }
+            withAnimation(reduceMotion ? nil : Anim.tap) { isOn.toggle() }
         } label: {
             ZStack(alignment: isOn ? .trailing : .leading) {
                 Rectangle()

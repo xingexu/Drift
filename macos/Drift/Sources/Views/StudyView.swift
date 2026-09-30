@@ -1200,7 +1200,8 @@ private struct BlockingSettingsSheet: View {
             }
         }
         .frame(width: 680, height: 620)
-        .background(.regularMaterial)
+        .background { DriftGlassSurface(role: .content, cornerRadius: 20) }
+        .presentationBackground(.ultraThinMaterial)
         .preferredColorScheme(.dark)
     }
 }

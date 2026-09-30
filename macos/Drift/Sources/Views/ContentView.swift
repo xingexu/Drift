@@ -5,6 +5,7 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var currentScreen: AppState.AppScreen = .welcome
 
     var body: some View {
@@ -31,6 +32,8 @@ struct ContentView: View {
                 ))
             case .main:
                 MainAppView()
+                    // The artwork is dark in every theme; glass content needs light ink.
+                    .environment(\.colorScheme, .dark)
                     .ignoresSafeArea(.container, edges: .top)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .trailing)),
@@ -39,10 +42,16 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(colorScheme)
+        .environment(\.driftReduceMotion, systemReduceMotion || appState.reduceMotion)
         .font(TypeScale.bodyMd)
         .foregroundStyle(Color.driftText)
         .onAppear {
             currentScreen = appState.hasOnboarded ? .main : .welcome
+#if DEBUG
+            if ProcessInfo.processInfo.environment["DRIFT_SNAPSHOT_PATH"] != nil {
+                currentScreen = .main
+            }
+#endif
         }
     }
 

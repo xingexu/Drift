@@ -128,16 +128,16 @@ extension Color {
         dark: NSColor(red: 0.067, green: 0.063, blue: 0.086, alpha: 1)
     )
     static let driftPanel = driftAdaptiveColor(
-        light: NSColor(red: 0.996, green: 0.965, blue: 0.918, alpha: 0.94),
-        dark: NSColor(red: 0.141, green: 0.102, blue: 0.086, alpha: 0.94)
+        light: NSColor(red: 0.996, green: 0.965, blue: 0.918, alpha: 0.10),
+        dark: NSColor(red: 0.141, green: 0.102, blue: 0.086, alpha: 0.10)
     )
     static let driftPanelRaised = driftAdaptiveColor(
-        light: NSColor(red: 0.925, green: 0.855, blue: 0.773, alpha: 0.98),
-        dark: NSColor(red: 0.188, green: 0.137, blue: 0.114, alpha: 0.98)
+        light: NSColor(red: 0.925, green: 0.855, blue: 0.773, alpha: 0.14),
+        dark: NSColor(red: 0.188, green: 0.137, blue: 0.114, alpha: 0.14)
     )
     static let driftPanelInset = driftAdaptiveColor(
-        light: NSColor(red: 0.941, green: 0.878, blue: 0.808, alpha: 0.98),
-        dark: NSColor(red: 0.110, green: 0.078, blue: 0.067, alpha: 0.98)
+        light: NSColor(red: 0.941, green: 0.878, blue: 0.808, alpha: 0.14),
+        dark: NSColor(red: 0.110, green: 0.078, blue: 0.067, alpha: 0.14)
     )
     static let driftBorder = driftAdaptiveColor(
         light: NSColor(red: 0.141, green: 0.102, blue: 0.086, alpha: 0.18),
@@ -240,15 +240,15 @@ enum DriftShellLayer {
 
     var materialOpacity: Double {
         switch self {
-        case .sidebar: return 0.58
-        case .toolbar: return 0.48
+        case .sidebar: return 0.12
+        case .toolbar: return 0.08
         }
     }
 
     var tintOpacity: Double {
         switch self {
-        case .sidebar: return 0.76
-        case .toolbar: return 0.66
+        case .sidebar: return 0.20
+        case .toolbar: return 0.16
         }
     }
 }
@@ -406,17 +406,28 @@ enum TypeScale {
     static let sectionLabel = label
 }
 
+private struct DriftReduceMotionKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var driftReduceMotion: Bool {
+        get { self[DriftReduceMotionKey.self] }
+        set { self[DriftReduceMotionKey.self] = newValue }
+    }
+}
+
 // MARK: - Animation Tokens
 
 enum Anim {
     /// Button tap / toggle
-    static let tap    = Animation.easeOut(duration: 0.14)
+    static let tap    = Animation.spring(duration: 0.22, bounce: 0.12)
     /// Content appearing
     static let appear = Animation.easeOut(duration: 0.18)
     /// Quick opacity / color fade
     static let quick  = Animation.easeOut(duration: 0.14)
     /// Page / tab transition
-    static let page   = Animation.easeOut(duration: 0.20)
+    static let page   = Animation.timingCurve(0.22, 1, 0.36, 1, duration: 0.26)
     /// Numeric counter update
     static let count  = Animation.easeOut(duration: 0.16)
     /// Breathing pulse (repeatForever)
@@ -590,12 +601,15 @@ extension View {
 struct DriftButtonStyle: ButtonStyle {
     enum Variant { case primary, secondary, ghost, danger, destructive }
     let variant: Variant
+    @Environment(\.driftReduceMotion) private var appReduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var reduceMotion: Bool { appReduceMotion || systemReduceMotion }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.94 : 1.0)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : Anim.tap, value: configuration.isPressed)
     }
 }
 
@@ -606,7 +620,7 @@ struct DriftResponsivePressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.94 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : Anim.tap, value: configuration.isPressed)
     }
 }
 
@@ -648,11 +662,9 @@ struct PrimaryButton: View {
             .frame(height: 44)
             .frame(maxWidth: isFullWidth ? .infinity : nil)
             .background {
-                Capsule()
-                    .fill(color)
-                    .shadow(color: Color.black.opacity(0.22), radius: 8, y: 3)
+                DriftGlassSurface(role: .functional, cornerRadius: Radius.pill, tint: color, isHovered: isHovered, functionalDimming: 0.05)
             }
-            .foregroundStyle(Color.sandInk)
+            .foregroundStyle(Color.cream)
             .animation(Anim.hover, value: isHovered)
         }
         .buttonStyle(DriftButtonStyle(variant: .primary))
@@ -753,23 +765,23 @@ enum DriftSurfaceRole: Equatable {
 
     var fallbackMaterial: Material {
         switch self {
-        case .content, .contentDense: return .regularMaterial
-        case .functional: return .thinMaterial
+        case .content, .contentDense: return .ultraThinMaterial
+        case .functional: return .ultraThinMaterial
         }
     }
 
     var materialOpacity: Double {
         switch self {
-        case .content: return 0.66
-        case .contentDense: return 0.76
-        case .functional: return 0.58
+        case .content: return 0.10
+        case .contentDense: return 0.12
+        case .functional: return 0.14
         }
     }
 
     var tintOpacity: Double {
         switch self {
-        case .content: return 0.24
-        case .contentDense: return 0.34
+        case .content: return 0.12
+        case .contentDense: return 0.16
         case .functional: return 0.14
         }
     }
@@ -827,7 +839,9 @@ struct DriftGlassSurface: View {
     var functionalDimming: Double = 0.16
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.driftReduceMotion) private var appReduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var reduceMotion: Bool { appReduceMotion || systemReduceMotion }
     @Environment(\.colorSchemeContrast) private var contrast
 
     private var resolvedRole: DriftSurfaceRole { role ?? density.surfaceRole }
@@ -897,8 +911,8 @@ struct DriftGlassSurface: View {
                 shape
                     .fill(Color.clear)
                     .glassEffect(
-                        .regular
-                            .tint(resolvedTint.opacity(0.32 + hoverBoost))
+                        .clear
+                            .tint(resolvedTint.opacity(0.10 + hoverBoost))
                             .interactive(),
                         in: shape
                     )
@@ -929,7 +943,9 @@ private struct DriftSurfaceModifier: ViewModifier {
     var tint: Color?
     var functionalDimming: Double
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.driftReduceMotion) private var appReduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var reduceMotion: Bool { appReduceMotion || systemReduceMotion }
     @State private var isHovered = false
 
     func body(content: Content) -> some View {
@@ -1221,13 +1237,14 @@ struct SegmentedControl<Value: Hashable>: View {
                     Text(title(option))
                         .font(TypeScale.bodySm)
                         .fontWeight(selection == option ? .semibold : .regular)
-                        .foregroundStyle(selection == option ? Color.sandInk : Color.creamMuted)
+                        .foregroundStyle(selection == option ? Color.cream : Color.creamMuted)
                         .padding(.horizontal, 14)
                         .frame(height: 36)
                         .background {
                             if selection == option {
                                 Capsule()
-                                    .fill(Color.sand)
+                                    .fill(Color.white.opacity(0.16))
+                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
                                     .matchedGeometryEffect(id: "segmented-selection", in: selectionNamespace)
                             }
                         }
@@ -1237,7 +1254,7 @@ struct SegmentedControl<Value: Hashable>: View {
             }
         }
         .padding(4)
-        .driftFunctionalGlass(cornerRadius: Radius.pill, dimmingOpacity: 0.42)
+        .driftFunctionalGlass(cornerRadius: Radius.pill, dimmingOpacity: 0.10)
         .animation(
             reduceMotion ? nil : .spring(duration: 0.20, bounce: 0.08),
             value: selection
