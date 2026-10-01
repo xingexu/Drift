@@ -5,6 +5,7 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var currentScreen: AppState.AppScreen = .welcome
 
     var body: some View {
@@ -15,8 +16,8 @@ struct ContentView: View {
                     onGetStarted: { navigateTo(.onboarding) }
                 )
                 .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .leading)),
-                    removal: .opacity.combined(with: .move(edge: .leading))
+                    insertion: .drift(x: -24),
+                    removal: .drift(x: -24)
                 ))
             case .onboarding:
                 OnboardingView(
@@ -26,23 +27,31 @@ struct ContentView: View {
                     }
                 )
                 .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .trailing)),
-                    removal: .opacity.combined(with: .move(edge: .leading))
+                    insertion: .drift(x: 24),
+                    removal: .drift(x: -24)
                 ))
             case .main:
                 MainAppView()
+                    // The artwork is dark in every theme; glass content needs light ink.
+                    .environment(\.colorScheme, .dark)
                     .ignoresSafeArea(.container, edges: .top)
                     .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity.combined(with: .move(edge: .trailing))
+                        insertion: .drift(x: 24),
+                        removal: .drift(x: 24)
                     ))
             }
         }
         .preferredColorScheme(colorScheme)
+        .environment(\.driftReduceMotion, systemReduceMotion || appState.reduceMotion)
         .font(TypeScale.bodyMd)
         .foregroundStyle(Color.driftText)
         .onAppear {
             currentScreen = appState.hasOnboarded ? .main : .welcome
+#if DEBUG
+            if ProcessInfo.processInfo.environment["DRIFT_SNAPSHOT_PATH"] != nil {
+                currentScreen = .main
+            }
+#endif
         }
     }
 
@@ -67,6 +76,7 @@ struct MainAppView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var tracker: WindowTracker
     @StateObject private var blocker = FocusBlocker.shared
+    @StateObject private var studyModel = StudyViewModel.shared
     @State private var lastDetectedApp: String = ""
     @State private var windowSwitchSignal: String?
     @State private var statusBarFlash = false
@@ -107,7 +117,7 @@ struct MainAppView: View {
 
                 if showStatusBar && !isImmersiveFocus {
                     globalFocusStatusBar
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(.drift(y: 8))
                 }
             }
         }
@@ -193,7 +203,7 @@ struct MainAppView: View {
                     .transition(pageTransition)
             }
             if appState.currentTab == .focus {
-                StudyView()
+                StudyView(viewModel: studyModel)
                     .transition(pageTransition)
             }
             if appState.currentTab == .history {
@@ -254,7 +264,7 @@ struct MainAppView: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                .transition(.drift(y: 0, scale: 0.96))
             }
 
             if blocker.isBlocking && blocker.blockedAttempts > 0 {
@@ -374,7 +384,7 @@ private struct SidebarView: View {
             }
         }
         .onAppear {
-            withAnimation(appState.reduceMotion ? nil : .easeOut(duration: 0.20)) {
+            withAnimation(appState.reduceMotion ? nil : Anim.appear) {
                 brandAppeared = true
             }
         }
@@ -511,7 +521,7 @@ struct SidebarNavItem: View {
         .onHover { isHovered = $0 }
         .animation(Anim.quick, value: isHovered)
         .animation(
-            appState.reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.08),
+            appState.reduceMotion ? nil : Anim.glass,
             value: isSelected
         )
         .accessibilityLabel("\(label), tab")

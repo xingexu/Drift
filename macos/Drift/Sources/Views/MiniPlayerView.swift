@@ -37,7 +37,7 @@ struct MiniPlayerView: View {
                         )
                         .frame(width: ringSize, height: ringSize)
                         .rotationEffect(.degrees(-90))
-                        .animation(.linear(duration: 0.8), value: viewModel.progress)
+                        .animation(Anim.tick, value: viewModel.progress)
 
                     // Centred time value
                     Text(formattedTime)
@@ -94,7 +94,7 @@ struct MiniPlayerView: View {
                         height: 2
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .animation(.linear(duration: 0.8), value: viewModel.progress)
+                    .animation(Anim.tick, value: viewModel.progress)
                     .clipShape(
                         RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                     )

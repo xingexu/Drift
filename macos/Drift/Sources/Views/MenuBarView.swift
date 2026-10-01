@@ -57,7 +57,7 @@ struct MenuBarView: View {
                     .accessibilityLabel("Current app: \(tracker.activeApp.isEmpty ? "None" : tracker.activeApp)")
                 }
                 .padding(.bottom, Space.md)
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .transition(.drift(y: 0, scale: 0.96))
 
                 // Mini stats row
                 HStack(spacing: 0) {
@@ -131,7 +131,7 @@ struct MenuBarView: View {
                             }
                         }
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.drift(y: -8))
                     .accessibilityLabel(confirmReset ? "Confirm reset session" : "Reset tracking session")
                     .accessibilityHint(confirmReset ? "Discards the current session" : "")
                 }

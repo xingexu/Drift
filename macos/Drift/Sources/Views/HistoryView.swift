@@ -271,7 +271,7 @@ struct HistoryView: View {
             .chartXSelection(value: $chartSelection)
             .frame(height: 220)
             .animation(
-                appState.reduceMotion ? nil : .easeOut(duration: 0.26),
+                appState.reduceMotion ? nil : Anim.move,
                 value: range
             )
         }

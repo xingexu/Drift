@@ -316,7 +316,7 @@ struct WelcomeView: View {
                 ForEach(Array(zip(demoApps, [1, 2, 3])), id: \.1) { item, phase in
                     if demoPhase >= phase {
                         demoAppRow(name: item.name, duration: item.duration, isDistraction: item.isDistraction)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .transition(.drift(x: -12))
                     }
                 }
             }

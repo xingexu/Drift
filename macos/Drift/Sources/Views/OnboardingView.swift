@@ -142,13 +142,13 @@ struct OnboardingView: View {
         switch navigationDirection {
         case .forward:
             return .asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal: .move(edge: .leading).combined(with: .opacity)
+                insertion: .drift(x: 32),
+                removal: .drift(x: -32)
             )
         case .backward:
             return .asymmetric(
-                insertion: .move(edge: .leading).combined(with: .opacity),
-                removal: .move(edge: .trailing).combined(with: .opacity)
+                insertion: .drift(x: -32),
+                removal: .drift(x: 32)
             )
         }
     }
@@ -289,7 +289,7 @@ private struct OnboardingWelcomeStep: View {
                     .overlay(Rectangle().strokeBorder(Color.accent, lineWidth: 2))
                     .shadow(color: Color.driftShadow, radius: 0, x: 7, y: 7)
             }
-            .scaleEffect(appeared ? 1 : 0.85)
+            .scaleEffect(appeared ? 1 : 0.94)
             .opacity(appeared ? 1 : 0)
             .animation(Anim.appear, value: appeared)
             .accessibilityLabel("Drift app icon")
@@ -398,7 +398,7 @@ private struct OnboardingPermissionsStep: View {
                             .foregroundStyle(Color.productive)
                     }
                     .padding(.vertical, Space.sm)
-                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    .transition(.drift(y: 0, scale: 0.95))
                     .accessibilityLabel("Accessibility access has been granted")
                 } else {
                     OnboardingActionButton(
@@ -627,7 +627,7 @@ private struct OnboardingTrackingStep: View {
                             : Color.clear
                     )
                     .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.drift(y: -8))
                 }
             }
             .padding(.vertical, Space.sm)
@@ -682,7 +682,7 @@ private struct OnboardingFocusModeStep: View {
                 }
                 .frame(maxWidth: 400)
                 .onAppear {
-                    withAnimation(.easeInOut(duration: 2.0)) {
+                    withAnimation(.timingCurve(0.65, 0, 0.35, 1, duration: 1.6)) {
                         focusTimerValue = 0.82
                     }
                 }

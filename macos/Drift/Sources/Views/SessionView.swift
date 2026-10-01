@@ -372,7 +372,7 @@ private struct TimelineEventRow: View {
                     }
                     .padding(.horizontal, 104)
                     .padding(.bottom, Space.lg)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.drift(y: -8))
                 }
             }
             .contentShape(Rectangle())

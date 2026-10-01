@@ -15,6 +15,7 @@ let package = Package(
                 .copy("Resources/Fonts"),
                 .copy("Resources/Images")
             ]
-        )
+        ),
+        .testTarget(name: "DriftTests", dependencies: ["Drift"], path: "Tests")
     ]
 )

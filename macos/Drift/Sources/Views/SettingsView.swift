@@ -184,7 +184,7 @@ struct SettingsView: View {
         .padding(8)
         .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
         .animation(
-            appState.reduceMotion ? nil : .spring(duration: 0.20, bounce: 0.08),
+            appState.reduceMotion ? nil : Anim.glass,
             value: destination
         )
     }
@@ -765,10 +765,11 @@ struct SettingsToggleRow: View {
 
 private struct PixelToggle: View {
     @Binding var isOn: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
-            withAnimation(Anim.tap) { isOn.toggle() }
+            withAnimation(reduceMotion ? nil : Anim.tap) { isOn.toggle() }
         } label: {
             ZStack(alignment: isOn ? .trailing : .leading) {
                 Rectangle()
