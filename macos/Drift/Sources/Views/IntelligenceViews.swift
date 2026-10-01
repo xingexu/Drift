@@ -36,7 +36,7 @@ struct ApplicationsView: View {
 
                     if let selectedApp {
                         applicationDetail(selectedApp)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .transition(.drift(y: -8))
                     }
                 }
             }

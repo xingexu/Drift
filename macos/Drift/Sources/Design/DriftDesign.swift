@@ -420,22 +420,48 @@ extension EnvironmentValues {
 // MARK: - Animation Tokens
 
 enum Anim {
-    /// Button tap / toggle
-    static let tap    = Animation.spring(duration: 0.22, bounce: 0.12)
+    // Stock SwiftUI ease curves are too soft; these strong ease-outs give
+    // immediate feedback and settle gently. Springs retarget smoothly when
+    // interrupted mid-flight, so they drive anything the user can re-trigger.
+
+    /// Press-down: lands almost instantly so the click feels heard
+    static let press  = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.1)
+    /// Button tap / toggle, and press release
+    static let tap    = Animation.spring(duration: 0.24, bounce: 0.06)
     /// Content appearing
-    static let appear = Animation.easeOut(duration: 0.18)
+    static let appear = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.24)
     /// Quick opacity / color fade
-    static let quick  = Animation.easeOut(duration: 0.14)
+    static let quick  = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.16)
     /// Page / tab transition
-    static let page   = Animation.timingCurve(0.22, 1, 0.36, 1, duration: 0.26)
+    static let page   = Animation.spring(duration: 0.34, bounce: 0)
+    /// On-screen movement between two resting positions
+    static let move   = Animation.timingCurve(0.65, 0, 0.35, 1, duration: 0.3)
     /// Numeric counter update
-    static let count  = Animation.easeOut(duration: 0.16)
+    static let count  = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.2)
+    /// Continuous progress driven by the 1 s session tick; must match the tick
+    /// interval or motion stalls between updates.
+    static let tick   = Animation.linear(duration: 1.0)
     /// Breathing pulse (repeatForever)
-    static let breathe = Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)
+    static let breathe = Animation.easeInOut(duration: 2.4).repeatForever(autoreverses: true)
     /// Hover enter/exit
-    static let hover  = Animation.easeOut(duration: 0.18)
+    static let hover  = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.2)
     /// Strong ease-out for interruptible Liquid Glass hover feedback
-    static let glass  = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.18)
+    static let glass  = Animation.spring(duration: 0.26, bounce: 0)
+}
+
+extension AnyTransition {
+    /// Fade with a short drift. Full-edge `.move` slides views by their whole
+    /// size, which reads as a jump; a few points of travel reads as motion.
+    static func drift(y: CGFloat = 8, scale: CGFloat = 1) -> AnyTransition {
+        .opacity
+            .combined(with: .offset(y: y))
+            .combined(with: .scale(scale: scale))
+    }
+
+    /// Horizontal counterpart for screen-level navigation.
+    static func drift(x: CGFloat) -> AnyTransition {
+        .opacity.combined(with: .offset(x: x))
+    }
 }
 
 // MARK: - View Modifiers
@@ -609,7 +635,7 @@ struct DriftButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.94 : 1.0)
-            .animation(reduceMotion ? nil : Anim.tap, value: configuration.isPressed)
+            .animation(reduceMotion ? nil : (configuration.isPressed ? Anim.press : Anim.tap), value: configuration.isPressed)
     }
 }
 
@@ -620,7 +646,7 @@ struct DriftResponsivePressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.94 : 1)
-            .animation(reduceMotion ? nil : Anim.tap, value: configuration.isPressed)
+            .animation(reduceMotion ? nil : (configuration.isPressed ? Anim.press : Anim.tap), value: configuration.isPressed)
     }
 }
 
@@ -1256,7 +1282,7 @@ struct SegmentedControl<Value: Hashable>: View {
         .padding(4)
         .driftFunctionalGlass(cornerRadius: Radius.pill, dimmingOpacity: 0.10)
         .animation(
-            reduceMotion ? nil : .spring(duration: 0.20, bounce: 0.08),
+            reduceMotion ? nil : Anim.glass,
             value: selection
         )
     }

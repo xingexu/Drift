@@ -45,7 +45,7 @@ struct StudyView: View {
                     .padding(.top, 20)
                     Spacer()
                 }
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .transition(.drift(y: -12))
             }
 
             if viewModel.showCompletion {
@@ -54,7 +54,7 @@ struct StudyView: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(appState.reduceMotion ? nil : .easeOut(duration: 0.22), value: viewModel.mode)
+        .animation(appState.reduceMotion ? nil : Anim.page, value: viewModel.mode)
         .animation(appState.reduceMotion ? nil : Anim.appear, value: viewModel.showCompletion)
         .onChange(of: viewModel.focusDuration) { _, v in
             if viewModel.mode == .idle { viewModel.timeRemaining = v * 60 }
@@ -645,7 +645,7 @@ private struct TravelerJourney: View {
                 PixelTraveler()
                     .frame(width: 34, height: 44)
                     .offset(x: clampedProgress * travelWidth)
-                    .animation(reduceMotion || isPaused ? nil : .linear(duration: 0.9), value: clampedProgress)
+                    .animation(reduceMotion || isPaused ? nil : Anim.tick, value: clampedProgress)
 
                 PixelCampfire()
                     .frame(width: 34, height: 44)
@@ -1092,8 +1092,9 @@ private struct CompletionOverlay: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44, weight: .medium))
                 .foregroundStyle(Color.productive)
-                .scaleEffect(appeared ? 1 : 0.5)
-                .animation(Anim.appear, value: appeared)
+                .scaleEffect(appeared ? 1 : 0.9)
+                .opacity(appeared ? 1 : 0)
+                .animation(.spring(duration: 0.42, bounce: 0.22), value: appeared)
 
             Text("Session Complete")
                 .font(TypeScale.h2)
@@ -1306,7 +1307,7 @@ private struct FocusBlockerSection: View {
                     Rectangle().fill(Color.distraction.opacity(0.10))
                         .overlay(Rectangle().strokeBorder(Color.distraction.opacity(0.18), lineWidth: 0.5))
                 )
-                .transition(.scale(scale: 0.85).combined(with: .opacity))
+                .transition(.drift(y: 0, scale: 0.95))
             }
         }
         .accessibilityElement(children: .combine)
@@ -1350,7 +1351,7 @@ private struct FocusBlockerSection: View {
                                 .strokeBorder(Color.distraction.opacity(0.12), lineWidth: 0.5)
                         )
                 )
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.drift(y: -8))
             }
 
             if showStopDialog {
@@ -1360,7 +1361,7 @@ private struct FocusBlockerSection: View {
                     passwordError: $stopPasswordError,
                     showDialog: $showStopDialog
                 )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .transition(.drift(y: 8))
             } else {
                 Button {
                     if blocker.passwordRequired { showStopDialog = true }
@@ -1405,7 +1406,7 @@ private struct FocusBlockerSection: View {
 
             if showSetup {
                 blockerSetupPanel
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(.drift(y: 8))
             } else {
                 Button {
                     withAnimation(Anim.appear) { showSetup = true }
@@ -1523,7 +1524,7 @@ private struct FocusBlockerSection: View {
                                         )
                                 )
                         )
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(.drift(y: -8))
                         .accessibilityLabel("Confirm password")
 
                     if !blockerPasswordConfirm.isEmpty && !passwordsMatch {
@@ -1635,7 +1636,7 @@ private struct BlockerCountdown: View {
                     )
                     .frame(width: 96, height: 96)
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 1), value: blocker.progress)
+                    .animation(Anim.tick, value: blocker.progress)
 
                 VStack(spacing: 0) {
                     Text(blocker.timeRemainingFormatted)
@@ -1754,7 +1755,7 @@ private struct StopPasswordView: View {
                     .font(TypeScale.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(Color.distraction)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.drift(y: -8))
             }
         }
         .padding(Space.lg)
@@ -1766,7 +1767,7 @@ private struct StopPasswordView: View {
                         .strokeBorder(Color.distraction.opacity(0.10), lineWidth: 0.5)
                 )
         )
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
+        .transition(.drift(y: 8))
     }
 
     private func attemptStop() {
@@ -1884,7 +1885,7 @@ private struct BlockedSitesList: View {
                     .driftButton(.ghost)
                     .accessibilityLabel("Reset to default blocked sites")
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.drift(y: -8))
             }
         }
         .padding(Space.md)

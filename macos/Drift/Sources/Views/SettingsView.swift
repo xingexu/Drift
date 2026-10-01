@@ -184,7 +184,7 @@ struct SettingsView: View {
         .padding(8)
         .driftContentSurface(cornerRadius: DriftSurfaceRadius.major)
         .animation(
-            appState.reduceMotion ? nil : .spring(duration: 0.20, bounce: 0.08),
+            appState.reduceMotion ? nil : Anim.glass,
             value: destination
         )
     }
