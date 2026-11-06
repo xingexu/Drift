@@ -51,9 +51,16 @@ struct PendingSegment: Equatable {
     let dwellSeconds: Double
 }
 
-enum LabelingStoreError: Error {
+enum LabelingStoreError: LocalizedError {
     case open(String)
     case statement(String)
+    case export(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .open(let message), .statement(let message), .export(let message): return message
+        }
+    }
 }
 
 // MARK: - Labeling Store
@@ -85,10 +92,19 @@ final class LabelingStore {
 
     private func connection() throws -> OpaquePointer {
         if let db { return db }
-        try FileManager.default.createDirectory(
+        let files = FileManager.default
+        // Owner-only: the store holds raw window titles (email subjects,
+        // document names). A new folder is created 0700; the database is
+        // created 0600 before SQLite opens it, and SQLite gives its -wal and
+        // -shm files the same mode as the database.
+        try files.createDirectory(
             at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
         )
+        if !files.fileExists(atPath: url.path) {
+            files.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(url.path, &handle, flags, nil) == SQLITE_OK, let handle else {
@@ -122,6 +138,7 @@ final class LabelingStore {
             CREATE INDEX IF NOT EXISTS segments_session ON segments(session_id, ts);
             """)
         try migrate()
+        restrictToOwner()
         return handle
     }
 
@@ -140,6 +157,14 @@ final class LabelingStore {
             PRAGMA user_version = 1;
             COMMIT;
             """)
+    }
+
+    /// Tightens files left world-readable by earlier versions.
+    private func restrictToOwner() {
+        for suffix in ["", "-wal", "-shm"] {
+            let path = url.path + suffix
+            if FileManager.default.fileExists(atPath: path) { chmod(path, 0o600) }
+        }
     }
 
     func close() {
@@ -321,6 +346,20 @@ final class LabelingStore {
             return fields.map(Self.csvEscape).joined(separator: ",")
         }
         return ([header] + rows).joined(separator: "\n") + "\n"
+    }
+
+    /// Writes `exportCSV()` to a user-chosen file that only the owner can
+    /// read. Refuses non-file URLs and won't follow a symlink planted at the
+    /// destination.
+    func writeCSV(to destination: URL) throws {
+        guard destination.isFileURL else { throw LabelingStoreError.export("Choose a file on this Mac.") }
+        let data = Data(try exportCSV().utf8)
+        let fd = open(destination.path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw LabelingStoreError.export(String(cString: strerror(errno))) }
+        defer { Darwin.close(fd) }
+        // O_CREAT's mode only applies to new files; also tighten an overwritten one.
+        fchmod(fd, 0o600)
+        try FileHandle(fileDescriptor: fd, closeOnDealloc: false).write(contentsOf: data)
     }
 
     static func csvEscape(_ field: String) -> String {

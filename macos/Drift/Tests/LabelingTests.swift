@@ -202,6 +202,56 @@ final class LabelingStoreTests: XCTestCase {
         XCTAssertEqual(try store.labeledCount(), 0, "store reopens empty after wipe")
     }
 
+    // MARK: File permissions
+
+    private func mode(_ path: String) throws -> Int {
+        (try FileManager.default.attributesOfItem(atPath: path)[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
+    func testDatabaseAndWALFilesAreOwnerOnly() throws {
+        try store.beginSession(id: "s1", userId: "u1", goal: "g", startedAt: Date())
+        try store.insert(segment("Private email subject", at: 0), sessionId: "s1")
+        for suffix in ["", "-wal", "-shm"] where FileManager.default.fileExists(atPath: url.path + suffix) {
+            XCTAssertEqual(try mode(url.path + suffix), 0o600, suffix)
+        }
+    }
+
+    func testExistingWorldReadableDatabaseIsTightened() throws {
+        FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o644])
+        XCTAssertEqual(try store.labeledCount(), 0)
+        XCTAssertEqual(try mode(url.path), 0o600)
+    }
+
+    func testNewFolderIsOwnerOnly() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString)")
+        let nested = LabelingStore(url: folder.appendingPathComponent("labeling.sqlite"))
+        defer { nested.wipe(); try? FileManager.default.removeItem(at: folder) }
+        XCTAssertEqual(try nested.labeledCount(), 0)
+        XCTAssertEqual(try mode(folder.path), 0o700)
+    }
+
+    func testExportFileIsOwnerOnlyEvenWhenOverwriting() throws {
+        let csv = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString).csv")
+        defer { try? FileManager.default.removeItem(at: csv) }
+        FileManager.default.createFile(atPath: csv.path, contents: Data("old,longer,contents\n".utf8), attributes: [.posixPermissions: 0o644])
+
+        try store.writeCSV(to: csv)
+        XCTAssertEqual(try mode(csv.path), 0o600)
+        XCTAssertEqual(try String(contentsOf: csv, encoding: .utf8), try store.exportCSV(), "old contents are truncated")
+    }
+
+    func testExportRefusesSymlinkAndNonFileDestinations() throws {
+        let target = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString)")
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString).csv")
+        FileManager.default.createFile(atPath: target.path, contents: Data("keep".utf8))
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer { try? FileManager.default.removeItem(at: link); try? FileManager.default.removeItem(at: target) }
+
+        XCTAssertThrowsError(try store.writeCSV(to: link))
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "keep")
+        XCTAssertThrowsError(try store.writeCSV(to: URL(string: "https://example.com/labels.csv")!))
+    }
+
     func testCSVEscaping() {
         XCTAssertEqual(LabelingStore.csvEscape("plain"), "plain")
         XCTAssertEqual(LabelingStore.csvEscape("a,b"), "\"a,b\"")
