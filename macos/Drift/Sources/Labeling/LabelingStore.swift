@@ -232,13 +232,14 @@ final class LabelingStore {
         }
     }
 
-    /// Most recent session that still has unlabeled segments, if any.
+    /// Most recent ended session that still needs work: unlabeled segments,
+    /// or labels that can't be exported because the session has no goal.
     func latestSessionNeedingReview() throws -> String? {
         try query(
             """
             SELECT s.session_id FROM sessions s
             JOIN segments g ON g.session_id = s.session_id
-            WHERE s.ended_at IS NOT NULL AND g.label IS NULL
+            WHERE s.ended_at IS NOT NULL AND (g.label IS NULL OR s.goal = '')
             GROUP BY s.session_id ORDER BY s.started_at DESC LIMIT 1
             """,
             []
@@ -249,6 +250,18 @@ final class LabelingStore {
         try query("SELECT COUNT(*) FROM segments WHERE label IS NOT NULL", []) {
             Int(sqlite3_column_int64($0, 0))
         }.first ?? 0
+    }
+
+    /// Labeled segments that `exportCSV()` leaves out because their session
+    /// has no goal, so the UI can say so instead of dropping them silently.
+    func goallessLabeledCount() throws -> Int {
+        try query(
+            """
+            SELECT COUNT(*) FROM segments g JOIN sessions s ON s.session_id = g.session_id
+            WHERE g.label IS NOT NULL AND s.goal = ''
+            """,
+            []
+        ) { Int(sqlite3_column_int64($0, 0)) }.first ?? 0
     }
 
     /// CSV in the column layout the offline evaluation harness expects:
