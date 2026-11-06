@@ -157,6 +157,22 @@ final class LabelingStore {
         )
     }
 
+    /// Marks sessions left open by a crash or force-quit as ended at their
+    /// last recorded activity, so they become reviewable. Does nothing (and
+    /// creates no file) if labeling has never been used.
+    func closeAbandonedSessions() throws {
+        guard db != nil || FileManager.default.fileExists(atPath: url.path) else { return }
+        try run(
+            """
+            UPDATE sessions SET ended_at = COALESCE(
+                (SELECT MAX(ts + dwell_s) FROM segments WHERE segments.session_id = sessions.session_id),
+                started_at
+            ) WHERE ended_at IS NULL
+            """,
+            []
+        )
+    }
+
     func insert(_ segment: PendingSegment, sessionId: String) throws {
         try run(
             """

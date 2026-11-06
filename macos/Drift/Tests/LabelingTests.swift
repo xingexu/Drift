@@ -107,6 +107,20 @@ final class LabelingStoreTests: XCTestCase {
         XCTAssertTrue(lines[1].hasSuffix(",off_goal,u1,s1"))
     }
 
+    func testAbandonedSessionBecomesReviewable() throws {
+        try store.beginSession(id: "crashed", userId: "u1", goal: "g", startedAt: Date(timeIntervalSince1970: 1_800_000_000))
+        try store.insert(segment("Draft", at: 0), sessionId: "crashed")
+        XCTAssertNil(try store.latestSessionNeedingReview())
+
+        try store.closeAbandonedSessions()
+        XCTAssertEqual(try store.latestSessionNeedingReview(), "crashed")
+    }
+
+    func testClosingAbandonedSessionsDoesNotCreateFile() throws {
+        try store.closeAbandonedSessions()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
     func testWipeRemovesDatabase() throws {
         try store.beginSession(id: "s1", userId: "u1", goal: "g", startedAt: Date())
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
