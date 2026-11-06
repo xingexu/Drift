@@ -93,6 +93,7 @@ class WindowTracker: ObservableObject {
             pausedAccumulatedMs = 0
             pauseStartedAt = nil
             clearPreviousContext()
+            LabelingRecorder.shared.sessionDidStart()
         } else if let pausedAt = pauseStartedAt {
             // Resuming a paused session — bank the paused span so it's excluded
             // from elapsed time.
@@ -116,6 +117,7 @@ class WindowTracker: ObservableObject {
     func pause() {
         guard isTracking, !isPaused else { return }
         flushCurrentEvent()
+        LabelingRecorder.shared.flushSegment()
         clearPreviousContext()
         isPaused = true
         pauseStartedAt = Date()
@@ -134,6 +136,7 @@ class WindowTracker: ObservableObject {
         stopIdleTimer()
         removeWorkspaceObserver()
         clearPreviousContext()
+        LabelingRecorder.shared.finishSession()
     }
 
     /// Saves the current session to history and resets for a fresh run.
@@ -300,6 +303,10 @@ class WindowTracker: ObservableObject {
         }
 
         let currentURL = resolvedURL ?? ""
+
+        // Opt-in labeling mode keeps the raw title in its own local store;
+        // no-op unless the user enabled it.
+        LabelingRecorder.shared.sample(app: appName, bundleId: bundleId, title: title, url: webContextForClassification)
 
         if shouldRecordContextChange(
             appName: appName,

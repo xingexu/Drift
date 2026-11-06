@@ -243,6 +243,7 @@ class AppState: ObservableObject {
     func deleteHistory() {
         pastSessions.removeAll()
         session.reset()
+        LabelingRecorder.shared.wipeAll()
         savePastSessions()
         computeStats()
     }

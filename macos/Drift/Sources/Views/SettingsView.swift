@@ -94,6 +94,7 @@ struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject private var tracker: WindowTracker
     @StateObject private var blocker = FocusBlocker.shared
+    @ObservedObject private var labeling = LabelingRecorder.shared
     @State private var destination: SettingsDestination = .general
     @State private var rulesScope: RulesScope = .apps
     @State private var rulesSearch = ""
@@ -397,7 +398,24 @@ struct SettingsView: View {
                     SecondaryPillButton(title: "Export", icon: "square.and.arrow.up") { exportData() }
                 }
 
-                SettingsRow(title: "Delete History", explanation: "Permanently remove tracked sessions from this Mac.") {
+                SettingsRow(
+                    title: "Labeling Mode",
+                    explanation: "Opt-in research mode. Stores full window titles and your session goal in a separate local file so you can label each minute. Removed by Delete History."
+                ) {
+                    Toggle("Labeling Mode", isOn: $labeling.isEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+                if labeling.isEnabled {
+                    SettingsRow(title: "Review Labels", explanation: "Label the most recent session that still has unlabeled minutes.") {
+                        SecondaryPillButton(title: "Review", icon: "checklist") { labeling.reviewPending() }
+                    }
+                    SettingsRow(title: "Export Labels", explanation: "Save labeled minutes as CSV for offline evaluation.") {
+                        SecondaryPillButton(title: "Export CSV", icon: "tablecells") { exportLabels() }
+                    }
+                }
+
+                SettingsRow(title: "Delete History", explanation: "Permanently remove tracked sessions and labeling data from this Mac.") {
                     Button {
                         showDeleteHistoryConfirmation = true
                     } label: {
@@ -568,6 +586,17 @@ struct SettingsView: View {
         }
     }
 
+    private func exportLabels() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "drift_labeled_segments.csv"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if let csv = try? labeling.store.exportCSV() {
+            try? csv.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
     // MARK: - Section Builder
 
     @ViewBuilder
@@ -672,6 +701,8 @@ struct SettingsView: View {
         appState.session.reset()
         appState.pastSessions.removeAll()
         appState.classificationOverrides.removeAll()
+        labeling.isEnabled = false
+        labeling.wipeAll()
         // Route through setters so each default is re-persisted to the freshly
         // cleared UserDefaults (direct assignment skipped persistence, leaving
         // state and disk out of sync) and no preference is silently missed.

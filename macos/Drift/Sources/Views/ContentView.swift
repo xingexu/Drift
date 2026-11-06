@@ -77,6 +77,7 @@ struct MainAppView: View {
     @EnvironmentObject var tracker: WindowTracker
     @StateObject private var blocker = FocusBlocker.shared
     @StateObject private var studyModel = StudyViewModel.shared
+    @ObservedObject private var labeling = LabelingRecorder.shared
     @State private var lastDetectedApp: String = ""
     @State private var windowSwitchSignal: String?
     @State private var statusBarFlash = false
@@ -126,6 +127,18 @@ struct MainAppView: View {
         .background(Color.driftBackground)
         .clipped()
         .tint(Color.sand)
+        .sheet(item: Binding(
+            get: { labeling.sessionNeedingGoal.map(LabelingSheetID.init) },
+            set: { if $0 == nil { labeling.skipGoal() } }
+        )) { sheet in
+            LabelingGoalPrompt(sessionId: sheet.id, recorder: labeling)
+        }
+        .sheet(item: Binding(
+            get: { labeling.sessionNeedingGoal == nil ? labeling.sessionNeedingReview.map(LabelingSheetID.init) : nil },
+            set: { if $0 == nil { labeling.closeReview() } }
+        )) { sheet in
+            LabelingReviewView(sessionId: sheet.id, recorder: labeling)
+        }
         .onAppear  { setupKeyboardNavigation() }
         .onDisappear { teardownKeyboardNavigation() }
         .onChange(of: tracker.activeApp) { _, newApp in
@@ -163,6 +176,10 @@ struct MainAppView: View {
             }
             // Pass through when a text-input field has focus (NSText is the field-editor base class)
             if let fr = NSApp.keyWindow?.firstResponder, fr is NSText {
+                return event
+            }
+            // The labeling sheets use bare 1/2/3 for labels, not tab switching.
+            if MainActor.assumeIsolated({ LabelingRecorder.shared.isCapturingKeys }) {
                 return event
             }
             guard let appState else { return event }

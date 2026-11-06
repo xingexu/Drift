@@ -46,3 +46,5 @@ Windows support is not available yet.
 ## Privacy
 
 Drift records application names and domain-level browser context for focus classification. It does not retain full browser paths, query strings, keystrokes, screenshots, or screen contents.
+
+**Labeling mode (opt-in, off by default).** When you turn it on in Settings → Privacy, Drift also keeps the session goal you type and the dominant window title for each minute, so you can label each minute as on goal, supporting, or off goal. This data is kept in a separate file, `~/Library/Application Support/Drift/labeling.sqlite`, never leaves the Mac unless you export it as CSV yourself, and is deleted by Delete History and Reset All Data.
