@@ -109,7 +109,13 @@ final class LabelingRecorder: ObservableObject {
     @Published var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: Keys.enabled)
-            if !isEnabled { finishSession() }
+            if isEnabled, !oldValue, activeSessionId == nil, WindowTracker.shared.isTracking {
+                // Turned on mid-session: start labeling now instead of
+                // silently dropping samples until the next session.
+                sessionDidStart()
+            } else if !isEnabled {
+                finishSession()
+            }
         }
     }
     /// Session that should prompt for a goal (set when a labeled session starts).
@@ -139,6 +145,11 @@ final class LabelingRecorder: ObservableObject {
     init(store: LabelingStore = LabelingStore()) {
         self.store = store
         self.isEnabled = UserDefaults.standard.bool(forKey: Keys.enabled)
+        // A crash or force-quit leaves the previous session open (ended_at
+        // NULL), which hides it from review forever. The recorder is created
+        // before any session starts in this process, so every open session
+        // here is abandoned.
+        perform { try store.closeAbandonedSessions() }
     }
 
     // MARK: Session Lifecycle (called by WindowTracker)

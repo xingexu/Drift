@@ -89,15 +89,22 @@ struct LabelingReviewView: View {
     }
 
     private var goalField: some View {
-        HStack(spacing: Space.sm) {
-            Image(systemName: "target").foregroundStyle(Color.sand)
-            TextField("Session goal (required for export)", text: $goal)
-                .textFieldStyle(.roundedBorder)
-                .focused($goalFocused)
-                .onSubmit {
-                    saveGoal()
-                    listFocused = true
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: Space.sm) {
+                Image(systemName: "target").foregroundStyle(Color.sand)
+                TextField("Session goal (required for export)", text: $goal)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($goalFocused)
+                    .onSubmit {
+                        saveGoal()
+                        listFocused = true
+                    }
+            }
+            if goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Label("Without a goal, this session's labels are left out of the export.", systemImage: "exclamationmark.triangle")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(Color.distraction)
+            }
         }
     }
 

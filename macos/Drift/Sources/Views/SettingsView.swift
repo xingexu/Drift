@@ -103,6 +103,7 @@ struct SettingsView: View {
     @State private var showDeleteHistoryConfirmation = false
     @State private var showResetConfirmation = false
     @State private var showResetSuccess = false
+    @State private var skippedGoallessLabels = 0
     @Namespace private var settingsSelectionNamespace
 
     var body: some View {
@@ -131,6 +132,18 @@ struct SettingsView: View {
             Button("Reset Everything", role: .destructive) { resetAllData() }
         } message: {
             Text("This will permanently erase all local data including session history and preferences. This action cannot be undone.")
+        }
+        .alert(
+            "\(skippedGoallessLabels) labeled minute\(skippedGoallessLabels == 1 ? "" : "s") not exported",
+            isPresented: Binding(get: { skippedGoallessLabels > 0 }, set: { if !$0 { skippedGoallessLabels = 0 } })
+        ) {
+            Button("Review Now") {
+                skippedGoallessLabels = 0
+                labeling.reviewPending()
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Their sessions have no goal. Add a goal in Review, then export again.")
         }
         .alert("Data Reset Complete", isPresented: $showResetSuccess) {
             Button("OK", role: .cancel) {}
@@ -595,6 +608,7 @@ struct SettingsView: View {
         if let csv = try? labeling.store.exportCSV() {
             try? csv.write(to: url, atomically: true, encoding: .utf8)
         }
+        skippedGoallessLabels = (try? labeling.store.goallessLabeledCount()) ?? 0
     }
 
     // MARK: - Section Builder

@@ -70,7 +70,7 @@ final class LabelingStoreTests: XCTestCase {
     }
 
     func testRoundTripLabelsAndReviewQueue() throws {
-        try store.beginSession(id: "s1", userId: "u1", goal: "", startedAt: Date())
+        try store.beginSession(id: "s1", userId: "u1", goal: "Finish the Q3 report", startedAt: Date())
         try store.insert(segment("Q3 report", at: 0), sessionId: "s1")
         try store.insert(segment("Inbox", at: 60), sessionId: "s1")
         XCTAssertNil(try store.latestSessionNeedingReview(), "open sessions are not reviewed yet")
@@ -105,6 +105,36 @@ final class LabelingStoreTests: XCTestCase {
         XCTAssertEqual(lines[0], "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id")
         XCTAssertTrue(lines[1].hasPrefix("Finish the Q3 report,No goal yet,Chrome,com.google.Chrome,docs.google.com,42.0,"))
         XCTAssertTrue(lines[1].hasSuffix(",off_goal,u1,s1"))
+    }
+
+    func testAbandonedSessionBecomesReviewable() throws {
+        try store.beginSession(id: "crashed", userId: "u1", goal: "g", startedAt: Date(timeIntervalSince1970: 1_800_000_000))
+        try store.insert(segment("Draft", at: 0), sessionId: "crashed")
+        XCTAssertNil(try store.latestSessionNeedingReview())
+
+        try store.closeAbandonedSessions()
+        XCTAssertEqual(try store.latestSessionNeedingReview(), "crashed")
+    }
+
+    func testClosingAbandonedSessionsDoesNotCreateFile() throws {
+        try store.closeAbandonedSessions()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testGoallessLabeledSessionStaysReviewableAndIsCounted() throws {
+        try store.beginSession(id: "s1", userId: "u1", goal: "", startedAt: Date())
+        try store.insert(segment("Draft", at: 0), sessionId: "s1")
+        try store.endSession(id: "s1", endedAt: Date())
+        try store.setLabel(.onGoal, segmentId: try store.segments(sessionId: "s1")[0].id)
+
+        // Fully labeled but goal-less: still surfaced for review, and counted as skipped.
+        XCTAssertEqual(try store.latestSessionNeedingReview(), "s1")
+        XCTAssertEqual(try store.goallessLabeledCount(), 1)
+
+        try store.setGoal("Write the essay", sessionId: "s1")
+        XCTAssertNil(try store.latestSessionNeedingReview())
+        XCTAssertEqual(try store.goallessLabeledCount(), 0)
+        XCTAssertEqual(try store.exportCSV().split(separator: "\n").count, 2)
     }
 
     func testWipeRemovesDatabase() throws {
