@@ -6,11 +6,18 @@ struct TrackingView: View {
     @EnvironmentObject private var tracker: WindowTracker
     @State private var appeared = false
     @State private var showScoreInfo = false
+    @ObservedObject private var permissions = PermissionMonitor.shared
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
                 todayHorizon
+                if SetupChecklistView.isNeeded(
+                    permissions: permissions,
+                    hasSession: !appState.pastSessions.isEmpty || tracker.isTracking
+                ) {
+                    SetupChecklistView(permissions: permissions)
+                }
                 currentActivity
                 summaryStrip
 
@@ -65,7 +72,8 @@ struct TrackingView: View {
             Spacer()
 
             HStack(spacing: 10) {
-                Text("\(efficiencyScore)")
+                // A score from under 5 minutes reads as a bad grade; show a dash.
+                Text(hasScore ? "\(efficiencyScore)" : "—")
                     .font(TypeScale.monoMd)
                     .fontWeight(.bold)
                     .monospacedDigit()
@@ -476,6 +484,8 @@ struct TrackingView: View {
         }
         return max(longest, appState.session.longestProductiveStreakMs)
     }
+
+    private var hasScore: Bool { todayTotal >= 5 * 60_000 }
 
     private var efficiencyScore: Int {
         guard todayTotal > 0 else { return 0 }
