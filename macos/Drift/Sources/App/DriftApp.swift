@@ -96,18 +96,25 @@ struct DriftApp: App {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
 
-            if let window = NSApp.windows.first(where: { $0.canBecomeMain && !($0 is NSPanel) }) {
-                window.collectionBehavior.insert(.fullScreenPrimary)
-                window.isOpaque = true
-                window.backgroundColor = NSColor(red: 0.030, green: 0.024, blue: 0.052, alpha: 1)
-                window.styleMask.insert(.fullSizeContentView)
-                window.titlebarAppearsTransparent = true
-                window.titleVisibility = .hidden
-                window.titlebarSeparatorStyle = .none
-                window.title = "Drift"
-                window.makeKeyAndOrderFront(nil)
-            }
+            // Style every main window, not just the first one found: a
+            // restored or recreated window otherwise keeps the default light
+            // title bar on top of the dark app.
+            let windows = NSApp.windows.filter { $0.canBecomeMain && !($0 is NSPanel) }
+            windows.forEach(Self.applyDriftChrome)
+            windows.first?.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// Transparent, dark title bar shared by every Drift main window.
+    static func applyDriftChrome(to window: NSWindow) {
+        window.collectionBehavior.insert(.fullScreenPrimary)
+        window.isOpaque = true
+        window.backgroundColor = NSColor(red: 0.030, green: 0.024, blue: 0.052, alpha: 1)
+        window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
+        window.title = "Drift"
     }
 
     // MARK: - Scene Phase
