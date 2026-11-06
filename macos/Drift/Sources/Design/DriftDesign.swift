@@ -1263,6 +1263,8 @@ struct SegmentedControl<Value: Hashable>: View {
                     Text(title(option))
                         .font(TypeScale.bodySm)
                         .fontWeight(selection == option ? .semibold : .regular)
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundStyle(selection == option ? Color.cream : Color.creamMuted)
                         .padding(.horizontal, 14)
                         .frame(height: 36)
@@ -1280,6 +1282,9 @@ struct SegmentedControl<Value: Hashable>: View {
             }
         }
         .padding(4)
+        // Never let a neighbouring flexible view squeeze the labels into
+        // wrapping ("Syst/em").
+        .fixedSize()
         .driftFunctionalGlass(cornerRadius: Radius.pill, dimmingOpacity: 0.10)
         .animation(
             reduceMotion ? nil : Anim.glass,
@@ -1349,11 +1354,15 @@ struct SettingsRow<Trailing: View>: View {
                 Text(explanation)
                     .font(TypeScale.caption)
                     .foregroundStyle(Color.driftMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.xl)
             trailing()
+                .fixedSize()
         }
         .padding(.horizontal, Space.lg)
+        // Multi-line explanations need breathing room above and below.
+        .padding(.vertical, Space.md)
         .frame(minHeight: 58)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.cream.opacity(0.10)).frame(height: 1)

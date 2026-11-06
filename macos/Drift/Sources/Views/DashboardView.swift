@@ -6,11 +6,29 @@ struct TrackingView: View {
     @EnvironmentObject private var tracker: WindowTracker
     @State private var appeared = false
     @State private var showScoreInfo = false
+    @ObservedObject private var permissions = PermissionMonitor.shared
+
+    private var setupState: SetupChecklistState {
+        SetupChecklistState(
+            accessibility: permissions.accessibility,
+            automation: permissions.browserAutomation,
+            sessionCount: appState.pastSessions.count,
+            isTracking: tracker.isTracking
+        )
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
                 todayHorizon
+                if setupState.isNeeded {
+                    SetupChecklistView(
+                        state: setupState,
+                        automation: permissions.browserAutomation,
+                        onAllowAccessibility: requestAccessibility,
+                        onStartTracking: { tracker.start() }
+                    )
+                }
                 currentActivity
                 summaryStrip
 
@@ -42,7 +60,18 @@ struct TrackingView: View {
         }
         .onAppear {
             withAnimation(appState.reduceMotion ? nil : Anim.appear) { appeared = true }
+            permissions.refresh()
         }
+    }
+
+    /// Shows the system Accessibility prompt, falling back to System Settings
+    /// when macOS has already decided (prompt suppressed).
+    private func requestAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(options) {
+            SetupChecklistView.openPrivacyPane("Privacy_Accessibility")
+        }
+        permissions.refresh()
     }
 
     private var todayHorizon: some View {
@@ -65,7 +94,8 @@ struct TrackingView: View {
             Spacer()
 
             HStack(spacing: 10) {
-                Text("\(efficiencyScore)")
+                // A score from under 5 minutes reads as a bad grade; show a dash.
+                Text(hasScore ? "\(efficiencyScore)" : "—")
                     .font(TypeScale.monoMd)
                     .fontWeight(.bold)
                     .monospacedDigit()
@@ -476,6 +506,8 @@ struct TrackingView: View {
         }
         return max(longest, appState.session.longestProductiveStreakMs)
     }
+
+    private var hasScore: Bool { todayTotal >= 5 * 60_000 }
 
     private var efficiencyScore: Int {
         guard todayTotal > 0 else { return 0 }

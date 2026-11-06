@@ -284,11 +284,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             .foregroundStyle(Color.driftText)
             .tint(AppState.shared.accentColor)
         let window = NSWindow(contentViewController: NSHostingController(rootView: content))
-        window.title = "Drift"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.titlebarSeparatorStyle = .none
+        DriftApp.applyDriftChrome(to: window)
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 960, height: 680))
         window.center()
