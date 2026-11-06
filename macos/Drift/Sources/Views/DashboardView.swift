@@ -6,11 +6,29 @@ struct TrackingView: View {
     @EnvironmentObject private var tracker: WindowTracker
     @State private var appeared = false
     @State private var showScoreInfo = false
+    @ObservedObject private var permissions = PermissionMonitor.shared
+
+    private var setupState: SetupChecklistState {
+        SetupChecklistState(
+            accessibility: permissions.accessibility,
+            automation: permissions.browserAutomation,
+            sessionCount: appState.pastSessions.count,
+            isTracking: tracker.isTracking
+        )
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
                 todayHorizon
+                if setupState.isNeeded {
+                    SetupChecklistView(
+                        state: setupState,
+                        automation: permissions.browserAutomation,
+                        onAllowAccessibility: requestAccessibility,
+                        onStartTracking: { tracker.start() }
+                    )
+                }
                 currentActivity
                 summaryStrip
 
@@ -42,7 +60,18 @@ struct TrackingView: View {
         }
         .onAppear {
             withAnimation(appState.reduceMotion ? nil : Anim.appear) { appeared = true }
+            permissions.refresh()
         }
+    }
+
+    /// Shows the system Accessibility prompt, falling back to System Settings
+    /// when macOS has already decided (prompt suppressed).
+    private func requestAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(options) {
+            SetupChecklistView.openPrivacyPane("Privacy_Accessibility")
+        }
+        permissions.refresh()
     }
 
     private var todayHorizon: some View {
