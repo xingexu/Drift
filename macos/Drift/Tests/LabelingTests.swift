@@ -1,4 +1,5 @@
 import XCTest
+import SQLite3
 @testable import Drift
 
 final class SegmentAccumulatorTests: XCTestCase {
@@ -102,9 +103,65 @@ final class LabelingStoreTests: XCTestCase {
         try store.insert(segment("Unlabeled, \"quoted\"", at: 60), sessionId: "s1")
         let lines = try store.exportCSV().split(separator: "\n").map(String.init)
         XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(lines[0], "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id")
+        XCTAssertEqual(lines[0], "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id,segment_id")
         XCTAssertTrue(lines[1].hasPrefix("Finish the Q3 report,No goal yet,Chrome,com.google.Chrome,docs.google.com,42.0,"))
-        XCTAssertTrue(lines[1].hasSuffix(",off_goal,u1,s1"))
+        XCTAssertTrue(lines[1].contains(",2027-01-15T08:00:00Z,"), "ts is UTC so files from different time zones merge")
+        XCTAssertNotNil(lines[1].range(of: #",off_goal,u1,s1,[0-9a-f-]{36}$"#, options: .regularExpression))
+    }
+
+    // MARK: Merging exports from many people
+
+    private func exportedRows(_ store: LabelingStore, user: String, session: String) throws -> [[Substring]] {
+        try store.beginSession(id: session, userId: user, goal: "Write the essay", startedAt: Date())
+        for offset in [0.0, 60, 120] {
+            try store.insert(segment("Essay draft", at: offset), sessionId: session)
+        }
+        for row in try store.segments(sessionId: session) { try store.setLabel(.onGoal, segmentId: row.id) }
+        return try store.exportCSV().split(separator: "\n").dropFirst().map { $0.split(separator: ",") }
+    }
+
+    func testExportsFromDifferentInstallsMergeWithoutCollisions() throws {
+        let otherURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("drift-labeling-\(UUID().uuidString).sqlite")
+        let other = LabelingStore(url: otherURL)
+        defer { other.wipe() }
+
+        // Both installs number their rows 1, 2, 3 locally; the exported IDs must still differ.
+        let mine = try exportedRows(store, user: "u1", session: "s1")
+        let theirs = try exportedRows(other, user: "u2", session: "s2")
+        XCTAssertEqual(try store.segments(sessionId: "s1").map(\.id), try other.segments(sessionId: "s2").map(\.id))
+
+        let merged = mine + theirs
+        XCTAssertEqual(Set(merged.map { $0.last! }).count, merged.count, "segment_id is unique across installs")
+        XCTAssertEqual(Set(merged.map { $0[8] }), ["u1", "u2"])
+    }
+
+    func testReexportKeepsSegmentIDsSoDuplicatesCanBeDropped() throws {
+        let first = try exportedRows(store, user: "u1", session: "s1")
+        let second = try store.exportCSV().split(separator: "\n").dropFirst().map { $0.split(separator: ",") }
+        XCTAssertEqual(first.map { $0.last! }, second.map { $0.last! })
+    }
+
+    func testMigrationBackfillsSegmentIDsInExistingDatabase() throws {
+        // A database written before segment IDs existed (user_version 0, no uid column).
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &db), SQLITE_OK)
+        sqlite3_exec(db, """
+            CREATE TABLE sessions (session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL,
+                goal TEXT NOT NULL DEFAULT '', started_at REAL NOT NULL, ended_at REAL);
+            CREATE TABLE segments (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL,
+                ts REAL NOT NULL, bundle_id TEXT NOT NULL, app TEXT NOT NULL, domain TEXT,
+                title TEXT NOT NULL, dwell_s REAL NOT NULL, label TEXT, labeled_at REAL);
+            INSERT INTO sessions VALUES ('old', 'u1', 'g', 0, 1);
+            INSERT INTO segments (session_id, ts, bundle_id, app, title, dwell_s, label)
+                VALUES ('old', 0, 'b', 'A', 'T1', 30, 'on_goal'), ('old', 60, 'b', 'A', 'T2', 30, 'off_goal');
+            """, nil, nil, nil)
+        sqlite3_close(db)
+
+        let rows = try store.exportCSV().split(separator: "\n").dropFirst().map { $0.split(separator: ",") }
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(Set(rows.map { $0.last! }).count, 2)
+        XCTAssertTrue(rows.allSatisfy { $0.last!.count == 32 })
     }
 
     func testAbandonedSessionBecomesReviewable() throws {
@@ -143,6 +200,56 @@ final class LabelingStoreTests: XCTestCase {
         store.wipe()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
         XCTAssertEqual(try store.labeledCount(), 0, "store reopens empty after wipe")
+    }
+
+    // MARK: File permissions
+
+    private func mode(_ path: String) throws -> Int {
+        (try FileManager.default.attributesOfItem(atPath: path)[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
+    func testDatabaseAndWALFilesAreOwnerOnly() throws {
+        try store.beginSession(id: "s1", userId: "u1", goal: "g", startedAt: Date())
+        try store.insert(segment("Private email subject", at: 0), sessionId: "s1")
+        for suffix in ["", "-wal", "-shm"] where FileManager.default.fileExists(atPath: url.path + suffix) {
+            XCTAssertEqual(try mode(url.path + suffix), 0o600, suffix)
+        }
+    }
+
+    func testExistingWorldReadableDatabaseIsTightened() throws {
+        FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o644])
+        XCTAssertEqual(try store.labeledCount(), 0)
+        XCTAssertEqual(try mode(url.path), 0o600)
+    }
+
+    func testNewFolderIsOwnerOnly() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString)")
+        let nested = LabelingStore(url: folder.appendingPathComponent("labeling.sqlite"))
+        defer { nested.wipe(); try? FileManager.default.removeItem(at: folder) }
+        XCTAssertEqual(try nested.labeledCount(), 0)
+        XCTAssertEqual(try mode(folder.path), 0o700)
+    }
+
+    func testExportFileIsOwnerOnlyEvenWhenOverwriting() throws {
+        let csv = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString).csv")
+        defer { try? FileManager.default.removeItem(at: csv) }
+        FileManager.default.createFile(atPath: csv.path, contents: Data("old,longer,contents\n".utf8), attributes: [.posixPermissions: 0o644])
+
+        try store.writeCSV(to: csv)
+        XCTAssertEqual(try mode(csv.path), 0o600)
+        XCTAssertEqual(try String(contentsOf: csv, encoding: .utf8), try store.exportCSV(), "old contents are truncated")
+    }
+
+    func testExportRefusesSymlinkAndNonFileDestinations() throws {
+        let target = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString)")
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent("drift-\(UUID().uuidString).csv")
+        FileManager.default.createFile(atPath: target.path, contents: Data("keep".utf8))
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer { try? FileManager.default.removeItem(at: link); try? FileManager.default.removeItem(at: target) }
+
+        XCTAssertThrowsError(try store.writeCSV(to: link))
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "keep")
+        XCTAssertThrowsError(try store.writeCSV(to: URL(string: "https://example.com/labels.csv")!))
     }
 
     func testCSVEscaping() {

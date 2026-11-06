@@ -104,6 +104,7 @@ struct SettingsView: View {
     @State private var showResetConfirmation = false
     @State private var showResetSuccess = false
     @State private var skippedGoallessLabels = 0
+    @State private var labelExportError: String?
     @Namespace private var settingsSelectionNamespace
 
     var body: some View {
@@ -132,6 +133,14 @@ struct SettingsView: View {
             Button("Reset Everything", role: .destructive) { resetAllData() }
         } message: {
             Text("This will permanently erase all local data including session history and preferences. This action cannot be undone.")
+        }
+        .alert(
+            "Couldn't export labels",
+            isPresented: Binding(get: { labelExportError != nil }, set: { if !$0 { labelExportError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(labelExportError ?? "")
         }
         .alert(
             "\(skippedGoallessLabels) labeled minute\(skippedGoallessLabels == 1 ? "" : "s") not exported",
@@ -605,8 +614,11 @@ struct SettingsView: View {
         panel.nameFieldStringValue = "drift_labeled_segments.csv"
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        if let csv = try? labeling.store.exportCSV() {
-            try? csv.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try labeling.store.writeCSV(to: url)
+        } catch {
+            labelExportError = error.localizedDescription
+            return
         }
         skippedGoallessLabels = (try? labeling.store.goallessLabeledCount()) ?? 0
     }
