@@ -390,11 +390,8 @@ struct SettingsView: View {
 
                 Rectangle().fill(Color.cream.opacity(0.12)).frame(height: 1)
 
-                SettingsRow(title: "Local Storage", explanation: "Sessions and corrections are stored only on this Mac.") {
+                SettingsRow(title: "Local Storage", explanation: "Sessions and corrections are stored only on this Mac. Nothing is uploaded.") {
                     Text("Local").font(TypeScale.caption).foregroundStyle(Color.productive)
-                }
-                SettingsRow(title: "Cloud Sync", explanation: "No activity data is uploaded.") {
-                    Text("Off").font(TypeScale.caption).foregroundStyle(Color.driftMuted)
                 }
                 SettingsRow(title: "Export Data", explanation: "Save a portable JSON copy of sessions and rules.") {
                     SecondaryPillButton(title: "Export", icon: "square.and.arrow.up") { exportData() }
