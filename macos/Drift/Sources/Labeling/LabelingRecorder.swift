@@ -225,6 +225,9 @@ final class LabelingRecorder: ObservableObject {
         sessionNeedingReview = nil
         activeGoal = ""
         store.wipe()
+        // New pseudonym: data collected after a wipe can't be linked to
+        // anything exported before it.
+        UserDefaults.standard.removeObject(forKey: Keys.userId)
     }
 
     // MARK: Helpers

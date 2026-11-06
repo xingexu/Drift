@@ -121,7 +121,25 @@ final class LabelingStore {
             );
             CREATE INDEX IF NOT EXISTS segments_session ON segments(session_id, ts);
             """)
+        try migrate()
         return handle
+    }
+
+    /// Schema version 1 adds `uid`: a random, globally unique segment ID.
+    /// The local `id` restarts at 1 on every install, so it can't identify a
+    /// row once CSVs from many people are merged, or when one person exports
+    /// twice and both files are submitted.
+    private func migrate() throws {
+        let version = try query("PRAGMA user_version", []) { Int(sqlite3_column_int64($0, 0)) }.first ?? 0
+        guard version < 1 else { return }
+        try exec("""
+            BEGIN;
+            ALTER TABLE segments ADD COLUMN uid TEXT;
+            UPDATE segments SET uid = lower(hex(randomblob(16))) WHERE uid IS NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS segments_uid ON segments(uid);
+            PRAGMA user_version = 1;
+            COMMIT;
+            """)
     }
 
     func close() {
@@ -176,10 +194,11 @@ final class LabelingStore {
     func insert(_ segment: PendingSegment, sessionId: String) throws {
         try run(
             """
-            INSERT INTO segments (session_id, ts, bundle_id, app, domain, title, dwell_s)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO segments (uid, session_id, ts, bundle_id, app, domain, title, dwell_s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
+                .text(UUID().uuidString.lowercased()),
                 .text(sessionId),
                 .real(segment.timestamp.timeIntervalSince1970),
                 .text(segment.bundleId),
@@ -265,14 +284,18 @@ final class LabelingStore {
     }
 
     /// CSV in the column layout the offline evaluation harness expects:
-    /// `goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id`.
+    /// `goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id,segment_id`.
     /// Only labeled segments from sessions with a goal are exported.
+    ///
+    /// Files from many people can be concatenated: `user_id` and `session_id`
+    /// are random UUIDs, `ts` is UTC, and `segment_id` is unique per row, so a
+    /// re-exported row can be de-duplicated (keep the last file's label).
     func exportCSV() throws -> String {
-        let header = "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id"
+        let header = "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id,segment_id"
         let rows = try query(
             """
             SELECT s.goal, g.title, g.app, g.bundle_id, g.domain, g.dwell_s, g.ts, g.label,
-                   s.user_id, s.session_id
+                   s.user_id, s.session_id, g.uid
             FROM segments g JOIN sessions s ON s.session_id = g.session_id
             WHERE g.label IS NOT NULL AND s.goal <> ''
             ORDER BY g.ts
@@ -293,6 +316,7 @@ final class LabelingStore {
                 Self.text(row, 7) ?? "",
                 Self.text(row, 8) ?? "",
                 Self.text(row, 9) ?? "",
+                Self.text(row, 10) ?? "",
             ]
             return fields.map(Self.csvEscape).joined(separator: ",")
         }

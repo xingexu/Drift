@@ -1,4 +1,5 @@
 import XCTest
+import SQLite3
 @testable import Drift
 
 final class SegmentAccumulatorTests: XCTestCase {
@@ -102,9 +103,65 @@ final class LabelingStoreTests: XCTestCase {
         try store.insert(segment("Unlabeled, \"quoted\"", at: 60), sessionId: "s1")
         let lines = try store.exportCSV().split(separator: "\n").map(String.init)
         XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(lines[0], "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id")
+        XCTAssertEqual(lines[0], "goal,title,app,bundle_id,domain,dwell_s,ts,label,user_id,session_id,segment_id")
         XCTAssertTrue(lines[1].hasPrefix("Finish the Q3 report,No goal yet,Chrome,com.google.Chrome,docs.google.com,42.0,"))
-        XCTAssertTrue(lines[1].hasSuffix(",off_goal,u1,s1"))
+        XCTAssertTrue(lines[1].contains(",2027-01-15T08:00:00Z,"), "ts is UTC so files from different time zones merge")
+        XCTAssertNotNil(lines[1].range(of: #",off_goal,u1,s1,[0-9a-f-]{36}$"#, options: .regularExpression))
+    }
+
+    // MARK: Merging exports from many people
+
+    private func exportedRows(_ store: LabelingStore, user: String, session: String) throws -> [[Substring]] {
+        try store.beginSession(id: session, userId: user, goal: "Write the essay", startedAt: Date())
+        for offset in [0.0, 60, 120] {
+            try store.insert(segment("Essay draft", at: offset), sessionId: session)
+        }
+        for row in try store.segments(sessionId: session) { try store.setLabel(.onGoal, segmentId: row.id) }
+        return try store.exportCSV().split(separator: "\n").dropFirst().map { $0.split(separator: ",") }
+    }
+
+    func testExportsFromDifferentInstallsMergeWithoutCollisions() throws {
+        let otherURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("drift-labeling-\(UUID().uuidString).sqlite")
+        let other = LabelingStore(url: otherURL)
+        defer { other.wipe() }
+
+        // Both installs number their rows 1, 2, 3 locally; the exported IDs must still differ.
+        let mine = try exportedRows(store, user: "u1", session: "s1")
+        let theirs = try exportedRows(other, user: "u2", session: "s2")
+        XCTAssertEqual(try store.segments(sessionId: "s1").map(\.id), try other.segments(sessionId: "s2").map(\.id))
+
+        let merged = mine + theirs
+        XCTAssertEqual(Set(merged.map { $0.last! }).count, merged.count, "segment_id is unique across installs")
+        XCTAssertEqual(Set(merged.map { $0[8] }), ["u1", "u2"])
+    }
+
+    func testReexportKeepsSegmentIDsSoDuplicatesCanBeDropped() throws {
+        let first = try exportedRows(store, user: "u1", session: "s1")
+        let second = try store.exportCSV().split(separator: "\n").dropFirst().map { $0.split(separator: ",") }
+        XCTAssertEqual(first.map { $0.last! }, second.map { $0.last! })
+    }
+
+    func testMigrationBackfillsSegmentIDsInExistingDatabase() throws {
+        // A database written before segment IDs existed (user_version 0, no uid column).
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &db), SQLITE_OK)
+        sqlite3_exec(db, """
+            CREATE TABLE sessions (session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL,
+                goal TEXT NOT NULL DEFAULT '', started_at REAL NOT NULL, ended_at REAL);
+            CREATE TABLE segments (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL,
+                ts REAL NOT NULL, bundle_id TEXT NOT NULL, app TEXT NOT NULL, domain TEXT,
+                title TEXT NOT NULL, dwell_s REAL NOT NULL, label TEXT, labeled_at REAL);
+            INSERT INTO sessions VALUES ('old', 'u1', 'g', 0, 1);
+            INSERT INTO segments (session_id, ts, bundle_id, app, title, dwell_s, label)
+                VALUES ('old', 0, 'b', 'A', 'T1', 30, 'on_goal'), ('old', 60, 'b', 'A', 'T2', 30, 'off_goal');
+            """, nil, nil, nil)
+        sqlite3_close(db)
+
+        let rows = try store.exportCSV().split(separator: "\n").dropFirst().map { $0.split(separator: ",") }
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(Set(rows.map { $0.last! }).count, 2)
+        XCTAssertTrue(rows.allSatisfy { $0.last!.count == 32 })
     }
 
     func testAbandonedSessionBecomesReviewable() throws {
