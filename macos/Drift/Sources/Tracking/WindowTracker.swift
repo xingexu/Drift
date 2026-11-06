@@ -375,12 +375,10 @@ class WindowTracker: ObservableObject {
                 timestamp: lastEventTimestamp,
                 durationMs: durationMs
             )
+            // Keep every event for the session: insights (longest focus block,
+            // switch counts, Study results) are computed from the full list,
+            // so trimming the head silently corrupts them on long sessions.
             AppState.shared.session.events.append(event)
-
-            // Cap event history to prevent unbounded memory growth.
-            if AppState.shared.session.events.count > 200 {
-                AppState.shared.session.events.removeFirst()
-            }
         }
 
         previousApp = newApp
@@ -416,10 +414,6 @@ class WindowTracker: ObservableObject {
             timestamp: lastEventTimestamp,
             durationMs: durationMs
         ))
-
-        if AppState.shared.session.events.count > 200 {
-            AppState.shared.session.events.removeFirst()
-        }
 
         lastEventTimestamp = now
     }
