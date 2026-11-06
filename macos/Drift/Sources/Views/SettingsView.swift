@@ -95,6 +95,7 @@ struct SettingsView: View {
     @EnvironmentObject private var tracker: WindowTracker
     @StateObject private var blocker = FocusBlocker.shared
     @ObservedObject private var labeling = LabelingRecorder.shared
+    @ObservedObject private var permissions = PermissionMonitor.shared
     @State private var destination: SettingsDestination = .general
     @State private var rulesScope: RulesScope = .apps
     @State private var rulesSearch = ""
@@ -266,16 +267,17 @@ struct SettingsView: View {
             permissionRow(
                 title: "Accessibility",
                 explanation: "Reads the active app and window title.",
-                granted: AXIsProcessTrusted(),
+                state: permissions.accessibility,
                 privacyPane: "Privacy_Accessibility"
             )
             permissionRow(
                 title: "Browser Automation",
                 explanation: "Reads the active tab URL in supported browsers.",
-                granted: !tracker.activeURL.isEmpty,
+                state: permissions.browserAutomation,
                 privacyPane: "Privacy_Automation"
             )
         }
+        .onAppear { permissions.refresh() }
     }
 
     private var rulesSettings: some View {
@@ -467,20 +469,29 @@ struct SettingsView: View {
     private func permissionRow(
         title: String,
         explanation: String,
-        granted: Bool,
+        state: PermissionState,
         privacyPane: String
     ) -> some View {
-        SettingsRow(title: title, explanation: explanation) {
+        let (text, icon, color): (String, String, Color) = switch state {
+        case .granted: ("Granted", "checkmark.circle.fill", .productive)
+        case .denied: ("Required", "exclamationmark.circle.fill", .distraction)
+        // macOS asks on first use; not an error yet.
+        case .notDetermined: ("Not asked yet", "circle.dashed", .driftMuted)
+        // Automation can only be checked while a supported browser runs.
+        case .unknown: ("Open a browser to check", "questionmark.circle", .driftMuted)
+        }
+        return SettingsRow(title: title, explanation: explanation) {
             HStack(spacing: 12) {
-                Label(
-                    granted ? "Granted" : "Required",
-                    systemImage: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
-                )
-                .font(TypeScale.caption)
-                .foregroundStyle(granted ? Color.productive : Color.distraction)
+                Label(text, systemImage: icon)
+                    .font(TypeScale.caption)
+                    .foregroundStyle(color)
+                    .lineLimit(1)
 
-                SecondaryPillButton(title: "Open System Settings", icon: "arrow.up.right") {
-                    openPrivacyPane(privacyPane)
+                if state != .granted {
+                    SecondaryPillButton(title: "Open Settings", icon: "arrow.up.right") {
+                        openPrivacyPane(privacyPane)
+                    }
+                    .help("Open System Settings → Privacy & Security")
                 }
             }
         }
