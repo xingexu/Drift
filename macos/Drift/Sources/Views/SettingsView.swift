@@ -505,16 +505,22 @@ struct SettingsView: View {
                 IconBadge(systemName: "globe", color: .sand, size: 38)
             }
 
+            let isOverridden = appState.classificationOverride(for: item.key) != nil
             VStack(alignment: .leading, spacing: 3) {
+                // Middle truncation keeps both ends of long names readable;
+                // the name gets layout priority so it truncates last.
                 Text(item.name)
                     .font(TypeScale.heading)
                     .lineLimit(1)
-                Text(item.key.hasPrefix("app:") ? "Application" : "Website")
+                    .truncationMode(.middle)
+                    .help(item.name)
+                Text("\(item.key.hasPrefix("app:") ? "Application" : "Website") · \(isOverridden ? "Your rule" : "Built-in")")
                     .font(TypeScale.caption)
-                    .foregroundStyle(Color.driftMuted)
+                    .foregroundStyle(isOverridden ? Color.sand : Color.driftMuted)
             }
+            .layoutPriority(1)
 
-            Spacer()
+            Spacer(minLength: Space.sm)
 
             TactileMenu(
                 selection: Binding(
@@ -527,11 +533,19 @@ struct SettingsView: View {
             )
             .frame(width: 166)
 
-            TertiaryButton(title: "Reset override") {
-                appState.removeClassificationOverride(for: item.key)
+            // Only rules the user changed can be reset; keep the slot so menus
+            // stay aligned down the list.
+            Group {
+                if isOverridden {
+                    TertiaryButton(title: "Reset") {
+                        appState.removeClassificationOverride(for: item.key)
+                    }
+                    .help("Return \(item.name) to its built-in category")
+                } else {
+                    Color.clear
+                }
             }
-            .disabled(appState.classificationOverride(for: item.key) == nil)
-            .opacity(appState.classificationOverride(for: item.key) == nil ? 0.45 : 1)
+            .frame(width: 76)
         }
         .padding(.horizontal, Space.lg)
         .frame(minHeight: 64)
